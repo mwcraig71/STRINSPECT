@@ -114,7 +114,7 @@ export function DefectCard({ record, isLegacy, onEdit }: DefectCardProps) {
             )}
           </View>
           {record.locationDesc ? (
-            <Text style={[styles.desc, { color: c.mutedForeground }]} numberOfLines={2}>
+            <Text style={[styles.desc, { color: c.mutedForeground }]} numberOfLines={1}>
               {record.locationDesc}
             </Text>
           ) : null}
@@ -148,28 +148,29 @@ export function DefectCard({ record, isLegacy, onEdit }: DefectCardProps) {
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 14,
+    borderRadius: 10,
     borderWidth: 1,
-    borderLeftWidth: 4,
-    padding: 12,
-    marginBottom: 8,
+    borderLeftWidth: 3,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    marginBottom: 4,
   },
-  row: { flexDirection: "row", gap: 10, alignItems: "flex-start" },
-  thumb: { width: 52, height: 52, borderRadius: 8 },
-  main: { flex: 1, gap: 3 },
-  topRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  location: { fontSize: 11, fontWeight: "800", textTransform: "uppercase" },
-  env: { fontSize: 10, fontWeight: "600" },
-  elementName: { fontSize: 13, fontWeight: "800", textTransform: "uppercase" },
-  badges: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 2 },
-  csBadge: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
-  csBadgeText: { fontSize: 10, fontWeight: "900", color: "#fff" },
-  qty: { fontSize: 10, fontWeight: "700" },
-  flagBadge: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
-  flagText: { fontSize: 10, fontWeight: "700" },
-  photoCount: { flexDirection: "row", alignItems: "center", gap: 3 },
-  photoCountText: { fontSize: 10, fontWeight: "700" },
-  desc: { fontSize: 11, fontStyle: "italic", marginTop: 2 },
-  actions: { gap: 6, alignItems: "center" },
-  actionBtn: { padding: 8, borderRadius: 10 },
+  row: { flexDirection: "row", gap: 7, alignItems: "center" },
+  thumb: { width: 32, height: 32, borderRadius: 6 },
+  main: { flex: 1, gap: 1 },
+  topRow: { flexDirection: "row", alignItems: "center", gap: 5 },
+  location: { fontSize: 9, fontWeight: "800", textTransform: "uppercase" },
+  env: { fontSize: 9, fontWeight: "600" },
+  elementName: { fontSize: 11, fontWeight: "800", textTransform: "uppercase" },
+  badges: { flexDirection: "row", alignItems: "center", gap: 4, flexWrap: "wrap" },
+  csBadge: { paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 },
+  csBadgeText: { fontSize: 9, fontWeight: "900", color: "#fff" },
+  qty: { fontSize: 9, fontWeight: "700" },
+  flagBadge: { flexDirection: "row", alignItems: "center", gap: 2, paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4 },
+  flagText: { fontSize: 9, fontWeight: "700" },
+  photoCount: { flexDirection: "row", alignItems: "center", gap: 2 },
+  photoCountText: { fontSize: 9, fontWeight: "700" },
+  desc: { fontSize: 10, fontStyle: "italic" },
+  actions: { gap: 4, alignItems: "center", flexDirection: "row" },
+  actionBtn: { padding: 6, borderRadius: 8 },
 });

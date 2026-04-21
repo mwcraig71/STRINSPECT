@@ -41,6 +41,7 @@ export default function InspectionScreen() {
   const c = useColors();
   const {
     inspectionType,
+    setInspectionType,
     editId,
     setEditId,
     currentLocation,
@@ -178,6 +179,34 @@ export default function InspectionScreen() {
         keyboardShouldPersistTaps="handled"
         bottomOffset={24}
       >
+        {/* ── Module Toggle ── */}
+        <View style={[styles.moduleToggleRow, { backgroundColor: c.card, borderColor: c.border }]}>
+          <TouchableOpacity
+            style={[
+              styles.moduleToggleBtn,
+              inspectionType === INSPECTION_TYPES.TOPSIDE
+                ? { backgroundColor: "#0284c7" }
+                : { backgroundColor: c.background, borderColor: c.border },
+            ]}
+            onPress={() => setInspectionType(INSPECTION_TYPES.TOPSIDE)}
+          >
+            <Feather name="arrow-up" size={14} color={inspectionType === INSPECTION_TYPES.TOPSIDE ? "#fff" : c.mutedForeground} />
+            <Text style={[styles.moduleToggleBtnText, { color: inspectionType === INSPECTION_TYPES.TOPSIDE ? "#fff" : c.mutedForeground }]}>Topside</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.moduleToggleBtn,
+              inspectionType === INSPECTION_TYPES.UNDERSIDE
+                ? { backgroundColor: "#0f172a" }
+                : { backgroundColor: c.background, borderColor: c.border },
+            ]}
+            onPress={() => setInspectionType(INSPECTION_TYPES.UNDERSIDE)}
+          >
+            <Feather name="arrow-down" size={14} color={inspectionType === INSPECTION_TYPES.UNDERSIDE ? "#38bdf8" : c.mutedForeground} />
+            <Text style={[styles.moduleToggleBtnText, { color: inspectionType === INSPECTION_TYPES.UNDERSIDE ? "#38bdf8" : c.mutedForeground }]}>Underside</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* ── Location ── */}
         <View style={[styles.section, { backgroundColor: c.card, borderTopColor: c.headerBg }]}>
           <Text style={[styles.sectionLabel, { color: c.mutedForeground }]}>Location</Text>
@@ -366,26 +395,24 @@ export default function InspectionScreen() {
           {/* Photos */}
           <View style={styles.photoSection}>
             <View style={styles.photoSectionHeader}>
-              <View style={styles.photoSectionLeft}>
-                <Feather name="image" size={14} color={c.mutedForeground} />
-                <Text style={[styles.fieldLabel, { color: c.mutedForeground }]}>Photos</Text>
-              </View>
-              <View style={styles.photoBtns}>
-                <TouchableOpacity
-                  style={[styles.photoBtn, { backgroundColor: c.secondary }]}
-                  onPress={addPhoto}
-                >
-                  <Feather name="image" size={13} color={c.foreground} />
-                  <Text style={[styles.photoBtnText, { color: c.foreground }]}>Library</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.photoBtn, { backgroundColor: c.primary }]}
-                  onPress={capturePhoto}
-                >
-                  <Feather name="camera" size={13} color="#fff" />
-                  <Text style={[styles.photoBtnText, { color: "#fff" }]}>Capture</Text>
-                </TouchableOpacity>
-              </View>
+              <Feather name="image" size={14} color={c.mutedForeground} />
+              <Text style={[styles.fieldLabel, { color: c.mutedForeground }]}>Photos</Text>
+            </View>
+            <View style={styles.photoBtns}>
+              <TouchableOpacity
+                style={[styles.photoBtnLarge, { backgroundColor: c.secondary, borderColor: c.border }]}
+                onPress={addPhoto}
+              >
+                <Feather name="image" size={18} color={c.foreground} />
+                <Text style={[styles.photoBtnLargeText, { color: c.foreground }]}>Library</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.photoBtnLarge, { backgroundColor: c.primary, borderColor: c.primary }]}
+                onPress={capturePhoto}
+              >
+                <Feather name="camera" size={18} color="#fff" />
+                <Text style={[styles.photoBtnLargeText, { color: "#fff" }]}>Capture</Text>
+              </TouchableOpacity>
             </View>
             {photos.map((p, idx) => (
               <View key={idx} style={[styles.photoRow, { backgroundColor: c.secondary, borderColor: c.border }]}>
@@ -407,12 +434,12 @@ export default function InspectionScreen() {
           </View>
 
           {/* Critical + Maintenance flags */}
-          <View style={styles.twoCol}>
+          <View style={styles.flagRow}>
             <Pressable
               style={[
-                styles.flagCard,
+                styles.flagPill,
                 isCritical
-                  ? { backgroundColor: "#fef2f2", borderColor: "#dc2626" }
+                  ? { backgroundColor: "#dc2626", borderColor: "#dc2626" }
                   : { backgroundColor: c.secondary, borderColor: c.border },
               ]}
               onPress={() => {
@@ -420,19 +447,14 @@ export default function InspectionScreen() {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               }}
             >
-              <View style={[styles.checkbox, isCritical && { backgroundColor: "#dc2626", borderColor: "#dc2626" }, { borderColor: c.border }]}>
-                {isCritical && <Feather name="check" size={14} color="#fff" />}
-              </View>
-              <Text style={[styles.flagLabel, { color: isCritical ? "#dc2626" : c.mutedForeground }]}>
-                Critical Finding
-              </Text>
-              {isCritical && <Feather name="alert-triangle" size={18} color="#dc2626" />}
+              <Feather name="alert-triangle" size={13} color={isCritical ? "#fff" : c.mutedForeground} />
+              <Text style={[styles.flagPillText, { color: isCritical ? "#fff" : c.mutedForeground }]}>Critical</Text>
             </Pressable>
             <Pressable
               style={[
-                styles.flagCard,
+                styles.flagPill,
                 isMaintenance
-                  ? { backgroundColor: "#eff6ff", borderColor: c.primary }
+                  ? { backgroundColor: c.primary, borderColor: c.primary }
                   : { backgroundColor: c.secondary, borderColor: c.border },
               ]}
               onPress={() => {
@@ -440,13 +462,8 @@ export default function InspectionScreen() {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               }}
             >
-              <View style={[styles.checkbox, isMaintenance && { backgroundColor: c.primary, borderColor: c.primary }, { borderColor: c.border }]}>
-                {isMaintenance && <Feather name="check" size={14} color="#fff" />}
-              </View>
-              <Text style={[styles.flagLabel, { color: isMaintenance ? c.primary : c.mutedForeground }]}>
-                Maintenance Req
-              </Text>
-              {isMaintenance && <Feather name="tool" size={18} color={c.primary} />}
+              <Feather name="tool" size={13} color={isMaintenance ? "#fff" : c.mutedForeground} />
+              <Text style={[styles.flagPillText, { color: isMaintenance ? "#fff" : c.mutedForeground }]}>Maintenance</Text>
             </Pressable>
           </View>
         </View>
@@ -678,31 +695,54 @@ const styles = StyleSheet.create({
     minHeight: 80,
     textAlignVertical: "top",
   },
-  photoSection: { gap: 8 },
-  photoSectionHeader: {
+  moduleToggleRow: {
+    flexDirection: "row",
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: "hidden",
+    gap: 0,
+  },
+  moduleToggleBtn: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 12,
+    borderWidth: 1,
   },
-  photoSectionLeft: { flexDirection: "row", alignItems: "center", gap: 6 },
+  moduleToggleBtnText: { fontSize: 12, fontWeight: "900", textTransform: "uppercase" },
+  photoSection: { gap: 8 },
+  photoSectionHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
   photoBtns: { flexDirection: "row", gap: 8 },
-  photoBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
-  photoBtnText: { fontSize: 10, fontWeight: "800", textTransform: "uppercase" },
+  photoBtnLarge: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+  },
+  photoBtnLargeText: { fontSize: 13, fontWeight: "800", textTransform: "uppercase" },
   photoRow: { flexDirection: "row", alignItems: "center", gap: 8, padding: 8, borderRadius: 10, borderWidth: 1 },
   photoThumb: { width: 50, height: 50, borderRadius: 8 },
   photoInfo: { flex: 1 },
   photoInput: { borderWidth: 1, borderRadius: 6, padding: 6, fontSize: 11 },
-  flagCard: {
+  flagRow: { flexDirection: "row", gap: 8 },
+  flagPill: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 2,
+    justifyContent: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1.5,
   },
-  checkbox: { width: 22, height: 22, borderRadius: 4, borderWidth: 2, alignItems: "center", justifyContent: "center" },
-  flagLabel: { flex: 1, fontSize: 9, fontWeight: "900", textTransform: "uppercase" },
+  flagPillText: { fontSize: 10, fontWeight: "900", textTransform: "uppercase" },
   saveBtn: {
     flexDirection: "row",
     alignItems: "center",
