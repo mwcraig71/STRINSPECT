@@ -11,7 +11,8 @@ import {
 } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
-import { useInspection, SNBI_ELEMENTS, NOMENCLATURES, INSPECTION_TYPES } from "@/context/InspectionContext";
+import { useInspection, ENVIRONMENTS, INSPECTION_TYPES } from "@/context/InspectionContext";
+import { SettingsModal } from "@/components/SettingsModal";
 
 const RATING_OPTIONS = ["9", "8", "7", "6", "5", "4", "3", "2", "1", "0", "N", "-"];
 
@@ -30,14 +31,16 @@ export default function NBIScreen() {
     nbiRatings,
     updateSubComponent,
     savedDefects,
-    nomenclature,
-    setNomenclature,
     inspectionType,
-    setInspectionType,
+    environment,
+    setEnvironment,
   } = useInspection();
   const [activeItem, setActiveItem] = useState("58");
   const [expandedComp, setExpandedComp] = useState<number | null>(null);
   const [ratingPickerOpen, setRatingPickerOpen] = useState<number | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [envOpen, setEnvOpen] = useState(false);
+  const [envPickerOpen, setEnvPickerOpen] = useState(false);
 
   const activeNbi = nbiRatings.find((r) => r.item === activeItem);
   const activeIdx = nbiRatings.findIndex((r) => r.item === activeItem);
@@ -46,47 +49,79 @@ export default function NBIScreen() {
     return savedDefects.filter((d) => snbiIds.includes(d.elementId));
   };
 
+  const currentEnvName = ENVIRONMENTS.find((e) => e.id === environment)?.name || "Benign";
+
   return (
     <View style={[styles.container, { backgroundColor: c.background }]}>
-      {/* Header */}
+      {/* Slim Header */}
       <View style={[styles.header, { backgroundColor: c.headerBg }]}>
-        <View style={styles.headerTop}>
-          <View style={styles.headerInner}>
-            <Feather name="bar-chart-2" size={20} color="#38bdf8" />
-            <Text style={styles.headerTitle}>NBI Ratings</Text>
-          </View>
-          <View style={styles.headerControls}>
-            <View style={[styles.nomToggle, { backgroundColor: "#1e293b" }]}>
-              <TouchableOpacity
-                style={[styles.nomBtn, nomenclature === NOMENCLATURES.TXDOT && styles.nomBtnActive]}
-                onPress={() => setNomenclature(NOMENCLATURES.TXDOT)}
-              >
-                <Text style={[styles.nomBtnText, nomenclature === NOMENCLATURES.TXDOT && styles.nomBtnTextActive]}>TX</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.nomBtn, nomenclature === NOMENCLATURES.NCDOT && styles.nomBtnActive]}
-                onPress={() => setNomenclature(NOMENCLATURES.NCDOT)}
-              >
-                <Text style={[styles.nomBtnText, nomenclature === NOMENCLATURES.NCDOT && styles.nomBtnTextActive]}>NC</Text>
-              </TouchableOpacity>
+        <View style={styles.headerRow}>
+          <View style={styles.headerTitle}>
+            <Feather name="bar-chart-2" size={16} color="#38bdf8" />
+            <Text style={styles.headerTitleText}>NBI Ratings</Text>
+            <View style={[styles.modulePill, { backgroundColor: inspectionType === INSPECTION_TYPES.TOPSIDE ? "#0284c7" : "#1e293b" }]}>
+              <Text style={styles.modulePillText}>{inspectionType === INSPECTION_TYPES.TOPSIDE ? "▲" : "▼"} {inspectionType}</Text>
             </View>
           </View>
+          <TouchableOpacity style={[styles.gearBtn, { backgroundColor: "#1e293b" }]} onPress={() => setSettingsOpen(true)}>
+            <Feather name="settings" size={16} color="#94a3b8" />
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity
-          style={[
-            styles.moduleToggle,
-            inspectionType === INSPECTION_TYPES.TOPSIDE
-              ? { backgroundColor: "#0284c7", borderColor: "#0ea5e9" }
-              : { backgroundColor: "#1e293b", borderColor: "#334155" },
-          ]}
-          onPress={() => setInspectionType(inspectionType === INSPECTION_TYPES.TOPSIDE ? INSPECTION_TYPES.UNDERSIDE : INSPECTION_TYPES.TOPSIDE)}
-        >
-          <Feather name="refresh-cw" size={14} color={inspectionType === INSPECTION_TYPES.TOPSIDE ? "#fff" : "#38bdf8"} />
-          <Text style={[styles.moduleToggleText, { color: inspectionType === INSPECTION_TYPES.TOPSIDE ? "#fff" : "#38bdf8" }]}>
-            Active Module: {inspectionType}
-          </Text>
-        </TouchableOpacity>
       </View>
+      <SettingsModal visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
+
+      {/* Site Environmental Conditions — collapsible */}
+      <TouchableOpacity
+        style={[styles.envBanner, { backgroundColor: c.card, borderBottomColor: c.border }]}
+        onPress={() => setEnvOpen(!envOpen)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.envBannerLeft}>
+          <Feather name="wind" size={13} color={c.mutedForeground} />
+          <Text style={[styles.envBannerLabel, { color: c.mutedForeground }]}>Site Environment:</Text>
+          <Text style={[styles.envBannerValue, { color: c.foreground }]}>{currentEnvName}</Text>
+        </View>
+        <Feather name={envOpen ? "chevron-up" : "chevron-down"} size={14} color={c.mutedForeground} />
+      </TouchableOpacity>
+
+      {envOpen && (
+        <View style={[styles.envPanel, { backgroundColor: c.card, borderBottomColor: c.border }]}>
+          <Text style={[styles.envPanelLabel, { color: c.mutedForeground }]}>
+            Site Environmental Conditions — affects element corrosion ratings
+          </Text>
+          <TouchableOpacity
+            style={[styles.picker, { backgroundColor: c.background, borderColor: c.border }]}
+            onPress={() => setEnvPickerOpen(!envPickerOpen)}
+          >
+            <Text style={[styles.pickerValue, { color: c.foreground }]}>{currentEnvName}</Text>
+            <Feather name={envPickerOpen ? "chevron-up" : "chevron-down"} size={16} color={c.mutedForeground} />
+          </TouchableOpacity>
+          {envPickerOpen && (
+            <View style={[styles.dropdownList, { borderColor: c.border }]}>
+              {ENVIRONMENTS.map((env) => (
+                <TouchableOpacity
+                  key={env.id}
+                  style={[
+                    styles.dropdownItem,
+                    environment === env.id && { backgroundColor: c.primary + "20" },
+                    { borderBottomColor: c.border },
+                  ]}
+                  onPress={() => {
+                    setEnvironment(env.id);
+                    setEnvPickerOpen(false);
+                    setEnvOpen(false);
+                  }}
+                >
+                  <Text style={[styles.dropdownItemText, { color: environment === env.id ? c.primary : c.foreground }]}>
+                    {env.name}
+                  </Text>
+                  {environment === env.id && <Feather name="check" size={13} color={c.primary} />}
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
+      )}
 
       {/* Tab strip */}
       <View style={[styles.tabStrip, { backgroundColor: c.card, borderBottomColor: c.border }]}>
@@ -283,32 +318,62 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
     paddingTop: Platform.OS === "web" ? 67 : 0,
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    gap: 10,
+    paddingHorizontal: 14,
+    paddingBottom: 8,
   },
-  headerTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 12 },
-  headerControls: { flexDirection: "row", alignItems: "center", gap: 8 },
-  headerInner: { flexDirection: "row", alignItems: "center", gap: 8 },
-  headerTitle: { fontSize: 20, fontWeight: "900", color: "#f8fafc", textTransform: "uppercase" },
-  nomToggle: { flexDirection: "row", borderRadius: 8, padding: 3, gap: 2 },
-  nomBtn: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
-  nomBtnActive: { backgroundColor: "#0284c7" },
-  nomBtnText: { fontSize: 11, fontWeight: "900", color: "#64748b" },
-  nomBtnTextActive: { color: "#fff" },
-  moduleToggle: {
+  headerRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 2,
+    justifyContent: "space-between",
+    paddingTop: 8,
   },
-  moduleToggleText: { fontSize: 12, fontWeight: "900", textTransform: "uppercase", letterSpacing: 1 },
-  tabStrip: {
+  headerTitle: { flexDirection: "row", alignItems: "center", gap: 7 },
+  headerTitleText: { fontSize: 14, fontWeight: "900", color: "#f8fafc", letterSpacing: -0.3, textTransform: "uppercase" },
+  modulePill: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
+  modulePillText: { fontSize: 9, fontWeight: "900", color: "#fff", textTransform: "uppercase", letterSpacing: 0.5 },
+  gearBtn: { padding: 8, borderRadius: 10 },
+  envBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     borderBottomWidth: 1,
   },
+  envBannerLeft: { flexDirection: "row", alignItems: "center", gap: 7 },
+  envBannerLabel: { fontSize: 10, fontWeight: "700", textTransform: "uppercase" },
+  envBannerValue: { fontSize: 11, fontWeight: "800" },
+  envPanel: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    gap: 10,
+  },
+  envPanelLabel: { fontSize: 10, fontWeight: "600", lineHeight: 14 },
+  picker: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 11,
+  },
+  pickerValue: { fontSize: 13, fontWeight: "700", flex: 1 },
+  dropdownList: {
+    borderWidth: 1,
+    borderRadius: 10,
+    maxHeight: 200,
+    overflow: "hidden",
+  },
+  dropdownItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 12,
+    borderBottomWidth: 1,
+  },
+  dropdownItemText: { fontSize: 13, fontWeight: "700" },
+  tabStrip: { borderBottomWidth: 1 },
   tabStripContent: { padding: 8, gap: 6 },
   tab: {
     paddingHorizontal: 16,

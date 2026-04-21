@@ -19,16 +19,14 @@ import {
 import { useColors } from "@/hooks/useColors";
 import {
   DEFECTS_BY_ELEMENT,
-  ENVIRONMENTS,
   INSPECTION_TYPES,
-  NOMENCLATURES,
   PhotoItem,
-  SNBI_ELEMENTS,
   useInspection,
 } from "@/context/InspectionContext";
 import { DefectCard } from "@/components/DefectCard";
 import { CIFModal } from "@/components/CIFModal";
 import { FUAModal } from "@/components/FUAModal";
+import { SettingsModal } from "@/components/SettingsModal";
 import colors from "@/constants/colors";
 
 const CS_OPTIONS = ["CS1", "CS2", "CS3", "CS4"] as const;
@@ -42,18 +40,13 @@ const CS_COLORS: Record<string, string> = {
 export default function InspectionScreen() {
   const c = useColors();
   const {
-    nomenclature,
-    setNomenclature,
     inspectionType,
-    setInspectionType,
     editId,
     setEditId,
     currentLocation,
     setCurrentLocation,
     element,
     setElement,
-    environment,
-    setEnvironment,
     defect,
     setDefect,
     conditionState,
@@ -86,17 +79,12 @@ export default function InspectionScreen() {
     setRangeMax,
     syncToCurrentLoc,
     setSyncToCurrentLoc,
-    simulateLegacyImport,
-    parsingActive,
   } = useInspection();
 
-  const NOM = NOMENCLATURES;
-  const INSP = INSPECTION_TYPES;
-
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [locationPickerOpen, setLocationPickerOpen] = useState(false);
   const [elementPickerOpen, setElementPickerOpen] = useState(false);
   const [defectPickerOpen, setDefectPickerOpen] = useState(false);
-  const [envPickerOpen, setEnvPickerOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   const addPhoto = async () => {
@@ -169,55 +157,20 @@ export default function InspectionScreen() {
     <View style={[styles.container, { backgroundColor: c.background }]}>
       {/* ── App Header ── */}
       <View style={[styles.appHeader, { backgroundColor: c.headerBg }]}>
-        <View style={styles.headerTop}>
+        <View style={styles.headerRow}>
           <View style={styles.headerTitle}>
-            <Feather name="activity" size={20} color="#38bdf8" />
+            <Feather name="activity" size={16} color="#38bdf8" />
             <Text style={styles.headerTitleText}>Bridge Inspection</Text>
-          </View>
-          <View style={styles.headerRight}>
-            <TouchableOpacity
-              style={[styles.importBtn, { backgroundColor: "#1e293b" }]}
-              onPress={simulateLegacyImport}
-              disabled={parsingActive}
-            >
-              {parsingActive ? (
-                <Feather name="loader" size={12} color="#94a3b8" />
-              ) : (
-                <Feather name="upload" size={12} color="#94a3b8" />
-              )}
-              <Text style={styles.importBtnText}>Import</Text>
-            </TouchableOpacity>
-            <View style={[styles.nomToggle, { backgroundColor: "#1e293b" }]}>
-              <TouchableOpacity
-                style={[styles.nomBtn, nomenclature === NOM.TXDOT && styles.nomBtnActive]}
-                onPress={() => setNomenclature(NOM.TXDOT)}
-              >
-                <Text style={[styles.nomBtnText, nomenclature === NOM.TXDOT && styles.nomBtnTextActive]}>TX</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.nomBtn, nomenclature === NOM.NCDOT && styles.nomBtnActive]}
-                onPress={() => setNomenclature(NOM.NCDOT)}
-              >
-                <Text style={[styles.nomBtnText, nomenclature === NOM.NCDOT && styles.nomBtnTextActive]}>NC</Text>
-              </TouchableOpacity>
+            <View style={[styles.modulePill, { backgroundColor: inspectionType === INSPECTION_TYPES.TOPSIDE ? "#0284c7" : "#1e293b" }]}>
+              <Text style={styles.modulePillText}>{inspectionType === INSPECTION_TYPES.TOPSIDE ? "▲" : "▼"} {inspectionType}</Text>
             </View>
           </View>
+          <TouchableOpacity style={[styles.gearBtn, { backgroundColor: "#1e293b" }]} onPress={() => setSettingsOpen(true)}>
+            <Feather name="settings" size={16} color="#94a3b8" />
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity
-          style={[
-            styles.moduleToggle,
-            inspectionType === INSP.TOPSIDE
-              ? { backgroundColor: "#0284c7", borderColor: "#0ea5e9" }
-              : { backgroundColor: "#1e293b", borderColor: "#334155" },
-          ]}
-          onPress={() => setInspectionType(inspectionType === INSP.TOPSIDE ? INSP.UNDERSIDE : INSP.TOPSIDE)}
-        >
-          <Feather name="refresh-cw" size={14} color={inspectionType === INSP.TOPSIDE ? "#fff" : "#38bdf8"} />
-          <Text style={[styles.moduleToggleText, { color: inspectionType === INSP.TOPSIDE ? "#fff" : "#38bdf8" }]}>
-            Active Module: {inspectionType}
-          </Text>
-        </TouchableOpacity>
       </View>
+      <SettingsModal visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
       <KeyboardAwareScrollViewCompat
         style={styles.scroll}
@@ -398,40 +351,6 @@ export default function InspectionScreen() {
               />
             </View>
           </View>
-
-          {/* Environment */}
-          <Text style={[styles.fieldLabel, { color: c.mutedForeground }]}>Environment</Text>
-          <TouchableOpacity
-            style={[styles.picker, { backgroundColor: c.background, borderColor: c.border }]}
-            onPress={() => setEnvPickerOpen(!envPickerOpen)}
-          >
-            <Text style={[styles.pickerValue, { color: c.foreground }]}>
-              {ENVIRONMENTS.find((e) => e.id === environment)?.name || "Select..."}
-            </Text>
-            <Feather name={envPickerOpen ? "chevron-up" : "chevron-down"} size={18} color={c.mutedForeground} />
-          </TouchableOpacity>
-          {envPickerOpen && (
-            <View style={[styles.dropdownList, { borderColor: c.border }]}>
-              {ENVIRONMENTS.map((env) => (
-                <TouchableOpacity
-                  key={env.id}
-                  style={[
-                    styles.dropdownItem,
-                    environment === env.id && { backgroundColor: c.primary + "20" },
-                    { borderBottomColor: c.border },
-                  ]}
-                  onPress={() => {
-                    setEnvironment(env.id);
-                    setEnvPickerOpen(false);
-                  }}
-                >
-                  <Text style={[styles.dropdownItemText, { color: environment === env.id ? c.primary : c.foreground }]}>
-                    {env.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
 
           {/* Notes */}
           <Text style={[styles.fieldLabel, { color: c.mutedForeground }]}>Defect Notes</Text>
@@ -690,36 +609,20 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   appHeader: {
     paddingTop: Platform.OS === "web" ? 67 : 0,
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    gap: 10,
+    paddingHorizontal: 14,
+    paddingBottom: 8,
   },
-  headerTop: {
+  headerRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingTop: 12,
+    paddingTop: 8,
   },
-  headerTitle: { flexDirection: "row", alignItems: "center", gap: 8 },
-  headerTitleText: { fontSize: 18, fontWeight: "900", color: "#f8fafc", letterSpacing: -0.5, textTransform: "uppercase" },
-  headerRight: { flexDirection: "row", alignItems: "center", gap: 8 },
-  importBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8 },
-  importBtnText: { fontSize: 9, fontWeight: "800", color: "#94a3b8", textTransform: "uppercase" },
-  nomToggle: { flexDirection: "row", borderRadius: 8, padding: 3, gap: 2 },
-  nomBtn: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
-  nomBtnActive: { backgroundColor: "#0284c7" },
-  nomBtnText: { fontSize: 11, fontWeight: "900", color: "#64748b" },
-  nomBtnTextActive: { color: "#fff" },
-  moduleToggle: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 2,
-  },
-  moduleToggleText: { fontSize: 12, fontWeight: "900", textTransform: "uppercase", letterSpacing: 1 },
+  headerTitle: { flexDirection: "row", alignItems: "center", gap: 7 },
+  headerTitleText: { fontSize: 14, fontWeight: "900", color: "#f8fafc", letterSpacing: -0.3, textTransform: "uppercase" },
+  modulePill: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
+  modulePillText: { fontSize: 9, fontWeight: "900", color: "#fff", textTransform: "uppercase", letterSpacing: 0.5 },
+  gearBtn: { padding: 8, borderRadius: 10 },
   scroll: { flex: 1 },
   scrollContent: { padding: 12, gap: 12 },
   section: {
