@@ -1234,26 +1234,33 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           }
         }
 
-        setSavedDefects([...newDefects, ...savedDefects]);
+        setSavedDefectsState((prev) => {
+          const merged = [...newDefects, ...prev];
+          AsyncStorage.setItem(STORAGE_KEYS.SAVED_DEFECTS, JSON.stringify(merged)).catch(() => {});
+          return merged;
+        });
 
         if (nbi.length > 0) {
-          const updatedNbi = nbiRatings.map((item) => ({
-            ...item,
-            subComponents: item.subComponents.map((sub) => {
-              const match = nbi.find(
-                (r) => r.item === item.item && r.componentName === sub.name
-              );
-              if (!match) return sub;
-              const wasBlank = !sub.rating;
-              return {
-                ...sub,
-                rating: wasBlank ? match.rating : sub.rating,
-                previousComments: match.comment || sub.previousComments,
-                isImported: !!(match.rating || match.comment),
-              };
-            }),
-          }));
-          setNbiRatings(updatedNbi);
+          setNbiRatingsState((prevNbi) => {
+            const updated = prevNbi.map((item) => ({
+              ...item,
+              subComponents: item.subComponents.map((sub) => {
+                const match = nbi.find(
+                  (r) => r.item === item.item && r.componentName === sub.name
+                );
+                if (!match) return sub;
+                const wasBlank = !sub.rating;
+                return {
+                  ...sub,
+                  rating: wasBlank ? match.rating : sub.rating,
+                  previousComments: match.comment || sub.previousComments,
+                  isImported: !!(match.rating || match.comment),
+                };
+              }),
+            }));
+            AsyncStorage.setItem(STORAGE_KEYS.NBI_RATINGS, JSON.stringify(updated)).catch(() => {});
+            return updated;
+          });
         }
 
         const { Alert } = require("react-native");
@@ -1273,7 +1280,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         setParsingActive(false);
       }
     },
-    [savedDefects, setSavedDefects, nbiRatings, setNbiRatings, setStructureNumber]
+    [setSavedDefectsState, setNbiRatingsState, setStructureNumber]
   );
 
   const value: InspectionContextType = {
