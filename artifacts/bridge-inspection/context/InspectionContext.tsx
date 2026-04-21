@@ -166,7 +166,7 @@ const SNBI_CODE_TO_DEFECT_ID: Record<string, string> = {
   "1080": "spall",
   "1090": "spall",
   "1100": "corr_s",
-  "1120": "crack",
+  "1120": "corr_s",
   "1130": "crack",
   "1190": "wear",
   "2000": "corr",
@@ -1193,8 +1193,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
             }
           } else {
             const defectName = row.elementName;
-            const snbiCodeMatch = defectName.match(/^(\d{4,})[- ]/);
-            const snbiCode = snbiCodeMatch?.[1] || "";
+            const snbiCode = row.defectCode || "";
             const internalDefectId =
               SNBI_CODE_TO_DEFECT_ID[snbiCode] ||
               DEFECTS_BY_ELEMENT[currentParentElementId]?.[0]?.id ||
@@ -1247,7 +1246,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
                 ...sub,
                 rating: wasBlank ? match.rating : sub.rating,
                 previousComments: match.comment || sub.previousComments,
-                isImported: wasBlank && !!match.rating,
+                isImported: !!(match.rating || match.comment),
               };
             }),
           }));

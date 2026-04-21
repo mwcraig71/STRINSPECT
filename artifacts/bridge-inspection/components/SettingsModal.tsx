@@ -4,7 +4,6 @@ import React from "react";
 import {
   Alert,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -52,11 +51,7 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
       if (result.canceled || !result.assets?.length) return;
       const asset = result.assets[0];
       onClose();
-      if (Platform.OS === "web" && (asset as any).file) {
-        await importFromPdf((asset as any).file as File);
-      } else {
-        await importFromPdf({ uri: asset.uri, name: asset.name });
-      }
+      await importFromPdf({ uri: asset.uri, name: asset.name });
     } catch (err: any) {
       Alert.alert("Error", err?.message || "Could not open document picker.");
     }

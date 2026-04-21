@@ -6,6 +6,7 @@ export interface ParsedElementRow {
   elementId: string;
   elementName: string;
   isDefect: boolean;
+  defectCode?: string;
   environment: string;
   totalQty: number;
   unit: string;
@@ -318,22 +319,26 @@ export function parseElementsTable(pages: string[][]): ParsedElementRow[] {
     }
 
     if (defectMatch) {
-      const defectId = defectMatch[1];
+      const defectCode = defectMatch[1];
       const defectNameRaw = defectMatch[2].trim();
-      const [, , cs2s, cs1s, cs3s, cs4s] = defectMatch;
+      const cs1 = parseInt(defectMatch[3]) || 0;
+      const cs2 = parseInt(defectMatch[4]) || 0;
+      const cs3 = parseInt(defectMatch[5]) || 0;
+      const cs4 = parseInt(defectMatch[6]) || 0;
 
       if (currentElement) {
         results.push({
           elementId: currentElement.elementId,
           elementName: defectNameRaw,
           isDefect: true,
+          defectCode,
           environment: currentElement.environment,
-          totalQty: 0,
+          totalQty: cs1 + cs2 + cs3 + cs4,
           unit: currentElement.unit,
-          cs1: parseInt(cs1s) || 0,
-          cs2: parseInt(cs2s) || 0,
-          cs3: parseInt(cs3s) || 0,
-          cs4: parseInt(cs4s) || 0,
+          cs1,
+          cs2,
+          cs3,
+          cs4,
         });
       }
       continue;
@@ -362,6 +367,7 @@ export function parseElementsTable(pages: string[][]): ParsedElementRow[] {
             elementId: currentElement.elementId,
             elementName: rawName,
             isDefect: true,
+            defectCode: id,
             environment: currentElement.environment,
             totalQty: last4.reduce((a, b) => a + b, 0),
             unit: currentElement.unit,
