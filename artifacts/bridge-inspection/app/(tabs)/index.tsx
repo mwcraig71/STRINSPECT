@@ -384,6 +384,18 @@ export default function InspectionScreen() {
             placeholderTextColor={c.mutedForeground}
           />
 
+          {/* ── Commit ── */}
+          <TouchableOpacity
+            style={[styles.saveBtn, { backgroundColor: c.headerBg }]}
+            onPress={onSave}
+            testID="save-button"
+          >
+            <Feather name="save" size={18} color="#fff" />
+            <Text style={styles.saveBtnText}>
+              {editId ? "UPDATE RECORD" : "COMMIT LOG"}
+            </Text>
+          </TouchableOpacity>
+
           {/* Photos */}
           <View style={styles.photoSection}>
             <View style={styles.photoSectionHeader}>
@@ -591,18 +603,6 @@ export default function InspectionScreen() {
             ))}
           </View>
         )}
-
-        {/* ── Save Button ── */}
-        <TouchableOpacity
-          style={[styles.saveBtn, { backgroundColor: c.headerBg }]}
-          onPress={onSave}
-          testID="save-button"
-        >
-          <Feather name="save" size={18} color="#fff" />
-          <Text style={styles.saveBtnText}>
-            {editId ? "UPDATE RECORD" : "COMMIT LOG"}
-          </Text>
-        </TouchableOpacity>
 
         <View style={{ height: 20 }} />
       </KeyboardAwareScrollViewCompat>
