@@ -226,7 +226,7 @@ export default function InspectionScreen() {
           )}
           <View style={styles.sectionHeader}>
             <Feather name="file-text" size={14} color={c.mutedForeground} />
-            <Text style={[styles.sectionLabel, { color: c.mutedForeground }]}>SNBI Data Acquisition</Text>
+            <Text style={[styles.sectionLabel, { color: c.mutedForeground }]}>Element Defect Data</Text>
           </View>
 
           {/* Element */}
