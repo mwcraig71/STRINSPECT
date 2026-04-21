@@ -604,7 +604,7 @@ export default function InspectionScreen() {
           </View>
         )}
 
-        <View style={{ height: 20 }} />
+        <View style={{ height: 100 }} />
       </KeyboardAwareScrollViewCompat>
 
       <CIFModal />
@@ -640,12 +640,12 @@ const styles = StyleSheet.create({
   moduleToggleHeaderText: { fontSize: 10, fontWeight: "900", textTransform: "uppercase", letterSpacing: 0.5 },
   gearBtn: { padding: 8, borderRadius: 10 },
   scroll: { flex: 1 },
-  scrollContent: { padding: 10, gap: 8 },
+  scrollContent: { padding: 12, gap: 12 },
   section: {
-    borderRadius: 12,
-    padding: 10,
+    borderRadius: 14,
+    padding: 14,
     borderTopWidth: 3,
-    gap: 7,
+    gap: 10,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
