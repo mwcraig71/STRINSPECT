@@ -39,9 +39,6 @@ export default function SummaryScreen() {
           <View style={styles.headerInner}>
             <Feather name="layers" size={16} color="#38bdf8" />
             <Text style={styles.headerTitle}>Summary Tables</Text>
-            <View style={[styles.modulePill, { backgroundColor: inspectionType === INSPECTION_TYPES.TOPSIDE ? "#0284c7" : "#1e293b" }]}>
-              <Text style={styles.modulePillText}>{inspectionType === INSPECTION_TYPES.TOPSIDE ? "▲" : "▼"} {inspectionType}</Text>
-            </View>
           </View>
           <TouchableOpacity style={[styles.gearBtn, { backgroundColor: "#1e293b" }]} onPress={() => setSettingsOpen(true)}>
             <Feather name="settings" size={16} color="#94a3b8" />
