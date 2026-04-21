@@ -105,12 +105,12 @@ export default function SummaryScreen() {
           )}
         </View>
 
-        {/* ── Maintenance Plan Summary ── */}
+        {/* ── Maintenance Plan ── */}
         <View style={[styles.card, { backgroundColor: c.card, borderColor: c.primary, borderWidth: 2 }]}>
           <View style={styles.cardHeader}>
             <View style={styles.cardHeaderLeft}>
               <Feather name="tool" size={20} color={c.primary} />
-              <Text style={[styles.cardTitle, { color: c.primary }]}>Maintenance Plan Summary</Text>
+              <Text style={[styles.cardTitle, { color: c.primary }]}>Maintenance Plan</Text>
             </View>
             <View style={[styles.countBadge, { backgroundColor: c.primary }]}>
               <Text style={styles.countBadgeText}>{maintenanceSummary.length} Items</Text>
