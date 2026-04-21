@@ -1,0 +1,915 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  Camera, 
+  Save, 
+  Trash2, 
+  AlertTriangle, 
+  Info, 
+  Plus, 
+  X,
+  Layout,
+  Layers,
+  History,
+  FileText,
+  UserCheck,
+  Image as ImageIcon,
+  Ruler,
+  TrendingDown,
+  Box,
+  Maximize2,
+  Edit2,
+  CheckCircle2,
+  BarChart3,
+  Globe,
+  ClipboardList,
+  ChevronDown,
+  ChevronUp,
+  MessageSquare,
+  Activity,
+  Zap,
+  Navigation,
+  ArrowDownCircle,
+  Eye,
+  Upload,
+  Check,
+  RotateCcw,
+  ShieldAlert,
+  ShieldCheck,
+  AlertCircle,
+  ArrowUpDown,
+  Filter,
+  LocateFixed,
+  Hash,
+  Wrench,
+  Phone,
+  Mail,
+  Send,
+  ClipboardCheck,
+  Printer,
+  FileDown,
+  Clock,
+  HardHat,
+  Copy,
+  RefreshCw
+} from 'lucide-react';
+
+// --- SNBI & Technical Constants ---
+
+const NOMENCLATURES = {
+  TXDOT: 'Texas (TxDOT)',
+  NCDOT: 'North Carolina (NCDOT)'
+};
+
+const INSPECTION_TYPES = {
+  TOPSIDE: 'Topside',
+  UNDERSIDE: 'Underside'
+};
+
+const ENVIRONMENTS = [
+  { id: '1', name: '1 - Benign' },
+  { id: '2', name: '2 - Low' },
+  { id: '3', name: '3 - Moderate' },
+  { id: '4', name: '4 - Severe' }
+];
+
+const SNBI_ELEMENTS = [
+  { id: '12', name: 'RC Deck', category: 'Deck', material: 'Concrete', unit: 'sq ft' },
+  { id: '38', name: 'RC Slab', category: 'Deck', material: 'Concrete', unit: 'sq ft' },
+  { id: '107', name: 'Steel Girder', category: 'Superstructure', material: 'Steel', unit: 'ft' },
+  { id: '109', name: 'PSC Girder', category: 'Superstructure', material: 'Concrete', unit: 'ft' },
+  { id: '205', name: 'RC Column', category: 'Substructure', material: 'Concrete', unit: 'ea' },
+  { id: '215', name: 'RC Abutment', category: 'Substructure', material: 'Concrete', unit: 'ft' },
+  { id: '225', name: 'RC Pile', category: 'Substructure', material: 'Concrete', unit: 'ea' },
+  { id: '226', name: 'Steel Pipe Pile', category: 'Substructure', material: 'Steel', unit: 'ea' },
+  { id: '228', name: 'Timber Pile', category: 'Substructure', material: 'Timber', unit: 'ea' },
+  { id: '234', name: 'RC Cap', category: 'Substructure', material: 'Concrete', unit: 'ft' },
+  { id: '310', name: 'Elastomeric Bearing', category: 'Bearing', material: 'Other', unit: 'ea' },
+  { id: '331', name: 'RC Bridge Railing', category: 'Railing', material: 'Concrete', unit: 'ft' },
+  { id: '300', name: 'Strip Seal Joint', category: 'Joint', material: 'Other', unit: 'ft' },
+  { id: '304', name: 'Open Joint', category: 'Joint', material: 'Other', unit: 'ft' },
+  { id: '515', name: 'Protective Coating', category: 'Other', material: 'Steel', unit: 'sq ft' },
+];
+
+const DEFECTS_BY_ELEMENT = {
+  '12': [ { id: 'spall', name: 'Spalling/Delamination', unit: 'sq ft' }, { id: 'crack', name: 'Cracking', unit: 'ft' } ],
+  '38': [ { id: 'spall', name: 'Spalling/Delamination', unit: 'sq ft' }, { id: 'crack', name: 'Cracking', unit: 'ft' } ],
+  '107': [ { id: 'corr', name: 'Corrosion/Section Loss', unit: 'in' }, { id: 'crack_s', name: 'Cracking (Steel)', unit: 'in' } ],
+  '109': [ { id: 'spall', name: 'Spalling/Delamination', unit: 'sq ft' }, { id: 'crack', name: 'Cracking', unit: 'ft' } ],
+  '205': [ { id: 'spall', name: 'Spalling/Delamination', unit: 'sq ft' }, { id: 'crack', name: 'Cracking', unit: 'ft' } ],
+  '215': [ { id: 'spall', name: 'Spalling/Delamination', unit: 'sq ft' }, { id: 'crack', name: 'Cracking', unit: 'ft' } ],
+  '225': [ { id: 'spall', name: 'Spalling/Delamination', unit: 'sq ft' }, { id: 'crack', name: 'Cracking', unit: 'ft' } ],
+  '226': [ { id: 'corr_pile', name: 'Section Loss (Remaining Section)', unit: 'in' }, { id: 'pitting', name: 'Pitting Corrosion', unit: 'in' } ],
+  '228': [ { id: 'decay', name: 'Decay/Section Loss', unit: 'in' }, { id: 'check', name: 'Checking/Splitting', unit: 'ft' } ],
+  '234': [ { id: 'spall', name: 'Spalling/Delamination', unit: 'sq ft' }, { id: 'crack', name: 'Cracking', unit: 'ft' } ],
+  '310': [ { id: 'rotation', name: 'Excessive Rotation', unit: 'ea' }, { id: 'bulging', name: 'Excessive Bulging', unit: 'ea' } ],
+  '300': [ { id: 'seal', name: 'Seal Damage', unit: 'ft' }, { id: 'debris', name: 'Debris Accumulation', unit: 'sq ft' } ],
+  '304': [ { id: 'debris', name: 'Debris Accumulation', unit: 'sq ft' }, { id: 'armour', name: 'Armour Damage', unit: 'ft' } ],
+  '331': [ { id: 'impact', name: 'Impact Damage', unit: 'ea' }, { id: 'crack', name: 'Cracking', unit: 'ft' } ],
+  '515': [ { id: 'coat_fail', name: 'Coating Failure', unit: 'sq ft' } ]
+};
+
+const INITIAL_NBI_RATINGS = [
+  { item: '58', description: 'Deck', subComponents: [{ name: 'Deck - Component Rating', desc: '', min: '6', rating: '7', snbiIds: ['12', '38'], comments: '', previousComments: 'Underside exhibits isolated insignificant transverse cracks with isolated light efflorescence.' }] },
+  { item: '59', description: 'Superstructure', subComponents: [{ name: 'Superstructure - Component Rating', desc: '', min: '6', rating: '7', snbiIds: ['107', '109'], comments: '', previousComments: 'Steel girders show light surface corrosion on bottom flanges.' }] },
+  { item: '60', description: 'Substructure', subComponents: [{ name: 'Substructure - Component Rating', desc: '', min: '6', rating: 'N', snbiIds: ['205', '215', '225', '226', '228', '234'], comments: '', previousComments: 'RC substructure units show minor efflorescence.' }] }
+];
+
+export default function App() {
+  const [view, setView] = useState('inspection'); 
+  const [activeNbiItem, setActiveNbiItem] = useState('58');
+  const [nomenclature, setNomenclature] = useState(NOMENCLATURES.TXDOT);
+  const [inspectionType, setInspectionType] = useState(INSPECTION_TYPES.TOPSIDE);
+  const [supportCount] = useState(25);
+  const [parsingActive, setParsingActive] = useState(false);
+  
+  // Sequential Workflow State
+  const [pendingFUA, setPendingFUA] = useState(false);
+
+  // Modal Visibility
+  const [showCIFModal, setShowCIFModal] = useState(false);
+  const [showFUAModal, setShowFUAModal] = useState(false);
+
+  // Sorting & Filtering
+  const [sortCriteria, setSortCriteria] = useState('location');
+  const [filterType, setFilterType] = useState('All');
+  const [rangeMin, setRangeMin] = useState('');
+  const [rangeMax, setRangeMax] = useState('');
+  const [syncToCurrentLoc, setSyncToCurrentLoc] = useState(false);
+
+  // Form State
+  const [editId, setEditId] = useState(null);
+  const [currentLocation, setCurrentLocation] = useState('');
+  const [element, setElement] = useState(null);
+  const [environment, setEnvironment] = useState('2');
+  const [defect, setDefect] = useState(null);
+  const [conditionState, setConditionState] = useState('CS1');
+  const [quantity, setQuantity] = useState('');
+  const [maintenanceQuantity, setMaintenanceQuantity] = useState('');
+  const [size, setSize] = useState('');
+  const [locationDesc, setLocationDesc] = useState('');
+  const [isCritical, setIsCritical] = useState(false);
+  const [isMaintenance, setIsMaintenance] = useState(false);
+  const [photos, setPhotos] = useState([]);
+  const [savedDefects, setSavedDefects] = useState([]);
+  
+  const [nbiRatings, setNbiRatings] = useState(INITIAL_NBI_RATINGS);
+  const [showDefectPopover, setShowDefectPopover] = useState(null); 
+
+  // Modal-specific state
+  const [cifData, setCifData] = useState({
+    structureNumber: '18-061-0081-13-133',
+    inspectionDate: '02/15/2026',
+    findings: '',
+    defectDistress: '',
+    material: '',
+    referenceFeature: '',
+    recommendation: '',
+    phoneNotified: false,
+    assetWiseLogged: false,
+    photos: []
+  });
+
+  const [fuaData, setFuaData] = useState({
+    fuaId: '645238',
+    priority: 'Level 3', 
+    description: '',
+    recommendation: '',
+    phoneNotified: false,
+    assetWiseLogged: false,
+    photos: []
+  });
+
+  // --- Derived State & Logic ---
+
+  const activeNbiData = useMemo(() => nbiRatings.find(r => r.item === activeNbiItem), [nbiRatings, activeNbiItem]);
+  const activeNbiIdx = useMemo(() => nbiRatings.findIndex(r => r.item === activeNbiItem), [nbiRatings, activeNbiItem]);
+  
+  const locationSequence = useMemo(() => {
+    const sequence = [];
+    if (inspectionType === INSPECTION_TYPES.TOPSIDE) {
+      sequence.push('Approach 1');
+      for (let i = 1; i < supportCount; i++) {
+        sequence.push(`Joint ${i}`, `Span ${i}`);
+      }
+      sequence.push('Approach 2');
+    } else {
+      const start = nomenclature === NOMENCLATURES.TXDOT ? 'Abutment 1' : 'End Bent 1';
+      const end = nomenclature === NOMENCLATURES.TXDOT ? `Abutment ${supportCount}` : 'End Bent 2';
+      sequence.push(start);
+      for (let i = 1; i < supportCount - 1; i++) {
+        sequence.push(`Span ${i}`, `Bent ${nomenclature === NOMENCLATURES.TXDOT ? i + 1 : i}`);
+      }
+      sequence.push(`Span ${supportCount - 1}`, end);
+    }
+    return sequence;
+  }, [nomenclature, inspectionType, supportCount]);
+
+  const filteredElements = useMemo(() => {
+    if (!currentLocation) return [];
+    if (currentLocation.includes('Joint')) return SNBI_ELEMENTS.filter(e => e.category === 'Joint');
+    if (currentLocation.includes('Approach')) return SNBI_ELEMENTS.filter(e => ['Deck', 'Railing'].includes(e.category));
+    if (currentLocation.includes('Span')) return SNBI_ELEMENTS.filter(e => ['Deck', 'Superstructure', 'Railing'].includes(e.category));
+    if (currentLocation.includes('Abutment') || currentLocation.includes('Bent') || currentLocation.includes('End Bent')) {
+      return SNBI_ELEMENTS.filter(e => ['Substructure', 'Bearing'].includes(e.category));
+    }
+    return SNBI_ELEMENTS;
+  }, [currentLocation]);
+
+  const isDefectValid = (elementId, defectId) => (DEFECTS_BY_ELEMENT[elementId] || []).some(d => d.id === defectId);
+
+  const applyFilters = (list) => {
+    let result = [...list];
+    if (syncToCurrentLoc) {
+      result = result.filter(d => d.location === currentLocation);
+    } else {
+      if (filterType !== 'All') result = result.filter(d => d.location.includes(filterType));
+      if (rangeMin || rangeMax) {
+        result = result.filter(d => {
+          const numMatch = String(d.location).match(/\d+/);
+          if (!numMatch) return true;
+          const num = parseInt(numMatch[0]);
+          const min = rangeMin === '' ? -Infinity : parseInt(rangeMin);
+          const max = rangeMax === '' ? Infinity : parseInt(rangeMax);
+          return num >= min && num <= max;
+        });
+      }
+    }
+    return result.sort((a, b) => {
+      if (sortCriteria === 'location') return String(a.location).localeCompare(String(b.location), undefined, { numeric: true });
+      if (sortCriteria === 'severity') {
+        const order = { 'CS4': 0, 'CS3': 1, 'CS2': 2, 'CS1': 3 };
+        return (order[a.cs] ?? 4) - (order[b.cs] ?? 4);
+      }
+      return String(a.element).localeCompare(String(b.element));
+    });
+  };
+
+  const legacyManifest = useMemo(() => {
+    return applyFilters(savedDefects.filter(d => d.needsVerification || d.isLegacy));
+  }, [savedDefects, filterType, rangeMin, rangeMax, syncToCurrentLoc, currentLocation, sortCriteria]);
+
+  const sessionManifest = useMemo(() => {
+    return applyFilters(savedDefects.filter(d => !d.needsVerification && !d.isLegacy));
+  }, [savedDefects, filterType, rangeMin, rangeMax, syncToCurrentLoc, currentLocation, sortCriteria]);
+
+  const elementSummary = useMemo(() => {
+    const summary = {};
+    savedDefects.forEach(d => {
+      const elKey = d.elementId || d.element;
+      if (!summary[elKey]) {
+        const fullEl = SNBI_ELEMENTS.find(e => e.id === d.elementId || e.name === d.element);
+        summary[elKey] = { 
+          name: String(fullEl?.name || d.element), 
+          unit: String(fullEl?.unit || ''), 
+          CS1: 0, CS2: 0, CS3: 0, CS4: 0, 
+          maintQty: 0, 
+          critQty: 0,
+          total: 0 
+        };
+      }
+      const qty = parseFloat(d.quantityValue) || 0;
+      const mQty = parseFloat(d.maintenanceQuantityValue) || qty;
+      
+      summary[elKey][d.cs] += qty;
+      summary[elKey].total += qty;
+      if (d.isMaintenance) summary[elKey].maintQty += mQty;
+      if (d.isCritical) summary[elKey].critQty += qty;
+    });
+    return Object.values(summary);
+  }, [savedDefects]);
+
+  const criticalFindingsSummary = useMemo(() => savedDefects.filter(d => d.isCritical), [savedDefects]);
+  const maintenanceSummary = useMemo(() => savedDefects.filter(d => d.isMaintenance), [savedDefects]);
+
+  // --- Handlers ---
+
+  useEffect(() => {
+    if (!editId) setCurrentLocation(locationSequence[0]);
+  }, [locationSequence, editId]);
+
+  useEffect(() => {
+    if (filteredElements.length > 0 && !editId) setElement(filteredElements[0]);
+  }, [filteredElements, editId]);
+
+  useEffect(() => {
+    if (element && !editId) {
+      const available = DEFECTS_BY_ELEMENT[element.id] || [];
+      setDefect(available[0] || null);
+    }
+  }, [element, editId]);
+
+  const handlePhotoUpload = (e, target = 'main') => {
+    const files = Array.from(e.target.files);
+    const newPhotos = files.map(file => ({ 
+      url: URL.createObjectURL(file), 
+      name: file.name,
+      description: '' 
+    }));
+    if (target === 'cif') setCifData(prev => ({ ...prev, photos: [...prev.photos, ...newPhotos] }));
+    else if (target === 'fua') setFuaData(prev => ({ ...prev, photos: [...prev.photos, ...newPhotos] }));
+    else setPhotos([...photos, ...newPhotos]);
+  };
+
+  const updatePhotoDescription = (idx, desc, target = 'main') => {
+    if (target === 'cif') {
+      const updated = [...cifData.photos];
+      updated[idx].description = desc;
+      setCifData({ ...cifData, photos: updated });
+    } else if (target === 'fua') {
+      const updated = [...fuaData.photos];
+      updated[idx].description = desc;
+      setFuaData({ ...fuaData, photos: updated });
+    } else {
+      const updated = [...photos];
+      updated[idx].description = desc;
+      setPhotos(updated);
+    }
+  };
+
+  const copyNoteToPhoto = (idx, target = 'main') => {
+    const notePrefix = "previous note: ";
+    if (target === 'cif') {
+      const updated = [...cifData.photos];
+      updated[idx].description = notePrefix + cifData.findings;
+      setCifData({ ...cifData, photos: updated });
+    } else if (target === 'fua') {
+      const updated = [...fuaData.photos];
+      updated[idx].description = notePrefix + fuaData.description;
+      setFuaData({ ...fuaData, photos: updated });
+    } else {
+      const updated = [...photos];
+      updated[idx].description = notePrefix + locationDesc;
+      setPhotos(updated);
+    }
+  };
+
+  const removePhoto = (idx, target = 'main') => {
+    if (target === 'cif') setCifData(prev => ({ ...prev, photos: prev.photos.filter((_, i) => i !== idx) }));
+    else if (target === 'fua') setFuaData(prev => ({ ...prev, photos: prev.photos.filter((_, i) => i !== idx) }));
+    else setPhotos(photos.filter((_, i) => i !== idx));
+  };
+
+  const handleSave = () => {
+    const record = {
+      id: editId || Date.now(),
+      location: String(currentLocation),
+      elementId: String(element?.id || ''),
+      element: String(element?.name || ''),
+      environment: String(environment),
+      defect: String(defect?.name || ''),
+      defectId: String(defect?.id || ''),
+      cs: String(conditionState),
+      quantityValue: String(quantity),
+      maintenanceQuantityValue: String(maintenanceQuantity || quantity),
+      quantity: `${quantity} ${defect?.unit || ''}`,
+      size: String(size),
+      locationDesc: String(locationDesc),
+      photosCount: photos.length,
+      photos: [...photos],
+      isCritical,
+      isMaintenance,
+      needsVerification: false,
+      isLegacy: false
+    };
+
+    if (editId) {
+      setSavedDefects(savedDefects.map(d => d.id === editId ? record : d));
+      setEditId(null);
+    } else {
+      setSavedDefects([record, ...savedDefects]);
+    }
+    
+    if (isCritical) {
+      setCifData(prev => ({
+        ...prev,
+        findings: locationDesc,
+        defectDistress: defect?.name || '',
+        material: element?.material || '',
+        referenceFeature: `${element?.id || ''}. ${element?.name || ''}`,
+        photos: [...photos]
+      }));
+      setPendingFUA(isMaintenance);
+      setShowCIFModal(true);
+    } else if (isMaintenance) {
+      setFuaData(prev => ({
+        ...prev,
+        description: locationDesc,
+        bridgeComponent: element?.name || '',
+        photos: [...photos]
+      }));
+      setShowFUAModal(true);
+    }
+
+    setQuantity(''); setMaintenanceQuantity(''); setSize(''); setLocationDesc(''); setIsCritical(false); setIsMaintenance(false); setPhotos([]);
+  };
+
+  const startEdit = (record) => {
+    setEditId(record.id);
+    setView('inspection');
+    setCurrentLocation(record.location);
+    const matchedEl = SNBI_ELEMENTS.find(e => String(e.id) === String(record.elementId));
+    setElement(matchedEl);
+    setConditionState(record.cs);
+    setQuantity(record.quantityValue);
+    setMaintenanceQuantity(record.maintenanceQuantityValue || '');
+    setSize(record.size);
+    setLocationDesc(record.locationDesc);
+    setIsCritical(record.isCritical || false);
+    setIsMaintenance(record.isMaintenance || false);
+    setPhotos(record.photos || []);
+    const available = DEFECTS_BY_ELEMENT[matchedEl?.id] || [];
+    setDefect(available.find(d => String(d.id) === String(record.defectId)) || available[0]);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const deleteDefect = (id) => {
+    if (window.confirm("Delete diagnostic record?")) {
+      setSavedDefects(savedDefects.filter(d => d.id !== id));
+    }
+  };
+
+  const verifyDefect = (id) => {
+    setSavedDefects(savedDefects.map(d => d.id === id ? { ...d, needsVerification: false, isLegacy: true } : d));
+  };
+
+  const updateSubComponent = (itemIndex, compIndex, field, value) => {
+    setNbiRatings(prev => {
+      const next = [...prev];
+      const nextItem = { ...next[itemIndex] };
+      const nextSub = [...nextItem.subComponents];
+      nextSub[compIndex] = { ...nextSub[compIndex], [field]: value };
+      nextItem.subComponents = nextSub;
+      next[itemIndex] = nextItem;
+      return next;
+    });
+  };
+
+  const simulateReportParsing = () => {
+    setParsingActive(true);
+    const ts = Date.now();
+    setTimeout(() => {
+      const legacyElements = [
+        { id: `leg-${ts}`, location: 'Span 1', elementId: '107', element: 'Steel Girder', environment: '2', defect: 'Corrosion/Section Loss', defectId: 'corr', cs: 'CS2', quantityValue: '10', quantity: '10 in', size: 'N/A', locationDesc: 'Surface rust.', needsVerification: true, isLegacy: true, photos: [], photosCount: 0 }
+      ];
+      setSavedDefects([...legacyElements, ...savedDefects]);
+      setParsingActive(false);
+      setView('inspection');
+    }, 1200);
+  };
+
+  const completeCIF = () => {
+    if (!cifData.phoneNotified || !cifData.assetWiseLogged) {
+      alert("Verification of immediate safety protocol execution is mandatory.");
+      return;
+    }
+    setShowCIFModal(false);
+    if (pendingFUA) {
+      setFuaData(prev => ({
+        ...prev,
+        description: cifData.findings,
+        bridgeComponent: cifData.referenceFeature,
+        repairCategory: `Remedial Action: ${cifData.defectDistress}`,
+        recommendation: cifData.recommendation,
+        photos: [...cifData.photos] 
+      }));
+      setShowFUAModal(true);
+      setPendingFUA(false);
+    }
+  };
+
+  const completeFUA = () => {
+    if ((fuaData.priority === 'Level 1' || fuaData.priority === 'Level 2') && !fuaData.phoneNotified) {
+      alert("Priority Levels 1 & 2 require immediate phone notification.");
+      return;
+    }
+    if (!fuaData.assetWiseLogged) {
+      alert("AssetWise synchronization must be confirmed.");
+      return;
+    }
+    setShowFUAModal(false);
+  };
+
+  const toggleInspectionType = () => {
+    setInspectionType(prev => prev === INSPECTION_TYPES.TOPSIDE ? INSPECTION_TYPES.UNDERSIDE : INSPECTION_TYPES.TOPSIDE);
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-100 flex flex-col font-sans text-slate-900 pb-24">
+      <header className="bg-slate-900 text-white p-4 shadow-2xl sticky top-0 z-50">
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-xl font-black tracking-tight flex items-center gap-2 uppercase">
+            <Activity className="text-blue-400" size={26} /> 
+            {view === 'inspection' ? 'Bridge Inspection' : view === 'nbi' ? 'NBI Ratings' : 'Structural Summary'}
+          </h1>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={simulateReportParsing}
+              disabled={parsingActive}
+              className="bg-slate-800 hover:bg-slate-700 text-slate-300 p-1.5 rounded-lg border border-slate-700 transition-all flex items-center gap-1 text-[9px] font-black uppercase"
+            >
+              {parsingActive ? <RotateCcw size={12} className="animate-spin" /> : <Upload size={12}/>}
+              Import Legacy
+            </button>
+            <div className="flex bg-slate-800 p-1 rounded-lg text-[10px] font-bold border border-slate-700">
+              <button onClick={() => setNomenclature(NOMENCLATURES.TXDOT)} className={`px-2 py-1 rounded ${nomenclature === NOMENCLATURES.TXDOT ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400'}`}>TX</button>
+              <button onClick={() => setNomenclature(NOMENCLATURES.NCDOT)} className={`px-2 py-1 rounded ${nomenclature === NOMENCLATURES.NCDOT ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400'}`}>NC</button>
+            </div>
+          </div>
+        </div>
+        
+        {(view === 'inspection' || view === 'nbi') && (
+          <div className="flex flex-col gap-3">
+             <button 
+              onClick={toggleInspectionType}
+              className={`w-full py-2.5 rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 border-2 transition-all shadow-lg active:scale-[0.98] ${inspectionType === INSPECTION_TYPES.TOPSIDE ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-800 border-slate-700 text-blue-400'}`}
+             >
+               <RefreshCw size={16} />
+               Active Module: {inspectionType === INSPECTION_TYPES.TOPSIDE ? 'Topside' : 'Underside'}
+             </button>
+          </div>
+        )}
+      </header>
+
+      <main className="p-4 space-y-4 mx-auto w-full max-w-full">
+        {view === 'inspection' && (
+          <div className="max-w-2xl mx-auto w-full space-y-4">
+            <section className="bg-white p-4 rounded-xl shadow-md border-t-4 border-slate-900">
+              <h2 className="text-[11px] font-black text-slate-400 uppercase mb-3 tracking-widest text-center">Structural Stationing</h2>
+              <label className="text-xs font-black text-slate-600 mb-1 block uppercase">Support / Span Designation</label>
+              <select value={currentLocation} onChange={(e) => setCurrentLocation(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-lg font-black text-slate-900 outline-none focus:ring-2 ring-blue-500 transition-all">
+                {locationSequence.map(loc => <option key={loc} value={loc}>{loc}</option>)}
+              </select>
+            </section>
+
+            <section className="bg-white p-4 rounded-xl shadow-md border-t-4 border-blue-600 relative">
+              {editId && <div className="absolute -top-3 right-4 flex items-center gap-1 text-[10px] font-black bg-blue-600 text-white px-3 py-1 rounded-full shadow-lg uppercase animate-pulse"><Edit2 size={12}/> Modifying Record</div>}
+              <h2 className="text-[11px] font-black text-slate-400 uppercase mb-3 flex items-center gap-1 tracking-widest uppercase"><FileText size={14}/> SNBI Data Acquisition</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-black text-slate-600 mb-1 block uppercase text-[10px]">Element Selection</label>
+                  <select value={element?.id} onChange={(e) => setElement(SNBI_ELEMENTS.find(el => String(el.id) === e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 font-black text-blue-700 outline-none">
+                    {filteredElements.map(el => <option key={el.id} value={el.id}>{el.id} - {el.name}</option>)}
+                  </select>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-black text-slate-600 mb-1 block uppercase tracking-tight">Active Defect Mode</label>
+                    <select value={defect?.id} onChange={(e) => setDefect(DEFECTS_BY_ELEMENT[element?.id]?.find(d => String(d.id) === e.target.value) || DEFECTS_BY_ELEMENT[element?.id]?.[0])} className="w-full bg-slate-100 border border-slate-200 rounded-lg p-2 font-black text-slate-800 outline-none">
+                      {DEFECTS_BY_ELEMENT[element?.id]?.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-black text-slate-600 mb-1 block uppercase text-center text-[10px]">Condition State</label>
+                    <div className="grid grid-cols-4 gap-1">
+                      {['CS1', 'CS2', 'CS3', 'CS4'].map(cs => (
+                        <button key={cs} onClick={() => setConditionState(cs)} className={`py-2 rounded font-black text-[9px] border transition-all ${conditionState === cs ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-white text-slate-300 border-slate-100'}`}>{cs}</button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                   <div>
+                    <label className="text-xs font-black text-slate-600 mb-1 block uppercase text-[10px]">Element Qty ({defect?.unit || 'ea'})</label>
+                    <input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 font-black text-slate-900" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-black text-slate-600 mb-1 block uppercase text-[10px]">Maint Qty (Optional)</label>
+                    <input type="number" value={maintenanceQuantity} onChange={(e) => setMaintenanceQuantity(e.target.value)} placeholder={quantity || 'Override...'} className="w-full bg-blue-50/30 border border-blue-100 rounded-lg p-2 font-black text-blue-800" />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-600 mb-1 block uppercase tracking-tight">Defect Notes</label>
+                  <textarea value={locationDesc} onChange={(e) => setLocationDesc(e.target.value)} placeholder="Record structural anomalies..." className="w-full h-24 bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm font-medium outline-none focus:ring-1 ring-blue-500" />
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-black text-slate-600 mb-1 block uppercase tracking-tight flex items-center gap-2"><ImageIcon size={14}/> Diagnostic Media</label>
+                    <div className="flex gap-2">
+                      <label className="bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-[10px] font-black cursor-pointer flex items-center gap-1 uppercase transition-all hover:bg-slate-300">
+                        <Plus size={12}/> Library
+                        <input type="file" multiple accept="image/*" className="hidden" onChange={(e)=>handlePhotoUpload(e, 'main')} />
+                      </label>
+                      <label className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-black cursor-pointer flex items-center gap-1 uppercase transition-all hover:bg-blue-700 shadow-md">
+                        <Camera size={12}/> Capture
+                        <input type="file" capture="environment" accept="image/*" className="hidden" onChange={(e)=>handlePhotoUpload(e, 'main')} />
+                      </label>
+                    </div>
+                  </div>
+                  {photos.length > 0 && (
+                    <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                      {photos.map((p, idx) => (
+                        <div key={idx} className="flex gap-3 bg-slate-50 p-2 rounded-xl border border-slate-200 group">
+                          <img src={p.url} className="w-16 h-16 rounded-lg object-cover border border-slate-300" alt="defect" />
+                          <div className="flex-1 space-y-1">
+                             <div className="flex gap-1 items-center mb-1">
+                               <input placeholder="Photo Description..." value={p.description} onChange={(e) => updatePhotoDescription(idx, e.target.value, 'main')} className="flex-1 bg-white border border-slate-200 rounded p-1 text-[10px] font-medium outline-none" />
+                               <button onClick={() => copyNoteToPhoto(idx, 'main')} className="p-1.5 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors" title="Copy Defect Note"><Copy size={12}/></button>
+                             </div>
+                             <div className="text-[8px] font-bold text-slate-400 uppercase truncate">{p.name}</div>
+                          </div>
+                          <button onClick={() => removePhoto(idx, 'main')} className="text-slate-300 hover:text-red-600 self-center"><X size={16}/></button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className={`p-4 rounded-xl border-2 flex items-center justify-between transition-all duration-300 ${isCritical ? 'bg-red-50 border-red-500 shadow-inner' : 'bg-slate-50 border-slate-200'}`}>
+                    <label className="flex items-center gap-4 cursor-pointer flex-1">
+                      <input type="checkbox" checked={isCritical} onChange={(e) => setIsCritical(e.target.checked)} className="w-6 h-6 accent-red-600" />
+                      <span className={`text-[10px] font-black uppercase tracking-tight ${isCritical ? 'text-red-700' : 'text-slate-400'}`}>Critical Finding</span>
+                    </label>
+                    {isCritical && <AlertTriangle className="text-red-600 animate-pulse" size={24}/>}
+                  </div>
+                  <div className={`p-4 rounded-xl border-2 flex items-center justify-between transition-all duration-300 ${isMaintenance ? 'bg-blue-50 border-blue-500 shadow-inner' : 'bg-slate-50 border-slate-200'}`}>
+                    <label className="flex items-center gap-4 cursor-pointer flex-1">
+                      <input type="checkbox" checked={isMaintenance} onChange={(e) => setIsMaintenance(e.target.checked)} className="w-6 h-6 accent-blue-600" />
+                      <span className={`text-[10px] font-black uppercase tracking-tight ${isMaintenance ? 'text-blue-700' : 'text-slate-400'}`}>Maintenance Req</span>
+                    </label>
+                    {isMaintenance && <Wrench className="text-blue-600" size={24}/>}
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <button onClick={handleSave} className="w-full py-5 bg-slate-900 text-white rounded-xl font-black text-sm flex items-center justify-center gap-3 shadow-2xl active:scale-95 transition-transform tracking-widest uppercase text-center">
+              <Save size={20}/> {editId ? 'RECORD DEFECT' : 'COMMIT LOG'}
+            </button>
+
+            {/* SEPARATED MANIFESTS */}
+            <div className="space-y-6 mt-8">
+              <div className="bg-white p-4 rounded-xl shadow-lg border border-slate-200 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                  <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                    Station Filters
+                  </h3>
+                  <button onClick={() => setSyncToCurrentLoc(!syncToCurrentLoc)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-[10px] font-black uppercase transition-all shadow-sm ${syncToCurrentLoc ? 'bg-blue-600 text-white ring-2 ring-blue-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
+                    <LocateFixed size={14}/> {syncToCurrentLoc ? 'Locked to Active Station' : 'Show All Stations'}
+                  </button>
+                </div>
+                {!syncToCurrentLoc && (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase flex items-center gap-1"><Filter size={12}/> Station Type</label><select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded p-2 text-[10px] font-black text-blue-700 outline-none"><option value="All">All Components</option><option value="Span">Spans</option><option value="Bent">Bents</option><option value="Joint">Joints</option></select></div>
+                    <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase flex items-center gap-1"><Hash size={12}/> Range</label><div className="flex gap-1"><input type="number" placeholder="Min" value={rangeMin} onChange={(e) => setRangeMin(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded p-2 text-[10px] font-black outline-none" /><input type="number" placeholder="Max" value={rangeMax} onChange={(e) => setRangeMax(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded p-2 text-[10px] font-black outline-none" /></div></div>
+                    <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase flex items-center gap-1"><ArrowUpDown size={12}/> Sort</label><select value={sortCriteria} onChange={(e) => setSortCriteria(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded p-2 text-[10px] font-black text-blue-700 outline-none"><option value="location">Longitudinal</option><option value="severity">CS Severity</option></select></div>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                 <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest pl-2 flex items-center gap-2"><Zap size={14}/> Active Session Acquisitions ({sessionManifest.length})</h4>
+                 {sessionManifest.map(d => (
+                  <div key={d.id} className={`p-4 bg-white border rounded-2xl shadow-lg flex items-center justify-between border-l-8 transition-all relative ${d.isCritical ? 'border-l-red-600 bg-red-50/20' : d.isMaintenance ? 'border-l-blue-600 bg-blue-50/20' : 'border-l-blue-400'}`}>
+                    <div className="flex items-center gap-4 overflow-hidden">
+                       {d.photos && d.photos.length > 0 && (
+                         <img src={d.photos[0].url} className="w-14 h-14 rounded-lg object-cover border border-slate-200 shadow-sm shrink-0" alt="defect" />
+                       )}
+                       <div className="flex-1 overflow-hidden pr-4">
+                        <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 mb-1 uppercase truncate"><span className="text-blue-600 font-black">{String(d.location)}</span> • <span>ENV {String(d.environment)}</span></div>
+                        <div className="text-sm font-black truncate uppercase text-slate-800">{String(d.element)}: {String(d.defect)}</div>
+                        <div className="flex items-center gap-3 mt-2"><span className={`text-[10px] font-black px-2 py-1 rounded-full ${d.cs === 'CS4' ? 'bg-red-600 text-white' : 'bg-blue-100 text-blue-700'}`}>{String(d.cs)}</span><span className="text-[10px] font-bold text-slate-500 tracking-tighter uppercase">{String(d.quantity)}</span>{d.photosCount > 0 && <span className="flex items-center gap-1 text-blue-600 text-[10px] font-black"><ImageIcon size={12}/> {d.photosCount}</span>}</div>
+                      </div>
+                    </div>
+                    <button onClick={() => startEdit(d)} className="p-3 bg-slate-50 text-slate-400 rounded-xl border border-slate-100 shrink-0"><Edit2 size={18}/></button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-3 opacity-80">
+                 <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-2 flex items-center gap-2"><History size={14}/> Previous Reported Defects ({legacyManifest.length})</h4>
+                 {legacyManifest.map(d => (
+                  <div key={d.id} className={`p-4 bg-white border rounded-2xl shadow-lg flex items-center justify-between border-l-8 transition-all relative ${!isDefectValid(String(d.elementId), String(d.defectId)) ? 'border-l-red-500' : d.needsVerification ? 'border-l-amber-500 ring-2 ring-amber-100' : 'border-l-slate-300'}`}>
+                    <div className="flex items-center gap-4 overflow-hidden">
+                       {d.photos && d.photos.length > 0 && (
+                         <img src={d.photos[0].url} className="w-14 h-14 rounded-lg object-cover border border-slate-200 shadow-sm shrink-0" alt="defect" />
+                       )}
+                       <div className="flex-1 overflow-hidden pr-4">
+                        <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 mb-1 uppercase truncate"><span className="text-blue-600 font-black">{String(d.location)}</span> • <span>ENV {String(d.environment)}</span></div>
+                        <div className="text-sm font-black truncate uppercase text-slate-800">{String(d.element)}: {String(d.defect)}</div>
+                        <div className="flex items-center gap-3 mt-2">
+                          <span className={`text-[10px] font-black px-2 py-1 rounded-full ${d.cs === 'CS4' ? 'bg-red-600 text-white' : 'bg-blue-100 text-blue-700'}`}>{String(d.cs)}</span>
+                          {d.needsVerification && <ShieldAlert size={14} className="text-amber-500"/>}
+                          {!isDefectValid(String(d.elementId), String(d.defectId)) && <AlertCircle size={14} className="text-red-600 animate-pulse"/>}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      {d.needsVerification && <button onClick={() => verifyDefect(d.id)} className="p-3 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100"><ShieldCheck size={18}/></button>}
+                      <button onClick={() => startEdit(d)} className="p-3 bg-slate-50 text-slate-400 rounded-xl border border-slate-100"><Edit2 size={18}/></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {view === 'nbi' && (
+          <div className="space-y-4 animate-in slide-in-from-right duration-300 flex flex-col items-center">
+            <div className="bg-white p-1 rounded-xl shadow-lg border border-slate-200 flex gap-1 w-full overflow-x-auto sticky top-20 z-40 no-scrollbar">
+              {nbiRatings.map(item => (
+                <button key={item.item} onClick={() => setActiveNbiItem(item.item)} className={`flex-shrink-0 px-6 py-3 rounded-lg font-black text-[10px] uppercase tracking-widest transition-all ${activeNbiItem === item.item ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-50'}`}>
+                  {String(item.item).length > 2 ? String(item.item) : `Item ${String(item.item)}`}
+                </button>
+              ))}
+            </div>
+            {activeNbiData && (
+              <section className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden w-full">
+                <div className="bg-slate-900 p-4 flex items-center justify-between text-white"><h2 className="text-sm font-black uppercase tracking-wider">{activeNbiData.description} Assessment</h2><span className="text-sm font-black text-blue-400">{activeNbiData.item}</span></div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-[11px] border-collapse min-w-[1000px]">
+                    <thead><tr className="border-b border-slate-200 bg-slate-100 font-black text-slate-500 uppercase tracking-tighter"><th className="py-3 px-4 w-52">Component</th><th className="py-3 px-2 w-48">Spec / Material</th><th className="py-3 px-2 text-center w-16">Min.</th><th className="py-3 px-2 text-center w-20">Rating</th><th className="py-3 px-4">Diagnostic Narrative</th><th className="py-3 px-2 text-center w-24">Element Ref</th></tr></thead>
+                    <tbody>
+                      {activeNbiData.subComponents.map((comp, compIdx) => {
+                        const associatedDefects = getAssociatedDefects(comp.snbiIds);
+                        const isExpanded = showDefectPopover?.compIdx === compIdx;
+                        return (
+                          <React.Fragment key={compIdx}>
+                            <tr className="border-b border-slate-100 hover:bg-blue-50/20">
+                              <td className="py-4 px-4 font-black text-slate-800 uppercase align-top">{comp.name}</td>
+                              <td className="py-3 px-2 align-top"><input type="text" value={comp.desc} onChange={(e) => updateSubComponent(activeNbiIdx, compIdx, 'desc', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded p-2 text-[10px] font-bold outline-none" /></td>
+                              <td className="py-3 px-2 align-top"><input type="text" value={comp.min} onChange={(e) => updateSubComponent(activeNbiIdx, compIdx, 'min', e.target.value)} className="w-full bg-white border border-slate-300 rounded p-2 font-black text-center outline-none" /></td>
+                              <td className="py-3 px-2 align-top"><select value={comp.rating} onChange={(e) => updateSubComponent(activeNbiIdx, compIdx, 'rating', e.target.value)} className="w-full bg-white border-2 border-blue-600 rounded p-2 font-black text-blue-800 text-center outline-none">{['9','8','7','6','5','4','3','2','1','0','N','-'].map(v => <option key={v} value={v}>{v}</option>)}</select></td>
+                              <td className="py-3 px-4 align-top space-y-3"><textarea value={comp.comments} onChange={(e) => updateSubComponent(activeNbiIdx, compIdx, 'comments', e.target.value)} rows={2} className="w-full bg-white border border-slate-300 rounded p-3 text-[10px] font-bold text-slate-800 outline-none shadow-sm" /></td>
+                              <td className="py-3 px-2 text-center align-top">{comp.snbiIds.length > 0 && (<button onClick={() => setShowDefectPopover(isExpanded ? null : {compIdx})} className={`p-2 rounded-lg transition-all ${associatedDefects.length > 0 ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-400'}`}>{isExpanded ? <ChevronUp size={18}/> : <ArrowDownCircle size={18}/>}</button>)}</td>
+                            </tr>
+                            {isExpanded && (
+                              <tr className="bg-blue-50/50"><td colSpan={6} className="p-4 border-b border-blue-200 shadow-inner"><div className="flex items-center gap-2 mb-3 text-[10px] font-black text-blue-800 uppercase tracking-widest"><Zap size={14}/> Cataloged SNBI Defect Logs</div><div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {associatedDefects.map(d => (<div key={d.id} className="bg-white p-3 rounded-xl border border-blue-100 shadow-md flex items-center justify-between"><div className="flex-1"><div className="text-[9px] font-black text-blue-600 uppercase">{String(d.location)} • CS {String(d.cs)}</div><div className="text-[10px] font-black text-slate-800 uppercase">{String(d.element)}: {String(d.defect)}</div></div><button onClick={() => startEdit(d)} className="p-1 text-slate-400 hover:text-blue-600 transition-colors"><Edit2 size={14}/></button></div>))}</div></td></tr>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            )}
+          </div>
+        )}
+
+        {view === 'summary' && (
+          <div className="space-y-6 animate-in slide-in-from-right duration-300 max-w-6xl mx-auto w-full">
+            {/* CONDITION STATE SUMMARY */}
+            <section className="bg-white p-6 rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+              <div className="flex items-center justify-between mb-8 border-b border-slate-100 pb-4">
+                <h2 className="text-lg font-black text-slate-900 uppercase tracking-tighter flex items-center gap-2"><BarChart3 size={24} className="text-blue-600"/> Structural Analysis Matrix</h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-[12px] border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-[10px] font-black text-slate-500 uppercase bg-slate-50/50">
+                      <th className="py-4 px-4 w-1/4">Element</th>
+                      <th className="py-4 px-2 text-center text-emerald-600">CS1</th>
+                      <th className="py-4 px-2 text-center text-blue-600">CS2</th>
+                      <th className="py-4 px-2 text-center text-orange-600">CS3</th>
+                      <th className="py-4 px-2 text-center text-red-600">CS4</th>
+                      <th className="py-4 px-4 text-right font-black bg-slate-100">Total Gross</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {elementSummary.map(row => (
+                      <tr key={row.name} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                        <td className="py-5 px-4 font-black text-slate-800 uppercase leading-tight">{row.name}<div className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-widest">{row.unit}</div></td>
+                        <td className="py-5 px-2 text-center text-slate-400 font-bold">{row.CS1}</td>
+                        <td className="py-5 px-2 text-center text-blue-600 font-black">{row.CS2}</td>
+                        <td className="py-5 px-2 text-center text-orange-600 font-black">{row.CS3}</td>
+                        <td className="py-5 px-2 text-center text-red-600 font-black">{row.CS4}</td>
+                        <td className="py-5 px-4 text-right font-black text-slate-900 bg-slate-50">{row.total}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            {/* MAINTENANCE PLAN SUMMARY */}
+            <section className="bg-white p-6 rounded-2xl shadow-2xl border-4 border-blue-600 overflow-hidden">
+              <div className="flex items-center justify-between mb-6 border-b border-blue-100 pb-4">
+                <h2 className="text-lg font-black text-blue-700 uppercase tracking-tighter flex items-center gap-2"><Wrench size={24}/> Maintenance Plan Summary</h2>
+                <span className="bg-blue-600 text-white px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">{maintenanceSummary.length} Items</span>
+              </div>
+              <div className="overflow-x-auto">
+                 <table className="w-full text-left text-[12px] border-collapse">
+                    <thead>
+                      <tr className="border-b border-blue-200 text-[10px] font-black text-blue-600 uppercase bg-blue-50/50">
+                        <th className="py-3 px-4 w-48">Location/Element</th>
+                        <th className="py-3 px-4">Defect Description</th>
+                        <th className="py-3 px-4 text-right w-40">Maint Quantity</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {maintenanceSummary.map(d => (
+                        <tr key={d.id} className="border-b border-blue-100 hover:bg-blue-50/30">
+                          <td className="py-4 px-4 align-top">
+                            <div className="text-[11px] font-black text-slate-900 uppercase leading-none">{String(d.location)}</div>
+                            <div className="text-[9px] font-bold text-blue-600 uppercase mt-1">{String(d.element)}</div>
+                          </td>
+                          <td className="py-4 px-4 align-top">
+                            <div className="text-[11px] font-black text-slate-800 uppercase">{String(d.defect)}</div>
+                            <div className="text-[10px] font-medium text-slate-500 italic mt-1 leading-relaxed">{String(d.locationDesc)}</div>
+                          </td>
+                          <td className="py-4 px-4 text-right align-top font-black text-blue-700">
+                             {String(d.maintenanceQuantityValue || d.quantityValue)} {String(d.quantity).split(' ')[1]}
+                          </td>
+                        </tr>
+                      ))}
+                      {maintenanceSummary.length === 0 && (
+                        <tr><td colSpan={3} className="py-12 text-center text-[10px] font-black text-slate-300 uppercase italic">No Maintenance Tasks Cataloged</td></tr>
+                      )}
+                    </tbody>
+                 </table>
+              </div>
+            </section>
+
+            {/* CRITICAL FINDING SUMMARY */}
+            <section className="bg-white p-6 rounded-2xl shadow-2xl border-4 border-red-600 overflow-hidden">
+              <div className="flex items-center justify-between mb-6 border-b border-red-100 pb-4">
+                <h2 className="text-lg font-black text-red-600 uppercase tracking-tighter flex items-center gap-2"><ShieldAlert size={24} className="animate-pulse"/> Critical Finding Summary</h2>
+                <span className="bg-red-600 text-white px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">{criticalFindingsSummary.length} Active</span>
+              </div>
+              <div className="overflow-x-auto">
+                 <table className="w-full text-left text-[12px] border-collapse">
+                    <thead>
+                      <tr className="border-b border-red-200 text-[10px] font-black text-red-600 uppercase bg-red-50/50">
+                        <th className="py-3 px-4 w-48">Location/Element</th>
+                        <th className="py-3 px-4">Structural Write-up</th>
+                        <th className="py-3 px-4 text-right w-40">Quantity</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {criticalFindingsSummary.map(d => (
+                        <tr key={d.id} className="border-b border-red-100 hover:bg-red-50/30">
+                          <td className="py-4 px-4 align-top">
+                            <div className="text-[11px] font-black text-slate-900 uppercase leading-none">{String(d.location)}</div>
+                            <div className="text-[9px] font-bold text-red-600 uppercase mt-1">{String(d.element)}</div>
+                          </td>
+                          <td className="py-4 px-4 align-top">
+                            <div className="text-[11px] font-black text-slate-800 uppercase">{String(d.defect)}</div>
+                            <div className="text-[10px] font-medium text-slate-500 italic mt-1 leading-relaxed">{String(d.locationDesc)}</div>
+                          </td>
+                          <td className="py-4 px-4 text-right align-top font-black text-red-700 uppercase">
+                             {String(d.quantity)}
+                          </td>
+                        </tr>
+                      ))}
+                      {criticalFindingsSummary.length === 0 && (
+                        <tr><td colSpan={3} className="py-12 text-center text-[10px] font-black text-slate-300 uppercase italic">No Critical Deficiencies Reported</td></tr>
+                      )}
+                    </tbody>
+                 </table>
+              </div>
+            </section>
+          </div>
+        )}
+      </main>
+
+      {/* MODAL: FORM 2598 (CIF) */}
+      {showCIFModal && (
+        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-[100] flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl border-4 border-red-600 flex flex-col max-h-[95vh]">
+            <div className="p-6 bg-red-600 text-white flex items-center justify-between shrink-0"><div className="flex items-center gap-3"><ShieldAlert size={32} className="animate-pulse" /><div><h2 className="text-xl font-black uppercase tracking-tighter leading-none">Critical Inspection Finding</h2><p className="text-[10px] font-bold opacity-80 uppercase tracking-widest mt-1">Form 2598 Implementation</p></div></div><button onClick={() => setShowCIFModal(false)} className="p-2 hover:bg-red-700 rounded-full transition-all"><X size={24}/></button></div>
+            <div className="p-6 overflow-y-auto space-y-6">
+               <div className="border-2 border-slate-200 p-8 rounded-xl bg-white shadow-inner font-serif">
+                <div className="grid grid-cols-2 gap-x-8 gap-y-4 text-[11px] border-b-2 border-slate-900 pb-6 mb-6"><div><span className="font-bold block text-[8px] text-slate-500 uppercase">Structure No.</span><span className="font-black">{cifData.structureNumber}</span></div><div><span className="font-bold block text-[8px] text-slate-500 uppercase">Inspection Date</span><span className="font-black">{cifData.inspectionDate}</span></div></div>
+                <div className="space-y-4"><div className="bg-slate-100 p-2 font-bold uppercase text-[9px] border border-slate-300">Findings / Reason for CIF:</div><textarea className="w-full font-black outline-none bg-yellow-50 p-2 text-[10px] border border-slate-300 min-h-[100px]" value={cifData.findings} onChange={(e)=>setCifData({...cifData, findings: e.target.value})} /><div className="bg-slate-100 p-2 font-bold uppercase text-[9px] border border-slate-300">Inspector's Recommendation to Owner:</div><textarea className="w-full font-black outline-none bg-yellow-50 p-2 text-[10px] border border-slate-300 min-h-[100px]" value={cifData.recommendation} onChange={(e)=>setCifData({...cifData, recommendation: e.target.value})} placeholder="Specify remedial strategies..." /></div>
+                <div className="mt-8"><div className="flex items-center justify-between mb-2"><span className="text-[10px] font-black text-red-600 uppercase underline">Safety Evidence Media</span><label className="bg-red-600 text-white px-3 py-1 rounded text-[8px] font-black uppercase cursor-pointer flex items-center gap-1 hover:bg-red-700 shadow-sm"><Camera size={12}/> Append Evidence<input type="file" multiple accept="image/*" className="hidden" onChange={(e)=>handlePhotoUpload(e, 'cif')} /></label></div><div className="grid grid-cols-1 gap-4">
+                    {cifData.photos.map((p, idx) => (<div key={idx} className="flex gap-4 bg-slate-50 p-3 rounded-xl border border-slate-200"><img src={p.url} className="w-24 h-24 rounded-lg object-cover border-2 border-white shadow-md" alt="evidence" /><div className="flex-1 space-y-2"><div className="flex gap-1 items-center mb-1"><input placeholder="Description..." value={p.description} onChange={(e) => updatePhotoDescription(idx, e.target.value, 'cif')} className="flex-1 bg-white border border-slate-300 rounded p-1 text-[10px] font-bold outline-none" /><button onClick={() => copyNoteToPhoto(idx, 'cif')} className="p-1.5 bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors"><Copy size={12}/></button></div></div><button onClick={() => removePhoto(idx, 'cif')} className="text-slate-300 hover:text-red-600 self-center"><X size={18}/></button></div>))}
+                  </div></div>
+                <div className="mt-8 p-4 border-2 border-red-500 rounded-lg bg-red-50/10"><div className="text-[10px] font-black text-red-600 uppercase mb-4 underline decoration-red-300 decoration-2">Safety Protocol Verification</div><div className="space-y-3"><label className="flex items-center gap-3 cursor-pointer group"><input type="checkbox" checked={cifData.phoneNotified} onChange={(e) => setCifData({...cifData, phoneNotified: e.target.checked})} className="w-5 h-5 accent-red-600" /><span className="text-[10px] font-black text-slate-700 uppercase group-hover:text-red-600">Immediate Phone Notification to District Bridge Office Complete</span></label><label className="flex items-center gap-3 cursor-pointer group"><input type="checkbox" checked={cifData.assetWiseLogged} onChange={(e) => setCifData({...cifData, assetWiseLogged: e.target.checked})} className="w-5 h-5 accent-blue-600" /><span className="text-[10px] font-black text-slate-700 uppercase group-hover:text-blue-600">AssetWise FUA Transitioned to "District Bridge Review"</span></label></div></div>
+              </div>
+            </div>
+            <div className="p-6 bg-slate-50 border-t border-slate-200 shrink-0"><button onClick={completeCIF} className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all ${(!cifData.phoneNotified || !cifData.assetWiseLogged) ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-inner' : 'bg-red-600 text-white hover:bg-red-700 shadow-xl'}`}>Finalize CIF Safety Record</button></div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: FOLLOW-UP ACTION (FUA) - MAINTENANCE */}
+      {showFUAModal && (
+        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-[100] flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl border-4 border-blue-600 flex flex-col max-h-[95vh]">
+            <div className="p-6 bg-blue-600 text-white flex items-center justify-between shrink-0"><div className="flex items-center gap-3"><Wrench size={32} /><div><h2 className="text-xl font-black uppercase tracking-tighter leading-none">Maintenance Follow-Up Action</h2><p className="text-[10px] font-bold opacity-80 uppercase tracking-widest mt-1">AssetWise Maintenance Module Sync</p></div></div><button onClick={() => setShowFUAModal(false)} className="p-2 hover:bg-blue-700 rounded-full transition-all"><X size={24}/></button></div>
+            <div className="p-6 overflow-y-auto space-y-6">
+              <div className="border-2 border-slate-200 p-6 rounded-xl bg-white shadow-inner font-sans relative overflow-hidden"><div className="grid grid-cols-2 gap-x-8 gap-y-4 text-[11px] mb-8"><div className="border-b border-slate-200 pb-1"><span className="text-[9px] font-bold text-slate-400 block uppercase">Priority Level (Rec Type)</span><select value={fuaData.priority} onChange={(e)=>setFuaData({...fuaData, priority: e.target.value})} className="w-full font-black outline-none bg-blue-50/50"><option value="Level 1">Level 1 (30 Days)</option><option value="Level 2">Level 2 (6 Months)</option><option value="Level 3">Level 3 (24 Months)</option><option value="Level 4">Level 4 (No Timeframe)</option></select></div><div className="border-b border-slate-200 pb-1"><span className="text-[9px] font-bold text-slate-400 block uppercase">Previously Recommended?</span><select value={fuaData.previouslyRecommended} onChange={(e)=>setFuaData({...fuaData, previouslyRecommended: e.target.value})} className="w-full font-black outline-none bg-blue-50/50"><option value="N">No</option><option value="Y">Yes</option></select></div></div><div className="space-y-4"><div><div className="text-[10px] font-black text-slate-800 uppercase mb-1">Description of Issue</div><textarea value={fuaData.description} onChange={(e)=>setFuaData({...fuaData, description: e.target.value})} className="w-full h-24 bg-blue-50/30 border border-slate-300 rounded p-3 text-xs font-bold" /></div><div><div className="text-[10px] font-black text-slate-800 uppercase mb-1">Remedial Recommendation</div><textarea value={fuaData.recommendation} onChange={(e)=>setFuaData({...fuaData, recommendation: e.target.value})} className="w-full h-24 bg-blue-50/30 border border-slate-300 rounded p-3 text-xs font-bold" /></div></div><div className="mt-8"><div className="flex items-center justify-between mb-2"><span className="text-[10px] font-black text-blue-600 uppercase underline">Remedial Evidence Manifest</span><label className="bg-blue-600 text-white px-3 py-1 rounded text-[8px] font-black uppercase cursor-pointer flex items-center gap-1 hover:bg-blue-700 shadow-sm"><Camera size={12}/> Append Evidence<input type="file" multiple accept="image/*" className="hidden" onChange={(e)=>handlePhotoUpload(e, 'fua')} /></label></div><div className="grid grid-cols-1 gap-4">
+                    {fuaData.photos.map((p, idx) => (<div key={idx} className="flex gap-4 bg-slate-50 p-3 rounded-xl border border-slate-200"><img src={p.url} className="w-24 h-24 rounded-lg object-cover border-2 border-white shadow-md" alt="evidence" /><div className="flex-1 space-y-2"><div className="flex gap-1 items-center mb-1"><input placeholder="Description..." value={p.description} onChange={(e) => updatePhotoDescription(idx, e.target.value, 'fua')} className="flex-1 bg-white border border-slate-300 rounded p-1 text-[10px] font-bold outline-none" /><button onClick={() => copyNoteToPhoto(idx, 'fua')} className="p-1.5 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors"><Copy size={12}/></button></div></div><button onClick={() => removePhoto(idx, 'fua')} className="text-slate-300 hover:text-red-600 self-center"><X size={18}/></button></div>))}
+                  </div></div>
+                {(fuaData.priority === 'Level 1' || fuaData.priority === 'Level 2') && (<div className="mt-8 p-4 border-2 border-orange-500 rounded-lg bg-orange-50"><div className="flex items-center gap-2 text-orange-700 font-black text-[10px] uppercase mb-3"><Phone size={14}/> Urgent Notification Required</div><label className="flex items-center gap-3 cursor-pointer"><input type="checkbox" checked={fuaData.phoneNotified} onChange={(e)=>setFuaData({...fuaData, phoneNotified: e.target.checked})} className="w-5 h-6 accent-orange-600" /><span className="text-[10px] font-black text-slate-700 uppercase">Confirmed: District Phone Notification Logged</span></label></div>)}
+                <div className="mt-4 p-4 border-2 border-blue-500 rounded-lg bg-blue-50"><label className="flex items-center gap-3 cursor-pointer"><input type="checkbox" checked={fuaData.assetWiseLogged} onChange={(e)=>setFuaData({...fuaData, assetWiseLogged: e.target.checked})} className="w-5 h-5 accent-blue-600" /><span className="text-[10px] font-black text-slate-700 uppercase">Synchronized with AssetWise Maintenance Module</span></label></div></div></div>
+            <div className="p-6 bg-slate-50 border-t border-slate-200 shrink-0"><button onClick={completeFUA} className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all ${((fuaData.priority === 'Level 1' || fuaData.priority === 'Level 2') && !fuaData.phoneNotified) || !fuaData.assetWiseLogged ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-inner' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-xl'}`}>Finalize Follow-Up Action Record</button></div>
+          </div>
+        </div>
+      )}
+
+      <nav className="fixed bottom-0 left-0 right-0 h-20 bg-white border-t border-slate-200 flex items-center justify-around z-50 shadow-[0_-10px_30px_-10px_rgba(0,0,0,0.15)] px-4">
+        <button onClick={() => setView('inspection')} className={`flex-1 flex flex-col items-center justify-center transition-all h-full ${view === 'inspection' ? 'text-blue-600 border-t-4 border-blue-600 bg-blue-50/30 shadow-inner' : 'text-slate-300 hover:text-slate-500'}`}><Zap size={22}/><span className="text-[9px] font-black uppercase mt-1.5 tracking-widest">Element Data</span></button>
+        <button onClick={() => setView('nbi')} className={`flex-1 flex flex-col items-center justify-center transition-all h-full ${view === 'nbi' ? 'text-blue-600 border-t-4 border-blue-600 bg-blue-50/30 shadow-inner' : 'text-slate-300 hover:text-slate-500'}`}><ClipboardList size={22}/><span className="text-[9px] font-black uppercase mt-1.5 tracking-widest">NBI Ratings</span></button>
+        <button onClick={() => setView('summary')} className={`flex-1 flex flex-col items-center justify-center transition-all h-full ${view === 'summary' ? 'text-blue-600 border-t-4 border-blue-600 bg-blue-50/30 shadow-inner' : 'text-slate-300 hover:text-slate-500'}`}><BarChart3 size={22}/><span className="text-[9px] font-black uppercase mt-1.5 tracking-widest">Summary</span></button>
+      </nav>
+    </div>
+  );
+}
