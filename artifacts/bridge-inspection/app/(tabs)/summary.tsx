@@ -38,7 +38,7 @@ export default function SummaryScreen() {
         <View style={styles.headerRow}>
           <View style={styles.headerInner}>
             <Feather name="layers" size={16} color="#38bdf8" />
-            <Text style={styles.headerTitle}>Structural Summary</Text>
+            <Text style={styles.headerTitle}>Summary Tables</Text>
             <View style={[styles.modulePill, { backgroundColor: inspectionType === INSPECTION_TYPES.TOPSIDE ? "#0284c7" : "#1e293b" }]}>
               <Text style={styles.modulePillText}>{inspectionType === INSPECTION_TYPES.TOPSIDE ? "▲" : "▼"} {inspectionType}</Text>
             </View>
