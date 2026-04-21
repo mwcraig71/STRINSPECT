@@ -52,12 +52,12 @@ export default function SummaryScreen() {
 
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
 
-        {/* ── Structural Analysis Matrix ── */}
+        {/* ── Element Data ── */}
         <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
           <View style={styles.cardHeader}>
             <View style={styles.cardHeaderLeft}>
               <Feather name="bar-chart-2" size={20} color={c.primary} />
-              <Text style={[styles.cardTitle, { color: c.foreground }]}>Structural Analysis Matrix</Text>
+              <Text style={[styles.cardTitle, { color: c.foreground }]}>Element Data</Text>
             </View>
           </View>
           {/* Column headers */}
