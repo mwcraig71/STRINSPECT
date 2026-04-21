@@ -592,11 +592,7 @@ export default function InspectionScreen() {
           </View>
         )}
 
-        <View style={{ height: 100 }} />
-      </KeyboardAwareScrollViewCompat>
-
-      {/* ── Pinned Commit Button ── */}
-      <View style={[styles.commitBar, { backgroundColor: c.background, borderTopColor: c.border }]}>
+        {/* ── Save Button ── */}
         <TouchableOpacity
           style={[styles.saveBtn, { backgroundColor: c.headerBg }]}
           onPress={onSave}
@@ -607,7 +603,9 @@ export default function InspectionScreen() {
             {editId ? "UPDATE RECORD" : "COMMIT LOG"}
           </Text>
         </TouchableOpacity>
-      </View>
+
+        <View style={{ height: 20 }} />
+      </KeyboardAwareScrollViewCompat>
 
       <CIFModal />
       <FUAModal />
@@ -641,18 +639,13 @@ const styles = StyleSheet.create({
   },
   moduleToggleHeaderText: { fontSize: 10, fontWeight: "900", textTransform: "uppercase", letterSpacing: 0.5 },
   gearBtn: { padding: 8, borderRadius: 10 },
-  commitBar: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderTopWidth: 1,
-  },
   scroll: { flex: 1 },
-  scrollContent: { padding: 12, gap: 12 },
+  scrollContent: { padding: 10, gap: 8 },
   section: {
-    borderRadius: 14,
-    padding: 14,
+    borderRadius: 12,
+    padding: 10,
     borderTopWidth: 3,
-    gap: 10,
+    gap: 7,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
@@ -668,9 +661,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     borderWidth: 1,
     borderRadius: 10,
-    padding: 12,
+    padding: 9,
   },
-  pickerValue: { fontSize: 14, fontWeight: "800", flex: 1 },
+  pickerValue: { fontSize: 13, fontWeight: "800", flex: 1 },
   dropdownList: {
     borderWidth: 1,
     borderRadius: 10,
@@ -692,14 +685,14 @@ const styles = StyleSheet.create({
   csGrid: { flexDirection: "row", gap: 4 },
   csBtn: { flex: 1, paddingVertical: 8, borderRadius: 8, borderWidth: 1, alignItems: "center" },
   csBtnText: { fontSize: 9, fontWeight: "900" },
-  input: { borderWidth: 1, borderRadius: 10, padding: 10, fontSize: 15, fontWeight: "800" },
+  input: { borderWidth: 1, borderRadius: 10, padding: 8, fontSize: 14, fontWeight: "800" },
   textArea: {
     borderWidth: 1,
     borderRadius: 10,
-    padding: 10,
-    fontSize: 13,
+    padding: 8,
+    fontSize: 12,
     fontWeight: "600",
-    minHeight: 80,
+    minHeight: 52,
     textAlignVertical: "top",
   },
   photoSection: { gap: 8 },
@@ -710,12 +703,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    paddingVertical: 12,
-    borderRadius: 12,
+    gap: 7,
+    paddingVertical: 9,
+    borderRadius: 10,
     borderWidth: 1.5,
   },
-  photoBtnLargeText: { fontSize: 13, fontWeight: "800", textTransform: "uppercase" },
+  photoBtnLargeText: { fontSize: 12, fontWeight: "800", textTransform: "uppercase" },
   photoRow: { flexDirection: "row", alignItems: "center", gap: 8, padding: 8, borderRadius: 10, borderWidth: 1 },
   photoThumb: { width: 50, height: 50, borderRadius: 8 },
   photoInfo: { flex: 1 },
