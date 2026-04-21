@@ -162,13 +162,33 @@ export default function InspectionScreen() {
           <View style={styles.headerTitle}>
             <Feather name="activity" size={16} color="#38bdf8" />
             <Text style={styles.headerTitleText}>Bridge Inspection</Text>
-            <View style={[styles.modulePill, { backgroundColor: inspectionType === INSPECTION_TYPES.TOPSIDE ? "#0284c7" : "#1e293b" }]}>
-              <Text style={styles.modulePillText}>{inspectionType === INSPECTION_TYPES.TOPSIDE ? "▲" : "▼"} {inspectionType}</Text>
-            </View>
           </View>
-          <TouchableOpacity style={[styles.gearBtn, { backgroundColor: "#1e293b" }]} onPress={() => setSettingsOpen(true)}>
-            <Feather name="settings" size={16} color="#94a3b8" />
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={[
+                styles.moduleToggleHeaderBtn,
+                { backgroundColor: inspectionType === INSPECTION_TYPES.TOPSIDE ? "#0284c7" : "#0f172a" },
+              ]}
+              onPress={() => setInspectionType(
+                inspectionType === INSPECTION_TYPES.TOPSIDE ? INSPECTION_TYPES.UNDERSIDE : INSPECTION_TYPES.TOPSIDE
+              )}
+            >
+              <Feather
+                name={inspectionType === INSPECTION_TYPES.TOPSIDE ? "arrow-up" : "arrow-down"}
+                size={12}
+                color={inspectionType === INSPECTION_TYPES.TOPSIDE ? "#fff" : "#38bdf8"}
+              />
+              <Text style={[
+                styles.moduleToggleHeaderText,
+                { color: inspectionType === INSPECTION_TYPES.TOPSIDE ? "#fff" : "#38bdf8" },
+              ]}>
+                {inspectionType}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.gearBtn, { backgroundColor: "#1e293b" }]} onPress={() => setSettingsOpen(true)}>
+              <Feather name="settings" size={16} color="#94a3b8" />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
       <SettingsModal visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
@@ -179,34 +199,6 @@ export default function InspectionScreen() {
         keyboardShouldPersistTaps="handled"
         bottomOffset={24}
       >
-        {/* ── Module Toggle ── */}
-        <View style={[styles.moduleToggleRow, { backgroundColor: c.card, borderColor: c.border }]}>
-          <TouchableOpacity
-            style={[
-              styles.moduleToggleBtn,
-              inspectionType === INSPECTION_TYPES.TOPSIDE
-                ? { backgroundColor: "#0284c7" }
-                : { backgroundColor: c.background, borderColor: c.border },
-            ]}
-            onPress={() => setInspectionType(INSPECTION_TYPES.TOPSIDE)}
-          >
-            <Feather name="arrow-up" size={14} color={inspectionType === INSPECTION_TYPES.TOPSIDE ? "#fff" : c.mutedForeground} />
-            <Text style={[styles.moduleToggleBtnText, { color: inspectionType === INSPECTION_TYPES.TOPSIDE ? "#fff" : c.mutedForeground }]}>Topside</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.moduleToggleBtn,
-              inspectionType === INSPECTION_TYPES.UNDERSIDE
-                ? { backgroundColor: "#0f172a" }
-                : { backgroundColor: c.background, borderColor: c.border },
-            ]}
-            onPress={() => setInspectionType(INSPECTION_TYPES.UNDERSIDE)}
-          >
-            <Feather name="arrow-down" size={14} color={inspectionType === INSPECTION_TYPES.UNDERSIDE ? "#38bdf8" : c.mutedForeground} />
-            <Text style={[styles.moduleToggleBtnText, { color: inspectionType === INSPECTION_TYPES.UNDERSIDE ? "#38bdf8" : c.mutedForeground }]}>Underside</Text>
-          </TouchableOpacity>
-        </View>
-
         {/* ── Location ── */}
         <View style={[styles.section, { backgroundColor: c.card, borderTopColor: c.headerBg }]}>
           <Text style={[styles.sectionLabel, { color: c.mutedForeground }]}>Location</Text>
@@ -468,18 +460,6 @@ export default function InspectionScreen() {
           </View>
         </View>
 
-        {/* ── Save Button ── */}
-        <TouchableOpacity
-          style={[styles.saveBtn, { backgroundColor: c.headerBg }]}
-          onPress={onSave}
-          testID="save-button"
-        >
-          <Feather name="save" size={20} color="#fff" />
-          <Text style={styles.saveBtnText}>
-            {editId ? "UPDATE RECORD" : "COMMIT LOG"}
-          </Text>
-        </TouchableOpacity>
-
         {/* ── Filters ── */}
         <View style={[styles.section, { backgroundColor: c.card, borderTopColor: c.border }]}>
           <View style={styles.filterHeader}>
@@ -615,6 +595,20 @@ export default function InspectionScreen() {
         <View style={{ height: 100 }} />
       </KeyboardAwareScrollViewCompat>
 
+      {/* ── Pinned Commit Button ── */}
+      <View style={[styles.commitBar, { backgroundColor: c.background, borderTopColor: c.border }]}>
+        <TouchableOpacity
+          style={[styles.saveBtn, { backgroundColor: c.headerBg }]}
+          onPress={onSave}
+          testID="save-button"
+        >
+          <Feather name="save" size={18} color="#fff" />
+          <Text style={styles.saveBtnText}>
+            {editId ? "UPDATE RECORD" : "COMMIT LOG"}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       <CIFModal />
       <FUAModal />
     </View>
@@ -636,9 +630,22 @@ const styles = StyleSheet.create({
   },
   headerTitle: { flexDirection: "row", alignItems: "center", gap: 7 },
   headerTitleText: { fontSize: 14, fontWeight: "900", color: "#f8fafc", letterSpacing: -0.3, textTransform: "uppercase" },
-  modulePill: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
-  modulePillText: { fontSize: 9, fontWeight: "900", color: "#fff", textTransform: "uppercase", letterSpacing: 0.5 },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: 8 },
+  moduleToggleHeaderBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  moduleToggleHeaderText: { fontSize: 10, fontWeight: "900", textTransform: "uppercase", letterSpacing: 0.5 },
   gearBtn: { padding: 8, borderRadius: 10 },
+  commitBar: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+  },
   scroll: { flex: 1 },
   scrollContent: { padding: 12, gap: 12 },
   section: {
@@ -695,23 +702,6 @@ const styles = StyleSheet.create({
     minHeight: 80,
     textAlignVertical: "top",
   },
-  moduleToggleRow: {
-    flexDirection: "row",
-    borderRadius: 14,
-    borderWidth: 1,
-    overflow: "hidden",
-    gap: 0,
-  },
-  moduleToggleBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 12,
-    borderWidth: 1,
-  },
-  moduleToggleBtnText: { fontSize: 12, fontWeight: "900", textTransform: "uppercase" },
   photoSection: { gap: 8 },
   photoSectionHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
   photoBtns: { flexDirection: "row", gap: 8 },
@@ -747,14 +737,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 12,
-    paddingVertical: 18,
-    borderRadius: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    gap: 10,
+    paddingVertical: 14,
+    borderRadius: 14,
+    elevation: 3,
   },
   saveBtnText: { fontSize: 14, fontWeight: "900", color: "#fff", letterSpacing: 1.5 },
   editBanner: {
