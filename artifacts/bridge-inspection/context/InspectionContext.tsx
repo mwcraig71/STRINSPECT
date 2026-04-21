@@ -697,7 +697,10 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         if (insType) setInspectionTypeState(insType);
         if (superType) setSuperstructureTypeState(superType);
         if (subType) setSubstructureTypeState(subType);
-        if (structNum) setStructureNumberState(structNum);
+        if (structNum) {
+          setStructureNumberState(structNum);
+          setCifData((prev) => ({ ...prev, structureNumber: structNum }));
+        }
       } catch {}
     };
     load();
@@ -1262,9 +1265,10 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
             parsedNum ? `Structure: ${parsedNum}` : "Structure number not found."
           }\n\nAssign locations and verify records before submitting.`
         );
-      } catch (err: any) {
+      } catch (err: unknown) {
         const { Alert } = require("react-native");
-        Alert.alert("Import Failed", err?.message || "Could not parse the PDF. Ensure the file is a valid TxDOT inspection report.");
+        const message = err instanceof Error ? err.message : "Could not parse the PDF. Ensure the file is a valid TxDOT inspection report.";
+        Alert.alert("Import Failed", message);
       } finally {
         setParsingActive(false);
       }

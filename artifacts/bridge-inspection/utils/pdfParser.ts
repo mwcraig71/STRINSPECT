@@ -48,25 +48,34 @@ async function loadPdfText(source: PdfSource): Promise<string[][]> {
     const page = await pdf.getPage(pageNum);
     const textContent = await page.getTextContent();
 
-    const rowMap = new Map<number, { x: number; text: string }[]>();
+    const rowMap = new Map<number, { x: number; rightEdge: number; text: string }[]>();
     for (const item of textContent.items) {
       if (!("str" in item) || !item.str.trim()) continue;
       const x = item.transform[4];
       const y = item.transform[5];
+      const w = item.width;
       const yKey = Math.round(y / 2) * 2;
       if (!rowMap.has(yKey)) rowMap.set(yKey, []);
-      rowMap.get(yKey)!.push({ x, text: item.str });
+      rowMap.get(yKey)!.push({ x, rightEdge: x + w, text: item.str });
     }
 
+    const COLUMN_GAP_PX = 15;
     const sortedYs = Array.from(rowMap.keys()).sort((a, b) => b - a);
     const pageLines: string[] = [];
     for (const y of sortedYs) {
       const items = rowMap.get(y)!.sort((a, b) => a.x - b.x);
-      const line = items
-        .map((i) => i.text)
-        .join(" ")
-        .replace(/\s+/g, " ")
-        .trim();
+      let line = "";
+      let prevRightEdge = -1;
+      for (const item of items) {
+        if (prevRightEdge < 0) {
+          line = item.text;
+        } else {
+          const gap = item.x - prevRightEdge;
+          line += (gap > COLUMN_GAP_PX ? "  " : " ") + item.text;
+        }
+        prevRightEdge = item.rightEdge;
+      }
+      line = line.trim();
       if (line) pageLines.push(line);
     }
     allPages.push(pageLines);

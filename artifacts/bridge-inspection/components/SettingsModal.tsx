@@ -52,8 +52,9 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
       const asset = result.assets[0];
       onClose();
       await importFromPdf({ uri: asset.uri, name: asset.name });
-    } catch (err: any) {
-      Alert.alert("Error", err?.message || "Could not open document picker.");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Could not open document picker.";
+      Alert.alert("Error", message);
     }
   };
 
