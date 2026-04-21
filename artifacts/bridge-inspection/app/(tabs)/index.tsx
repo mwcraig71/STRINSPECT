@@ -288,7 +288,7 @@ export default function InspectionScreen() {
           {/* Defect + CS row */}
           <View style={styles.twoCol}>
             <View style={styles.colLeft}>
-              <Text style={[styles.fieldLabel, { color: c.mutedForeground }]}>Active Defect Mode</Text>
+              <Text style={[styles.fieldLabel, { color: c.mutedForeground }]}>Defect Type</Text>
               <TouchableOpacity
                 style={[styles.picker, { backgroundColor: c.secondary, borderColor: c.border }]}
                 onPress={() => setDefectPickerOpen(!defectPickerOpen)}
