@@ -368,7 +368,7 @@ export default function InspectionScreen() {
             <View style={styles.photoSectionHeader}>
               <View style={styles.photoSectionLeft}>
                 <Feather name="image" size={14} color={c.mutedForeground} />
-                <Text style={[styles.fieldLabel, { color: c.mutedForeground }]}>Diagnostic Media</Text>
+                <Text style={[styles.fieldLabel, { color: c.mutedForeground }]}>Photos</Text>
               </View>
               <View style={styles.photoBtns}>
                 <TouchableOpacity
