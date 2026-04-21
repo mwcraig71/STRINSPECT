@@ -1,0 +1,27 @@
+kind = "mobile"
+previewPath = "/"
+title = "Bridge Inspection"
+version = "1.0.0"
+id = "artifacts/bridge-inspection"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+ensurePreviewReachable = "/status"
+name = "expo"
+paths = [ "/" ]
+localPort = 23106
+
+[services.development]
+run = "pnpm --filter @workspace/bridge-inspection run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/bridge-inspection", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/bridge-inspection", "run", "serve" ]
+
+[services.env]
+PORT = "23106"
+BASE_PATH = "/"
