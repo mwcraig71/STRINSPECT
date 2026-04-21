@@ -37,7 +37,6 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
     setSuperstructureType,
     substructureType,
     setSubstructureType,
-    simulateLegacyImport,
     importFromPdf,
     parsingActive,
   } = useInspection();

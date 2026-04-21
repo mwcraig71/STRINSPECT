@@ -363,7 +363,7 @@ const INITIAL_NBI_RATINGS: NbiRating[] = [
 ];
 
 const INITIAL_CIF: CifData = {
-  structureNumber: "18-061-0081-13-133",
+  structureNumber: "",
   inspectionDate: new Date().toLocaleDateString("en-US"),
   findings: "",
   defectDistress: "",
@@ -376,7 +376,7 @@ const INITIAL_CIF: CifData = {
 };
 
 const INITIAL_FUA: FuaData = {
-  fuaId: "645238",
+  fuaId: "",
   priority: "Level 3",
   previouslyRecommended: "N",
   description: "",
@@ -485,7 +485,6 @@ interface InspectionContextType {
     field: string,
     value: string
   ) => void;
-  simulateLegacyImport: () => void;
   importFromPdf: (source: File | { uri: string; name?: string }) => Promise<void>;
   parsingActive: boolean;
 }
@@ -1006,134 +1005,6 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     [nbiRatings, setNbiRatings]
   );
 
-  const simulateLegacyImport = useCallback(() => {
-    setParsingActive(true);
-    setTimeout(() => {
-      // ── NBI ratings from 02/15/2025 inspection report ──
-      const reportNbi: { item: string; comp: string; rating: string; desc?: string; comment: string }[] = [
-        // Item 58 - Deck
-        { item: "58", comp: "Deck - Component Rating", rating: "7", comment: "The deck underside exhibits isolated insignificant transverse cracks with isolated light efflorescence and isolated minor honeycombing. Deck overhang soffits exhibit minor spalls at bents and at the southwest bridge corner. Spans have shifted laterally up to 1/2\" along joints." },
-        { item: "58", comp: "Wearing Surface", rating: "7", desc: "~2\" Asphalt", comment: "Asphalt wearing surface has minor to moderate wear. The asphalt wearing surface exhibits up to 1/8\" wide transverse cracks and isolated up to 6\" wide by full depth potholes over the full width of the bridge at deck joints." },
-        { item: "58", comp: "Joints, Expansion, Open", rating: "N", comment: "" },
-        { item: "58", comp: "Joints, Expansion, Sealed", rating: "7", comment: "Deck joints are paved over. Visible portions of the deck joints have missing seals." },
-        { item: "58", comp: "Joints, Other", rating: "N", comment: "" },
-        { item: "58", comp: "Drainage System", rating: "8", comment: "" },
-        { item: "58", comp: "Curbs, Sidewalk & Parapets", rating: "N", comment: "" },
-        { item: "58", comp: "Median Barrier", rating: "N", comment: "" },
-        { item: "58", comp: "Railings", rating: "7", desc: "SSTR", comment: "Concrete bridge railings have medium (<1/32\" wide) transverse cracks." },
-        { item: "58", comp: "Railing Protective Coating", rating: "N", comment: "" },
-        { item: "58", comp: "Delineation", rating: "N", comment: "" },
-        { item: "58", comp: "Other", rating: "N", comment: "" },
-        // Item 59 - Superstructure
-        { item: "59", comp: "Main Members - Steel", rating: "N", comment: "" },
-        { item: "59", comp: "Main Members - Concrete", rating: "7", comment: "Beam ends exhibit isolated minor spalls, some with exposed reinforcement. Beam 1 in Span 1 exhibits several shallow impact spalls and scrapes. Beam 4 in Span 1 has a minor spall with exposed reinforcement in the east face of the bottom flange at the abutment." },
-        { item: "59", comp: "Main Members - Timber", rating: "N", comment: "" },
-        { item: "59", comp: "Main Members - Connections", rating: "N", comment: "" },
-        { item: "59", comp: "Floor System Members", rating: "N", comment: "" },
-        { item: "59", comp: "Floor System Connections", rating: "N", comment: "" },
-        { item: "59", comp: "Secondary Members", rating: "8", comment: "" },
-        { item: "59", comp: "Secondary Mem. Connections", rating: "7", comment: "Nuts are missing at multiple diaphragm connections." },
-        { item: "59", comp: "Expansion Bearings", rating: "8", comment: "" },
-        { item: "59", comp: "Fixed Bearings", rating: "8", comment: "" },
-        { item: "59", comp: "Steel Protective Coating", rating: "N", comment: "" },
-        { item: "59", comp: "Overall Component Rating", rating: "7", comment: "" },
-        // Item 60 - Substructure
-        { item: "60", comp: "Abutment Caps", rating: "7", comment: "Abutment caps exhibit isolated insignificant vertical cracks and minor delaminations. There is a full width by 18\" high by 6\" deep spall in the west end of the Abutment 8 cap, and a similar, but less significant, spall is present in the west end of the Abutment 1 cap." },
-        { item: "60", comp: "Above Ground", rating: "N", comment: "" },
-        { item: "60", comp: "Below Ground or Foundation", rating: "8", comment: "" },
-        { item: "60", comp: "Backwalls & Wingwalls", rating: "6", comment: "Backwalls exhibit insignificant to medium (<1/32\" wide) vertical and diagonal cracks, some with light efflorescence. The backwalls also have several up to 1/8\" wide vertical and diagonal cracks with light to moderate efflorescence and light rust staining, and minor to moderate delaminations at the wingwall connections. The wingwalls exhibit insignificant diagonal cracks with light efflorescence." },
-        { item: "60", comp: "Caps - Concrete", rating: "7", comment: "Bent caps exhibit isolated insignificant flexural cracks near midspan between columns and isolated minor delaminations and spalls with exposed reinforcement." },
-        { item: "60", comp: "Caps - Steel", rating: "N", comment: "" },
-        { item: "60", comp: "Caps - Timber", rating: "N", comment: "" },
-        { item: "60", comp: "Above Ground - Concrete", rating: "7", comment: "Columns at Bents 2, 3, 4, and 7 exhibit isolated insignificant to medium (<1/32\" wide) horizontal cracks. Column 4 at Bent 5 exhibits minor honeycombing and a moderate (15\" wide by 12\" high by 1 1/2\" deep) honeycomb/spall with exposed and corroded reinforcement near the base. Column 2 at Bent 6 exhibits a 30\" wide by 6\" high by 1\" deep spall with exposed reinforcement at the top." },
-        { item: "60", comp: "Above Ground - Steel", rating: "N", comment: "" },
-        { item: "60", comp: "Above Ground - Timber", rating: "N", comment: "" },
-        { item: "60", comp: "Above Ground - Masonry", rating: "N", comment: "" },
-        { item: "60", comp: "Below Ground (Int. Supports)", rating: "8", comment: "" },
-        { item: "60", comp: "Collision Protection System", rating: "N", comment: "" },
-        { item: "60", comp: "Steel Protective Coating", rating: "N", comment: "" },
-        { item: "60", comp: "Overall Component Rating", rating: "6", comment: "" },
-        // Item 61 - Channel
-        { item: "61", comp: "Channel Banks", rating: "N", comment: "" },
-        { item: "61", comp: "Channel Bed", rating: "N", comment: "" },
-        { item: "61", comp: "Rip Rap, Toe Walls & Apron", rating: "N", comment: "" },
-        { item: "61", comp: "Overall Component Rating", rating: "N", comment: "" },
-        // Item 65 - Approaches
-        { item: "65", comp: "Embankments", rating: "7", comment: "The edges of the concrete rip rap are exposed up to 6\" high and the rip rap have settled up to 6\" along the wingwalls." },
-        { item: "65", comp: "Embankment Retaining Walls", rating: "N", comment: "" },
-        { item: "65", comp: "Slope Protection", rating: "7", comment: "The rip rap slopes exhibit up to 1/16\" wide random cracks, minor spalls, and minor settlement along joints. There are several up to 3' long fractured portions of the rip rap curbs." },
-        { item: "65", comp: "Roadway", rating: "7", comment: "Asphalt approach roadways have minor to moderate wear. Up to 1/8\" wide by full width transverse cracks are present in the asphalt approach roadways at the relief joints." },
-        { item: "65", comp: "Relief Joints", rating: "8", comment: "" },
-        { item: "65", comp: "Drainage", rating: "8", comment: "" },
-        { item: "65", comp: "Guardfence", rating: "7", comment: "The northeast corner approach guardfence has minor impact damage at the transition." },
-        { item: "65", comp: "Delineation", rating: "8", comment: "" },
-        { item: "65", comp: "Sight Distance", rating: "8", comment: "" },
-        { item: "65", comp: "Overall Component Rating", rating: "7", comment: "" },
-        // Item 36 - Traffic Safety
-        { item: "36", comp: "Bridge Rails", rating: "1", desc: "SSTR", comment: "" },
-        { item: "36", comp: "Transitions", rating: "1", desc: "Thrie Beam", comment: "" },
-        { item: "36", comp: "Approach Rails", rating: "1", desc: "MBGF", comment: "" },
-        { item: "36", comp: "Approach Rail Ends", rating: "1", desc: "Continuous", comment: "" },
-        // Item 71 - Waterway
-        { item: "71", comp: "Waterway Adequacy", rating: "N", comment: "" },
-        // Item 72 - Approach Alignment
-        { item: "72", comp: "Approach Roadway Alignment", rating: "8", comment: "Regulatory / Advisory Speeds: 70 mph / 70 mph" },
-      ];
-
-      // Merge report data into current NBI ratings (set previousComments + rating if blank)
-      const updatedNbi = nbiRatings.map((item) => ({
-        ...item,
-        subComponents: item.subComponents.map((sub) => {
-          const match = reportNbi.find(
-            (r) => r.item === item.item && r.comp === sub.name
-          );
-          if (!match) return sub;
-          const wasBlank = !sub.rating;
-          return {
-            ...sub,
-            rating: wasBlank ? match.rating : sub.rating,
-            desc: sub.desc || (match.desc ?? sub.desc),
-            previousComments: match.comment,
-            isImported: wasBlank && !!match.rating,
-          };
-        }),
-      }));
-      setNbiRatings(updatedNbi);
-
-      // ── Defect records from ELEMENTS section ──
-      const ts = Date.now();
-      const importedDefects: DefectRecord[] = [
-        // Element 12 - RC Deck
-        { id: `imp-${ts}-1`, location: "Span 1", elementId: "12", element: "RC Deck", environment: "3", defect: "Spalling/Delamination", defectId: "spall", cs: "CS2", quantityValue: "10", maintenanceQuantityValue: "10", quantity: "10 sq ft", size: "", locationDesc: "Delamination/Spall/Patched Area — 2025 Report", needsVerification: true, isLegacy: true, isImported: true, photos: [], photosCount: 0, isCritical: false, isMaintenance: false },
-        { id: `imp-${ts}-2`, location: "Span 2", elementId: "12", element: "RC Deck", environment: "3", defect: "Cracking", defectId: "crack", cs: "CS2", quantityValue: "150", maintenanceQuantityValue: "150", quantity: "150 sq ft", size: "", locationDesc: "Efflorescence/Rust Staining — 2025 Report", needsVerification: true, isLegacy: true, isImported: true, photos: [], photosCount: 0, isCritical: false, isMaintenance: false },
-        // Element 109 - PSC Girder
-        { id: `imp-${ts}-3`, location: "Span 1", elementId: "109", element: "PSC Girder", environment: "3", defect: "Spalling/Delamination", defectId: "spall", cs: "CS2", quantityValue: "20", maintenanceQuantityValue: "20", quantity: "20 ft", size: "", locationDesc: "Delamination/Spall/Patched Area — 2025 Report", needsVerification: true, isLegacy: true, isImported: true, photos: [], photosCount: 0, isCritical: false, isMaintenance: false },
-        { id: `imp-${ts}-4`, location: "Span 1", elementId: "109", element: "PSC Girder", environment: "3", defect: "Spalling/Delamination", defectId: "spall", cs: "CS2", quantityValue: "3", maintenanceQuantityValue: "3", quantity: "3 ft", size: "", locationDesc: "Exposed Rebar — 2025 Report", needsVerification: true, isLegacy: true, isImported: true, photos: [], photosCount: 0, isCritical: false, isMaintenance: false },
-        // Element 205 - RC Column
-        { id: `imp-${ts}-5`, location: "Bent 5", elementId: "205", element: "RC Column", environment: "3", defect: "Spalling/Delamination", defectId: "spall", cs: "CS3", quantityValue: "1", maintenanceQuantityValue: "1", quantity: "1 ea", size: "", locationDesc: "Delamination/Spall — Col 4 at Bent 5, 15\"×12\"×1.5\" deep — 2025 Report", needsVerification: true, isLegacy: true, isImported: true, photos: [], photosCount: 0, isCritical: false, isMaintenance: false },
-        { id: `imp-${ts}-6`, location: "Bent 6", elementId: "205", element: "RC Column", environment: "3", defect: "Spalling/Delamination", defectId: "spall", cs: "CS3", quantityValue: "1", maintenanceQuantityValue: "1", quantity: "1 ea", size: "", locationDesc: "Exposed Rebar — Col 2 at Bent 6, 30\"×6\"×1\" deep — 2025 Report", needsVerification: true, isLegacy: true, isImported: true, photos: [], photosCount: 0, isCritical: false, isMaintenance: false },
-        { id: `imp-${ts}-7`, location: "Bent 2", elementId: "205", element: "RC Column", environment: "3", defect: "Cracking", defectId: "crack", cs: "CS2", quantityValue: "9", maintenanceQuantityValue: "9", quantity: "9 ea", size: "", locationDesc: "Cracking (RC) at Bents 2, 3, 4, 7 — 2025 Report", needsVerification: true, isLegacy: true, isImported: true, photos: [], photosCount: 0, isCritical: false, isMaintenance: false },
-        // Element 215 - RC Abutment
-        { id: `imp-${ts}-8`, location: "Abutment 1", elementId: "215", element: "RC Abutment", environment: "3", defect: "Spalling/Delamination", defectId: "spall", cs: "CS2", quantityValue: "5", maintenanceQuantityValue: "5", quantity: "5 ft", size: "", locationDesc: "Delamination/Spall at Abutment 1 backwall — 2025 Report", needsVerification: true, isLegacy: true, isImported: true, photos: [], photosCount: 0, isCritical: false, isMaintenance: false },
-        { id: `imp-${ts}-9`, location: "Abutment 8", elementId: "215", element: "RC Abutment", environment: "3", defect: "Spalling/Delamination", defectId: "spall", cs: "CS3", quantityValue: "2", maintenanceQuantityValue: "2", quantity: "2 ft", size: "", locationDesc: "Major spall full width 18\"×6\" deep — Abutment 8 cap — 2025 Report", needsVerification: true, isLegacy: true, isImported: true, photos: [], photosCount: 0, isCritical: false, isMaintenance: false },
-        { id: `imp-${ts}-10`, location: "Abutment 1", elementId: "215", element: "RC Abutment", environment: "3", defect: "Cracking", defectId: "crack", cs: "CS2", quantityValue: "20", maintenanceQuantityValue: "20", quantity: "20 ft", size: "", locationDesc: "Efflorescence/Rust Staining at backwall — 2025 Report", needsVerification: true, isLegacy: true, isImported: true, photos: [], photosCount: 0, isCritical: false, isMaintenance: false },
-        // Element 234 - RC Cap
-        { id: `imp-${ts}-11`, location: "Bent 3", elementId: "234", element: "RC Cap", environment: "3", defect: "Spalling/Delamination", defectId: "spall", cs: "CS2", quantityValue: "10", maintenanceQuantityValue: "10", quantity: "10 ft", size: "", locationDesc: "Delamination/Spall at bent caps — 2025 Report", needsVerification: true, isLegacy: true, isImported: true, photos: [], photosCount: 0, isCritical: false, isMaintenance: false },
-        { id: `imp-${ts}-12`, location: "Bent 3", elementId: "234", element: "RC Cap", environment: "3", defect: "Cracking", defectId: "crack", cs: "CS2", quantityValue: "4", maintenanceQuantityValue: "4", quantity: "4 ft", size: "", locationDesc: "Exposed Rebar at bent caps — 2025 Report", needsVerification: true, isLegacy: true, isImported: true, photos: [], photosCount: 0, isCritical: false, isMaintenance: false },
-        // Element 331 - RC Bridge Railing
-        { id: `imp-${ts}-13`, location: "Span 1", elementId: "331", element: "RC Bridge Railing", environment: "3", defect: "Cracking", defectId: "crack", cs: "CS2", quantityValue: "50", maintenanceQuantityValue: "50", quantity: "50 ft", size: "", locationDesc: "Cracking (RC) in bridge railings — 2025 Report", needsVerification: true, isLegacy: true, isImported: true, photos: [], photosCount: 0, isCritical: false, isMaintenance: false },
-        // FUA item - missing diaphragm nuts
-        { id: `imp-${ts}-14`, location: "Span 7", elementId: "109", element: "PSC Girder", environment: "3", defect: "Spalling/Delamination", defectId: "spall", cs: "CS2", quantityValue: "1", maintenanceQuantityValue: "1", quantity: "1 ft", size: "", locationDesc: "Missing diaphragm nuts at multiple connections near Abutment 8 — 2025 Report (FUA 556781)", needsVerification: true, isLegacy: true, isImported: true, photos: [], photosCount: 0, isCritical: false, isMaintenance: true },
-      ];
-
-      const filtered = importedDefects.filter(
-        (imp) => !savedDefects.some((d) => d.id === imp.id)
-      );
-      setSavedDefects([...filtered, ...savedDefects]);
-      setParsingActive(false);
-    }, 1500);
-  }, [savedDefects, setSavedDefects, nbiRatings, setNbiRatings]);
-
   const importFromPdf = useCallback(
     async (source: File | { uri: string; name?: string }) => {
       setParsingActive(true);
@@ -1359,7 +1230,6 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     updateSubComponent,
     structureNumber,
     setStructureNumber,
-    simulateLegacyImport,
     importFromPdf,
     parsingActive,
   };
