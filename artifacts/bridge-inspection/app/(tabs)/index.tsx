@@ -180,7 +180,7 @@ export default function InspectionScreen() {
       >
         {/* ── Location ── */}
         <View style={[styles.section, { backgroundColor: c.card, borderTopColor: c.headerBg }]}>
-          <Text style={[styles.sectionLabel, { color: c.mutedForeground }]}>Structural Stationing</Text>
+          <Text style={[styles.sectionLabel, { color: c.mutedForeground }]}>Location</Text>
           <Text style={[styles.fieldLabel, { color: c.mutedForeground }]}>Location</Text>
           <TouchableOpacity
             style={[styles.picker, { backgroundColor: c.background, borderColor: c.border }]}
