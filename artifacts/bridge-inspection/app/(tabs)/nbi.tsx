@@ -111,17 +111,24 @@ export default function NBIScreen() {
               return (
                 <View key={compIdx} style={styles.compContainer}>
                   {/* Component Header */}
-                  <View style={[styles.compHeader, { backgroundColor: c.background, borderColor: c.border }]}>
+                  <View style={[styles.compHeader, { backgroundColor: c.background, borderColor: comp.isImported ? "#f97316" : c.border }]}>
                     <View style={styles.compHeaderLeft}>
-                      <Text style={[styles.compName, { color: c.foreground }]}>{comp.name}</Text>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <Text style={[styles.compName, { color: c.foreground }]}>{comp.name}</Text>
+                        {comp.isImported && (
+                          <View style={styles.importedBadge}>
+                            <Text style={styles.importedBadgeText}>IMPORTED</Text>
+                          </View>
+                        )}
+                      </View>
                       <Text style={[styles.compMin, { color: c.mutedForeground }]}>Min: {comp.min}</Text>
                     </View>
                     <View style={styles.compHeaderRight}>
                       <TouchableOpacity
-                        style={[styles.ratingBadge, { backgroundColor: ratingColor }]}
+                        style={[styles.ratingBadge, { backgroundColor: comp.isImported ? "#f97316" : ratingColor }]}
                         onPress={() => setRatingPickerOpen(ratingPickerOpen === compIdx ? null : compIdx)}
                       >
-                        <Text style={styles.ratingBadgeText}>{comp.rating}</Text>
+                        <Text style={styles.ratingBadgeText}>{comp.rating || "—"}</Text>
                         <Feather name="chevron-down" size={10} color="#fff" />
                       </TouchableOpacity>
                     </View>
@@ -130,7 +137,12 @@ export default function NBIScreen() {
                   {/* Rating picker */}
                   {ratingPickerOpen === compIdx && (
                     <View style={[styles.ratingPicker, { backgroundColor: c.card, borderColor: c.border }]}>
-                      <Text style={[styles.ratingPickerTitle, { color: c.mutedForeground }]}>Select Rating</Text>
+                      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                        <Text style={[styles.ratingPickerTitle, { color: c.mutedForeground }]}>Select Rating</Text>
+                        {comp.isImported && (
+                          <Text style={[styles.ratingPickerTitle, { color: "#f97316" }]}>⚠ Pre-filled from 2025 Report</Text>
+                        )}
+                      </View>
                       <View style={styles.ratingGrid}>
                         {RATING_OPTIONS.map((r) => (
                           <TouchableOpacity
@@ -142,6 +154,9 @@ export default function NBIScreen() {
                             ]}
                             onPress={() => {
                               updateSubComponent(activeIdx, compIdx, "rating", r);
+                              if (comp.isImported) {
+                                updateSubComponent(activeIdx, compIdx, "isImported" as any, false);
+                              }
                               setRatingPickerOpen(null);
                             }}
                           >
@@ -371,6 +386,8 @@ const styles = StyleSheet.create({
   compHeaderRight: {},
   compName: { fontSize: 13, fontWeight: "800", textTransform: "uppercase" },
   compMin: { fontSize: 10, fontWeight: "600" },
+  importedBadge: { backgroundColor: "#fff7ed", borderWidth: 1, borderColor: "#f97316", borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 },
+  importedBadgeText: { fontSize: 9, fontWeight: "700", color: "#f97316", textTransform: "uppercase" },
   ratingBadge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 },
   ratingBadgeText: { fontSize: 20, fontWeight: "900", color: "#fff" },
   ratingPicker: { borderWidth: 1, borderRadius: 12, padding: 12, gap: 8 },

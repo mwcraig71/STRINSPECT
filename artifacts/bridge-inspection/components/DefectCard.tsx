@@ -32,6 +32,8 @@ export function DefectCard({ record, isLegacy, onEdit }: DefectCardProps) {
 
   const borderColor = record.isCritical
     ? "#dc2626"
+    : record.isImported
+    ? "#f97316"
     : record.isMaintenance
     ? c.primary
     : isLegacy && record.needsVerification
@@ -60,6 +62,8 @@ export function DefectCard({ record, isLegacy, onEdit }: DefectCardProps) {
         {
           backgroundColor: record.isCritical
             ? "#fff5f5"
+            : record.isImported
+            ? "#fff7ed"
             : record.isMaintenance
             ? "#eff6ff"
             : c.card,
@@ -101,6 +105,12 @@ export function DefectCard({ record, isLegacy, onEdit }: DefectCardProps) {
               <View style={[styles.flagBadge, { backgroundColor: "#eff6ff" }]}>
                 <Feather name="tool" size={11} color={c.primary} />
                 <Text style={[styles.flagText, { color: c.primary }]}>Maint</Text>
+              </View>
+            )}
+            {record.isImported && (
+              <View style={[styles.flagBadge, { backgroundColor: "#fff7ed", borderWidth: 1, borderColor: "#f97316" }]}>
+                <Feather name="download" size={10} color="#f97316" />
+                <Text style={[styles.flagText, { color: "#f97316" }]}>Imported</Text>
               </View>
             )}
             {record.needsVerification && (
