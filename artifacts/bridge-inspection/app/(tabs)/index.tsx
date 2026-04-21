@@ -352,7 +352,7 @@ export default function InspectionScreen() {
           </View>
 
           {/* Notes */}
-          <Text style={[styles.fieldLabel, { color: c.mutedForeground }]}>Defect Notes</Text>
+          <Text style={[styles.fieldLabel, { color: c.mutedForeground }]}>Size and Location</Text>
           <TextInput
             style={[styles.textArea, { backgroundColor: c.background, borderColor: c.border, color: c.foreground }]}
             value={locationDesc}
