@@ -691,6 +691,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
             null
         );
       }
+      setEnvironment(record.environment);
       setConditionState(record.cs);
       setQuantity(record.quantityValue);
       setMaintenanceQuantity(record.maintenanceQuantityValue || "");

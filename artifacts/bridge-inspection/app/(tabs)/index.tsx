@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
-import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
+import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import React, { useState } from "react";
 import {
   Alert,
@@ -219,7 +219,7 @@ export default function InspectionScreen() {
         </TouchableOpacity>
       </View>
 
-      <KeyboardAwareScrollView
+      <KeyboardAwareScrollViewCompat
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
@@ -678,7 +678,7 @@ export default function InspectionScreen() {
         )}
 
         <View style={{ height: 100 }} />
-      </KeyboardAwareScrollView>
+      </KeyboardAwareScrollViewCompat>
 
       <CIFModal />
       <FUAModal />
