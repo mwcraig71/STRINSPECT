@@ -20,6 +20,88 @@ export const INSPECTION_TYPES = {
   UNDERSIDE: "Underside",
 };
 
+export const SUPERSTRUCTURE_TYPES = [
+  {
+    id: "STEEL_GIRDER",
+    label: "Steel Girder/Beam",
+    sub: "W-shape · Plate Girder · Box Girder",
+    icon: "⬛",
+    elementIds: ["107", "515"],
+    deckId: "12",
+  },
+  {
+    id: "PSC_GIRDER",
+    label: "Prestressed Concrete",
+    sub: "I-Beam · Box Beam · AASHTO",
+    icon: "⬜",
+    elementIds: ["109"],
+    deckId: "12",
+  },
+  {
+    id: "RC_SLAB",
+    label: "RC Deck/Slab",
+    sub: "Solid Slab · Voided Slab",
+    icon: "▬",
+    elementIds: ["38"],
+    deckId: "38",
+  },
+  {
+    id: "TIMBER",
+    label: "Timber",
+    sub: "Stringer · Deck Plank",
+    icon: "🪵",
+    elementIds: [] as string[],
+    deckId: null as string | null,
+  },
+  {
+    id: "OTHER",
+    label: "Other / Not Set",
+    sub: "Show all superstructure elements",
+    icon: "?",
+    elementIds: ["107", "109", "38"],
+    deckId: "12",
+  },
+];
+
+export const SUBSTRUCTURE_TYPES = [
+  {
+    id: "CONCRETE_COLUMN",
+    label: "Concrete Column/Pier",
+    sub: "RC Column · Drilled Shaft · Cap",
+    elementIds: ["205", "234"],
+  },
+  {
+    id: "CONCRETE_ABUTMENT",
+    label: "Concrete Abutment",
+    sub: "RC Abutment · Backwall · Wingwall",
+    elementIds: ["215"],
+  },
+  {
+    id: "CONCRETE_PILE",
+    label: "Concrete Pile/Cap",
+    sub: "RC Pile · Prestressed Pile",
+    elementIds: ["225", "234"],
+  },
+  {
+    id: "STEEL_PILE",
+    label: "Steel Pile",
+    sub: "H-Pile · Steel Pipe Pile",
+    elementIds: ["226"],
+  },
+  {
+    id: "TIMBER_PILE",
+    label: "Timber Pile/Bent",
+    sub: "Timber Pile · Timber Cap",
+    elementIds: ["228"],
+  },
+  {
+    id: "OTHER",
+    label: "Other / Not Set",
+    sub: "Show all substructure elements",
+    elementIds: ["205", "215", "225", "226", "228", "234"],
+  },
+];
+
 export const ENVIRONMENTS = [
   { id: "1", name: "1 - Benign" },
   { id: "2", name: "2 - Low" },
@@ -282,6 +364,10 @@ interface InspectionContextType {
   setNomenclature: (v: string) => void;
   inspectionType: string;
   setInspectionType: (v: string) => void;
+  superstructureType: string;
+  setSuperstructureType: (v: string) => void;
+  substructureType: string;
+  setSubstructureType: (v: string) => void;
   supportCount: number;
 
   // Form state
@@ -415,27 +501,50 @@ function buildLocationSequence(
   return sequence;
 }
 
-function getFilteredElements(location: string): readonly SnbiElement[] {
+function getFilteredElements(
+  location: string,
+  superTypeId: string,
+  subTypeId: string
+): readonly SnbiElement[] {
   if (!location) return [];
+
   if (location.includes("Joint"))
     return SNBI_ELEMENTS.filter((e) => e.category === "Joint");
+
   if (location.includes("Approach"))
-    return SNBI_ELEMENTS.filter((e) =>
-      ["Deck", "Railing"].includes(e.category)
-    );
-  if (location.includes("Span"))
-    return SNBI_ELEMENTS.filter((e) =>
-      ["Deck", "Superstructure", "Railing"].includes(e.category)
-    );
+    return SNBI_ELEMENTS.filter((e) => ["Deck", "Railing"].includes(e.category));
+
+  if (location.includes("Span")) {
+    const sType = SUPERSTRUCTURE_TYPES.find((t) => t.id === superTypeId);
+    if (!sType || superTypeId === "OTHER") {
+      return SNBI_ELEMENTS.filter((e) =>
+        ["Deck", "Superstructure", "Railing", "Bearing", "Other"].includes(e.category)
+      );
+    }
+    const allowedIds = new Set<string>([
+      ...(sType.deckId ? [sType.deckId] : []),
+      ...sType.elementIds,
+      "331",
+      "310",
+    ]);
+    return SNBI_ELEMENTS.filter((e) => allowedIds.has(e.id));
+  }
+
   if (
     location.includes("Abutment") ||
     location.includes("Bent") ||
     location.includes("End Bent")
   ) {
-    return SNBI_ELEMENTS.filter((e) =>
-      ["Substructure", "Bearing"].includes(e.category)
-    );
+    const sType = SUBSTRUCTURE_TYPES.find((t) => t.id === subTypeId);
+    if (!sType || subTypeId === "OTHER") {
+      return SNBI_ELEMENTS.filter((e) =>
+        ["Substructure", "Bearing"].includes(e.category)
+      );
+    }
+    const allowedIds = new Set<string>([...sType.elementIds, "310"]);
+    return SNBI_ELEMENTS.filter((e) => allowedIds.has(e.id));
   }
+
   return SNBI_ELEMENTS;
 }
 
@@ -490,6 +599,8 @@ const STORAGE_KEYS = {
   NBI_RATINGS: "@bridge_nbi_ratings",
   NOMENCLATURE: "@bridge_nomenclature",
   INSPECTION_TYPE: "@bridge_inspection_type",
+  SUPERSTRUCTURE_TYPE: "@bridge_superstructure_type",
+  SUBSTRUCTURE_TYPE: "@bridge_substructure_type",
 };
 
 export function InspectionProvider({ children }: { children: React.ReactNode }) {
@@ -497,6 +608,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
 
   const [nomenclature, setNomenclatureState] = useState(NOMENCLATURES.TXDOT);
   const [inspectionType, setInspectionTypeState] = useState(INSPECTION_TYPES.TOPSIDE);
+  const [superstructureType, setSuperstructureTypeState] = useState("OTHER");
+  const [substructureType, setSubstructureTypeState] = useState("OTHER");
   const [savedDefects, setSavedDefectsState] = useState<DefectRecord[]>([]);
   const [nbiRatings, setNbiRatingsState] = useState<NbiRating[]>(INITIAL_NBI_RATINGS);
 
@@ -531,16 +644,20 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     const load = async () => {
       try {
-        const [defects, nbi, nom, insType] = await Promise.all([
+        const [defects, nbi, nom, insType, superType, subType] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.SAVED_DEFECTS),
           AsyncStorage.getItem(STORAGE_KEYS.NBI_RATINGS),
           AsyncStorage.getItem(STORAGE_KEYS.NOMENCLATURE),
           AsyncStorage.getItem(STORAGE_KEYS.INSPECTION_TYPE),
+          AsyncStorage.getItem(STORAGE_KEYS.SUPERSTRUCTURE_TYPE),
+          AsyncStorage.getItem(STORAGE_KEYS.SUBSTRUCTURE_TYPE),
         ]);
         if (defects) setSavedDefectsState(JSON.parse(defects));
         if (nbi) setNbiRatingsState(JSON.parse(nbi));
         if (nom) setNomenclatureState(nom);
         if (insType) setInspectionTypeState(insType);
+        if (superType) setSuperstructureTypeState(superType);
+        if (subType) setSubstructureTypeState(subType);
       } catch {}
     };
     load();
@@ -568,6 +685,16 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     AsyncStorage.setItem(STORAGE_KEYS.INSPECTION_TYPE, v).catch(() => {});
   }, []);
 
+  const setSuperstructureType = useCallback((v: string) => {
+    setSuperstructureTypeState(v);
+    AsyncStorage.setItem(STORAGE_KEYS.SUPERSTRUCTURE_TYPE, v).catch(() => {});
+  }, []);
+
+  const setSubstructureType = useCallback((v: string) => {
+    setSubstructureTypeState(v);
+    AsyncStorage.setItem(STORAGE_KEYS.SUBSTRUCTURE_TYPE, v).catch(() => {});
+  }, []);
+
   // ── Derived ──
   const locationSequence = useMemo(
     () => buildLocationSequence(inspectionType, nomenclature, supportCount),
@@ -575,8 +702,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   );
 
   const filteredElements = useMemo(
-    () => getFilteredElements(currentLocation),
-    [currentLocation]
+    () => getFilteredElements(currentLocation, superstructureType, substructureType),
+    [currentLocation, superstructureType, substructureType]
   );
 
   useEffect(() => {
@@ -963,6 +1090,10 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     setNomenclature,
     inspectionType,
     setInspectionType,
+    superstructureType,
+    setSuperstructureType,
+    substructureType,
+    setSubstructureType,
     supportCount,
     editId,
     setEditId,

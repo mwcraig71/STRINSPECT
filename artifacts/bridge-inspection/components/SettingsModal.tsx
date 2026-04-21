@@ -3,6 +3,7 @@ import React from "react";
 import {
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -13,6 +14,8 @@ import { useColors } from "@/hooks/useColors";
 import {
   INSPECTION_TYPES,
   NOMENCLATURES,
+  SUBSTRUCTURE_TYPES,
+  SUPERSTRUCTURE_TYPES,
   useInspection,
 } from "@/context/InspectionContext";
 
@@ -28,6 +31,10 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
     setNomenclature,
     inspectionType,
     setInspectionType,
+    superstructureType,
+    setSuperstructureType,
+    substructureType,
+    setSubstructureType,
     simulateLegacyImport,
     parsingActive,
   } = useInspection();
@@ -51,7 +58,11 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.body}>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.body}
+          showsVerticalScrollIndicator={false}
+        >
           {/* State / Nomenclature */}
           <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
             <View style={styles.cardHeader}>
@@ -176,6 +187,113 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
             </View>
           </View>
 
+          {/* Structural Build */}
+          <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
+            <View style={styles.cardHeader}>
+              <Feather name="triangle" size={15} color={c.mutedForeground} />
+              <Text style={[styles.cardTitle, { color: c.foreground }]}>Structural Build</Text>
+            </View>
+            <Text style={[styles.cardDesc, { color: c.mutedForeground }]}>
+              Define the bridge's structural composition. Combined with the current location, this filters the available elements on the Inspection tab to only those relevant to the structure type.
+            </Text>
+
+            {/* Superstructure */}
+            <View style={styles.structSection}>
+              <View style={styles.structLabelRow}>
+                <View style={[styles.structLabelDot, { backgroundColor: "#38bdf8" }]} />
+                <Text style={[styles.structLabel, { color: c.foreground }]}>Superstructure</Text>
+              </View>
+              <View style={styles.typeGrid}>
+                {SUPERSTRUCTURE_TYPES.map((t) => {
+                  const active = superstructureType === t.id;
+                  return (
+                    <TouchableOpacity
+                      key={t.id}
+                      style={[
+                        styles.typeChip,
+                        {
+                          backgroundColor: active ? "#0f172a" : c.secondary,
+                          borderColor: active ? "#38bdf8" : c.border,
+                        },
+                      ]}
+                      onPress={() => setSuperstructureType(t.id)}
+                    >
+                      <Text style={[styles.typeChipLabel, { color: active ? "#f8fafc" : c.foreground }]}>
+                        {t.label}
+                      </Text>
+                      <Text style={[styles.typeChipSub, { color: active ? "#94a3b8" : c.mutedForeground }]}>
+                        {t.sub}
+                      </Text>
+                      {active && (
+                        <View style={styles.typeChipCheck}>
+                          <Feather name="check" size={11} color="#38bdf8" />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Divider */}
+            <View style={[styles.structDivider, { borderTopColor: c.border }]} />
+
+            {/* Substructure */}
+            <View style={styles.structSection}>
+              <View style={styles.structLabelRow}>
+                <View style={[styles.structLabelDot, { backgroundColor: "#a78bfa" }]} />
+                <Text style={[styles.structLabel, { color: c.foreground }]}>Substructure</Text>
+              </View>
+              <View style={styles.typeGrid}>
+                {SUBSTRUCTURE_TYPES.map((t) => {
+                  const active = substructureType === t.id;
+                  return (
+                    <TouchableOpacity
+                      key={t.id}
+                      style={[
+                        styles.typeChip,
+                        {
+                          backgroundColor: active ? "#1a0f2e" : c.secondary,
+                          borderColor: active ? "#a78bfa" : c.border,
+                        },
+                      ]}
+                      onPress={() => setSubstructureType(t.id)}
+                    >
+                      <Text style={[styles.typeChipLabel, { color: active ? "#f8fafc" : c.foreground }]}>
+                        {t.label}
+                      </Text>
+                      <Text style={[styles.typeChipSub, { color: active ? "#c4b5fd" : c.mutedForeground }]}>
+                        {t.sub}
+                      </Text>
+                      {active && (
+                        <View style={[styles.typeChipCheck, { backgroundColor: "rgba(167,139,250,0.15)" }]}>
+                          <Feather name="check" size={11} color="#a78bfa" />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Active summary pill */}
+            <View style={[styles.buildSummary, { backgroundColor: c.secondary, borderColor: c.border }]}>
+              <View style={styles.buildSummaryItem}>
+                <Text style={[styles.buildSummaryLabel, { color: c.mutedForeground }]}>Super</Text>
+                <Text style={[styles.buildSummaryValue, { color: "#38bdf8" }]}>
+                  {SUPERSTRUCTURE_TYPES.find((t) => t.id === superstructureType)?.label ?? "—"}
+                </Text>
+              </View>
+              <View style={[styles.buildSummaryDivider, { backgroundColor: c.border }]} />
+              <View style={styles.buildSummaryItem}>
+                <Text style={[styles.buildSummaryLabel, { color: c.mutedForeground }]}>Sub</Text>
+                <Text style={[styles.buildSummaryValue, { color: "#a78bfa" }]}>
+                  {SUBSTRUCTURE_TYPES.find((t) => t.id === substructureType)?.label ?? "—"}
+                </Text>
+              </View>
+            </View>
+          </View>
+
           {/* Import */}
           <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
             <View style={styles.cardHeader}>
@@ -199,7 +317,7 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
               </Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </ScrollView>
       </View>
     </Modal>
   );
@@ -219,7 +337,8 @@ const styles = StyleSheet.create({
   headerLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
   headerTitle: { fontSize: 16, fontWeight: "900", color: "#f8fafc", letterSpacing: -0.3, textTransform: "uppercase" },
   closeBtn: { padding: 8, borderRadius: 16 },
-  body: { padding: 16, gap: 14 },
+  scroll: { flex: 1 },
+  body: { padding: 16, gap: 14, paddingBottom: 40 },
   card: {
     borderRadius: 16,
     borderWidth: 1,
@@ -237,6 +356,43 @@ const styles = StyleSheet.create({
   optionText: { flex: 1 },
   optionTitle: { fontSize: 14, fontWeight: "800" },
   optionSub: { fontSize: 11, fontWeight: "500", marginTop: 1 },
+  // Structural build
+  structSection: { gap: 8 },
+  structLabelRow: { flexDirection: "row", alignItems: "center", gap: 7 },
+  structLabelDot: { width: 8, height: 8, borderRadius: 4 },
+  structLabel: { fontSize: 12, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.4 },
+  typeGrid: { gap: 6 },
+  typeChip: {
+    borderRadius: 10,
+    borderWidth: 1.5,
+    padding: 10,
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 0,
+  },
+  typeChipLabel: { fontSize: 13, fontWeight: "700", flex: 1 },
+  typeChipSub: { fontSize: 10, fontWeight: "500", flex: 1, textAlign: "right", marginRight: 6 },
+  typeChipCheck: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "rgba(56,189,248,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  structDivider: { borderTopWidth: 1, marginVertical: 2 },
+  buildSummary: {
+    borderRadius: 10,
+    borderWidth: 1,
+    flexDirection: "row",
+    padding: 10,
+    gap: 0,
+  },
+  buildSummaryItem: { flex: 1, gap: 2 },
+  buildSummaryLabel: { fontSize: 9, fontWeight: "700", textTransform: "uppercase" },
+  buildSummaryValue: { fontSize: 12, fontWeight: "800" },
+  buildSummaryDivider: { width: 1, marginHorizontal: 10 },
   importBtn: {
     flexDirection: "row",
     alignItems: "center",
