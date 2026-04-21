@@ -11,7 +11,7 @@ import {
 } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
-import { useInspection, SNBI_ELEMENTS } from "@/context/InspectionContext";
+import { useInspection, SNBI_ELEMENTS, NOMENCLATURES, INSPECTION_TYPES } from "@/context/InspectionContext";
 
 const RATING_OPTIONS = ["9", "8", "7", "6", "5", "4", "3", "2", "1", "0", "N", "-"];
 
@@ -26,7 +26,15 @@ const RATING_COLOR = (rating: string): string => {
 
 export default function NBIScreen() {
   const c = useColors();
-  const { nbiRatings, updateSubComponent, savedDefects } = useInspection();
+  const {
+    nbiRatings,
+    updateSubComponent,
+    savedDefects,
+    nomenclature,
+    setNomenclature,
+    inspectionType,
+    setInspectionType,
+  } = useInspection();
   const [activeItem, setActiveItem] = useState("58");
   const [expandedComp, setExpandedComp] = useState<number | null>(null);
   const [ratingPickerOpen, setRatingPickerOpen] = useState<number | null>(null);
@@ -42,10 +50,42 @@ export default function NBIScreen() {
     <View style={[styles.container, { backgroundColor: c.background }]}>
       {/* Header */}
       <View style={[styles.header, { backgroundColor: c.headerBg }]}>
-        <View style={styles.headerInner}>
-          <Feather name="bar-chart-2" size={20} color="#38bdf8" />
-          <Text style={styles.headerTitle}>NBI Ratings</Text>
+        <View style={styles.headerTop}>
+          <View style={styles.headerInner}>
+            <Feather name="bar-chart-2" size={20} color="#38bdf8" />
+            <Text style={styles.headerTitle}>NBI Ratings</Text>
+          </View>
+          <View style={styles.headerControls}>
+            <View style={[styles.nomToggle, { backgroundColor: "#1e293b" }]}>
+              <TouchableOpacity
+                style={[styles.nomBtn, nomenclature === NOMENCLATURES.TXDOT && styles.nomBtnActive]}
+                onPress={() => setNomenclature(NOMENCLATURES.TXDOT)}
+              >
+                <Text style={[styles.nomBtnText, nomenclature === NOMENCLATURES.TXDOT && styles.nomBtnTextActive]}>TX</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.nomBtn, nomenclature === NOMENCLATURES.NCDOT && styles.nomBtnActive]}
+                onPress={() => setNomenclature(NOMENCLATURES.NCDOT)}
+              >
+                <Text style={[styles.nomBtnText, nomenclature === NOMENCLATURES.NCDOT && styles.nomBtnTextActive]}>NC</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
+        <TouchableOpacity
+          style={[
+            styles.moduleToggle,
+            inspectionType === INSPECTION_TYPES.TOPSIDE
+              ? { backgroundColor: "#0284c7", borderColor: "#0ea5e9" }
+              : { backgroundColor: "#1e293b", borderColor: "#334155" },
+          ]}
+          onPress={() => setInspectionType(inspectionType === INSPECTION_TYPES.TOPSIDE ? INSPECTION_TYPES.UNDERSIDE : INSPECTION_TYPES.TOPSIDE)}
+        >
+          <Feather name="refresh-cw" size={14} color={inspectionType === INSPECTION_TYPES.TOPSIDE ? "#fff" : "#38bdf8"} />
+          <Text style={[styles.moduleToggleText, { color: inspectionType === INSPECTION_TYPES.TOPSIDE ? "#fff" : "#38bdf8" }]}>
+            Active Module: {inspectionType}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Tab strip */}
@@ -242,12 +282,30 @@ export default function NBIScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
-    paddingTop: Platform.OS === "web" ? 67 : 12,
+    paddingTop: Platform.OS === "web" ? 67 : 0,
     paddingHorizontal: 16,
     paddingBottom: 12,
+    gap: 10,
   },
+  headerTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 12 },
+  headerControls: { flexDirection: "row", alignItems: "center", gap: 8 },
   headerInner: { flexDirection: "row", alignItems: "center", gap: 8 },
   headerTitle: { fontSize: 20, fontWeight: "900", color: "#f8fafc", textTransform: "uppercase" },
+  nomToggle: { flexDirection: "row", borderRadius: 8, padding: 3, gap: 2 },
+  nomBtn: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  nomBtnActive: { backgroundColor: "#0284c7" },
+  nomBtnText: { fontSize: 11, fontWeight: "900", color: "#64748b" },
+  nomBtnTextActive: { color: "#fff" },
+  moduleToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 2,
+  },
+  moduleToggleText: { fontSize: 12, fontWeight: "900", textTransform: "uppercase", letterSpacing: 1 },
   tabStrip: {
     borderBottomWidth: 1,
   },

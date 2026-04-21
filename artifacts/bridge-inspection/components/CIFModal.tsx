@@ -92,7 +92,16 @@ export function CIFModal() {
       visible={showCIFModal}
       animationType="slide"
       presentationStyle="pageSheet"
-      onRequestClose={() => setShowCIFModal(false)}
+      onRequestClose={() => {
+        if (!cifData.phoneNotified || !cifData.assetWiseLogged) {
+          Alert.alert(
+            "Cannot Close",
+            "Complete the Safety Protocol Verification before closing this Critical Inspection Finding."
+          );
+          return;
+        }
+        setShowCIFModal(false);
+      }}
     >
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         {/* Header */}
@@ -104,8 +113,20 @@ export function CIFModal() {
               <Text style={styles.headerSubtitle}>Form 2598 Implementation</Text>
             </View>
           </View>
-          <TouchableOpacity onPress={() => setShowCIFModal(false)} style={styles.closeBtn}>
-            <Feather name="x" size={22} color="#fff" />
+          <TouchableOpacity
+            onPress={() => {
+              if (!cifData.phoneNotified || !cifData.assetWiseLogged) {
+                Alert.alert(
+                  "Cannot Close",
+                  "Complete the Safety Protocol Verification before closing this Critical Inspection Finding."
+                );
+                return;
+              }
+              setShowCIFModal(false);
+            }}
+            style={[styles.closeBtn, (!cifData.phoneNotified || !cifData.assetWiseLogged) && styles.closeBtnLocked]}
+          >
+            <Feather name={(!cifData.phoneNotified || !cifData.assetWiseLogged) ? "lock" : "x"} size={22} color="#fff" />
           </TouchableOpacity>
         </View>
 
@@ -253,6 +274,7 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 18, fontWeight: "900", color: "#fff", letterSpacing: -0.5 },
   headerSubtitle: { fontSize: 10, color: "rgba(255,255,255,0.8)", fontWeight: "700", marginTop: 2, textTransform: "uppercase" },
   closeBtn: { padding: 8, borderRadius: 20, backgroundColor: "rgba(0,0,0,0.2)" },
+  closeBtnLocked: { backgroundColor: "rgba(0,0,0,0.4)" },
   body: { flex: 1 },
   bodyContent: { padding: 16, gap: 12 },
   card: { borderRadius: 16, borderWidth: 1, padding: 16, gap: 16 },
