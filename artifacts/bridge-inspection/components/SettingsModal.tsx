@@ -1,7 +1,10 @@
 import { Feather } from "@expo/vector-icons";
+import * as DocumentPicker from "expo-document-picker";
 import React from "react";
 import {
+  Alert,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -36,8 +39,28 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
     substructureType,
     setSubstructureType,
     simulateLegacyImport,
+    importFromPdf,
     parsingActive,
   } = useInspection();
+
+  const handleImport = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: "application/pdf",
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled || !result.assets?.length) return;
+      const asset = result.assets[0];
+      onClose();
+      if (Platform.OS === "web" && (asset as any).file) {
+        await importFromPdf((asset as any).file as File);
+      } else {
+        await importFromPdf({ uri: asset.uri, name: asset.name });
+      }
+    } catch (err: any) {
+      Alert.alert("Error", err?.message || "Could not open document picker.");
+    }
+  };
 
   return (
     <Modal
@@ -298,22 +321,19 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
           <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
             <View style={styles.cardHeader}>
               <Feather name="upload" size={15} color={c.mutedForeground} />
-              <Text style={[styles.cardTitle, { color: c.foreground }]}>Legacy Data Import</Text>
+              <Text style={[styles.cardTitle, { color: c.foreground }]}>Previous Report Import</Text>
             </View>
             <Text style={[styles.cardDesc, { color: c.mutedForeground }]}>
-              Import previous inspection records for verification. Imported defects appear in the legacy manifest and require confirmation before being promoted.
+              Select a TxDOT bridge inspection PDF to extract ELEMENTS table data, NBI ratings, and the structure number. Imported defects appear in the legacy manifest and require verification.
             </Text>
             <TouchableOpacity
               style={[styles.importBtn, { backgroundColor: parsingActive ? c.muted : c.headerBg, borderColor: "#334155" }]}
-              onPress={() => {
-                simulateLegacyImport();
-                onClose();
-              }}
+              onPress={handleImport}
               disabled={parsingActive}
             >
-              <Feather name={parsingActive ? "loader" : "upload"} size={16} color={parsingActive ? c.mutedForeground : "#38bdf8"} />
+              <Feather name={parsingActive ? "loader" : "file-text"} size={16} color={parsingActive ? c.mutedForeground : "#38bdf8"} />
               <Text style={[styles.importBtnText, { color: parsingActive ? c.mutedForeground : "#f8fafc" }]}>
-                {parsingActive ? "Parsing..." : "Import Previous Report"}
+                {parsingActive ? "Parsing PDF..." : "Import Previous Report (PDF)"}
               </Text>
             </TouchableOpacity>
           </View>

@@ -7,6 +7,7 @@ import React, {
   useMemo,
   useState,
 } from "react";
+import { parseReport } from "../utils/pdfParser";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -113,7 +114,9 @@ export const SNBI_ELEMENTS = [
   { id: "12", name: "RC Deck", category: "Deck", material: "Concrete", unit: "sq ft" },
   { id: "38", name: "RC Slab", category: "Deck", material: "Concrete", unit: "sq ft" },
   { id: "107", name: "Steel Girder", category: "Superstructure", material: "Steel", unit: "ft" },
+  { id: "108", name: "PSC Open Girder/Beam", category: "Superstructure", material: "Concrete", unit: "ft" },
   { id: "109", name: "PSC Girder", category: "Superstructure", material: "Concrete", unit: "ft" },
+  { id: "113", name: "RC Open Girder/Beam", category: "Superstructure", material: "Concrete", unit: "ft" },
   { id: "205", name: "RC Column", category: "Substructure", material: "Concrete", unit: "ea" },
   { id: "215", name: "RC Abutment", category: "Substructure", material: "Concrete", unit: "ft" },
   { id: "225", name: "RC Pile", category: "Substructure", material: "Concrete", unit: "ea" },
@@ -121,6 +124,10 @@ export const SNBI_ELEMENTS = [
   { id: "228", name: "Timber Pile", category: "Substructure", material: "Timber", unit: "ea" },
   { id: "234", name: "RC Cap", category: "Substructure", material: "Concrete", unit: "ft" },
   { id: "310", name: "Elastomeric Bearing", category: "Bearing", material: "Other", unit: "ea" },
+  { id: "311", name: "Movable Bearing", category: "Bearing", material: "Steel", unit: "ea" },
+  { id: "313", name: "Fixed Bearing", category: "Bearing", material: "Steel", unit: "ea" },
+  { id: "321", name: "RC Approach Slab", category: "Deck", material: "Concrete", unit: "sq ft" },
+  { id: "330", name: "Metal Bridge Railing", category: "Railing", material: "Steel", unit: "ft" },
   { id: "331", name: "RC Bridge Railing", category: "Railing", material: "Concrete", unit: "ft" },
   { id: "300", name: "Strip Seal Joint", category: "Joint", material: "Other", unit: "ft" },
   { id: "304", name: "Open Joint", category: "Joint", material: "Other", unit: "ft" },
@@ -128,21 +135,45 @@ export const SNBI_ELEMENTS = [
 ] as const;
 
 export const DEFECTS_BY_ELEMENT: Record<string, { id: string; name: string; unit: string }[]> = {
-  "12": [{ id: "spall", name: "Spalling/Delamination", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }],
-  "38": [{ id: "spall", name: "Spalling/Delamination", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }],
+  "12": [{ id: "spall", name: "Spalling/Delamination", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "wear", name: "Abrasion/Wear", unit: "sq ft" }],
+  "38": [{ id: "spall", name: "Spalling/Delamination", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "wear", name: "Abrasion/Wear", unit: "sq ft" }],
   "107": [{ id: "corr", name: "Corrosion/Section Loss", unit: "in" }, { id: "crack_s", name: "Cracking (Steel)", unit: "in" }],
-  "109": [{ id: "spall", name: "Spalling/Delamination", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }],
+  "108": [{ id: "spall", name: "Spalling/Delamination", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "corr_s", name: "Efflorescence/Rust Staining", unit: "sq ft" }],
+  "109": [{ id: "spall", name: "Spalling/Delamination", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "corr_s", name: "Efflorescence/Rust Staining", unit: "sq ft" }],
+  "113": [{ id: "spall", name: "Spalling/Delamination", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "corr_s", name: "Efflorescence/Rust Staining", unit: "sq ft" }],
   "205": [{ id: "spall", name: "Spalling/Delamination", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }],
   "215": [{ id: "spall", name: "Spalling/Delamination", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }],
   "225": [{ id: "spall", name: "Spalling/Delamination", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }],
-  "226": [{ id: "corr_pile", name: "Section Loss (Remaining Section)", unit: "in" }, { id: "pitting", name: "Pitting Corrosion", unit: "in" }],
+  "226": [{ id: "corr_pile", name: "Section Loss (Remaining Section)", unit: "in" }, { id: "pitting", name: "Pitting Corrosion", unit: "in" }, { id: "corr", name: "Corrosion", unit: "sq ft" }],
   "228": [{ id: "decay", name: "Decay/Section Loss", unit: "in" }, { id: "check", name: "Checking/Splitting", unit: "ft" }],
   "234": [{ id: "spall", name: "Spalling/Delamination", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }],
   "310": [{ id: "rotation", name: "Excessive Rotation", unit: "ea" }, { id: "bulging", name: "Excessive Bulging", unit: "ea" }],
+  "311": [{ id: "corr", name: "Corrosion", unit: "sq ft" }, { id: "rotation", name: "Excessive Rotation", unit: "ea" }],
+  "313": [{ id: "corr", name: "Corrosion", unit: "sq ft" }, { id: "rotation", name: "Excessive Rotation", unit: "ea" }],
+  "321": [{ id: "spall", name: "Spalling/Delamination", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }],
+  "330": [{ id: "corr", name: "Corrosion", unit: "sq ft" }, { id: "impact", name: "Impact Damage", unit: "ea" }],
   "300": [{ id: "seal", name: "Seal Damage", unit: "ft" }, { id: "debris", name: "Debris Accumulation", unit: "sq ft" }],
   "304": [{ id: "debris", name: "Debris Accumulation", unit: "sq ft" }, { id: "armour", name: "Armour Damage", unit: "ft" }],
   "331": [{ id: "impact", name: "Impact Damage", unit: "ea" }, { id: "crack", name: "Cracking", unit: "ft" }],
   "515": [{ id: "coat_fail", name: "Coating Failure", unit: "sq ft" }],
+};
+
+const SNBI_CODE_TO_DEFECT_ID: Record<string, string> = {
+  "1000": "corr",
+  "1010": "crack_s",
+  "1020": "crack_s",
+  "1060": "spall",
+  "1080": "spall",
+  "1090": "spall",
+  "1100": "corr_s",
+  "1120": "crack",
+  "1130": "crack",
+  "1190": "wear",
+  "2000": "corr",
+  "2010": "crack_s",
+  "3000": "decay",
+  "3010": "check",
+  "4000": "spall",
 };
 
 export type SnbiElement = (typeof SNBI_ELEMENTS)[number];
@@ -437,6 +468,10 @@ interface InspectionContextType {
   criticalFindingsSummary: DefectRecord[];
   maintenanceSummary: DefectRecord[];
 
+  // Structure number
+  structureNumber: string;
+  setStructureNumber: (v: string) => void;
+
   // Actions
   handleSave: () => void;
   startEdit: (record: DefectRecord) => void;
@@ -451,6 +486,7 @@ interface InspectionContextType {
     value: string
   ) => void;
   simulateLegacyImport: () => void;
+  importFromPdf: (source: File | { uri: string; name?: string }) => Promise<void>;
   parsingActive: boolean;
 }
 
@@ -601,6 +637,7 @@ const STORAGE_KEYS = {
   INSPECTION_TYPE: "@bridge_inspection_type",
   SUPERSTRUCTURE_TYPE: "@bridge_superstructure_type",
   SUBSTRUCTURE_TYPE: "@bridge_substructure_type",
+  STRUCTURE_NUMBER: "@bridge_structure_number",
 };
 
 export function InspectionProvider({ children }: { children: React.ReactNode }) {
@@ -612,6 +649,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const [substructureType, setSubstructureTypeState] = useState("OTHER");
   const [savedDefects, setSavedDefectsState] = useState<DefectRecord[]>([]);
   const [nbiRatings, setNbiRatingsState] = useState<NbiRating[]>(INITIAL_NBI_RATINGS);
+  const [structureNumber, setStructureNumberState] = useState("");
 
   const [editId, setEditId] = useState<string | null>(null);
   const [currentLocation, setCurrentLocation] = useState("");
@@ -644,13 +682,14 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     const load = async () => {
       try {
-        const [defects, nbi, nom, insType, superType, subType] = await Promise.all([
+        const [defects, nbi, nom, insType, superType, subType, structNum] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.SAVED_DEFECTS),
           AsyncStorage.getItem(STORAGE_KEYS.NBI_RATINGS),
           AsyncStorage.getItem(STORAGE_KEYS.NOMENCLATURE),
           AsyncStorage.getItem(STORAGE_KEYS.INSPECTION_TYPE),
           AsyncStorage.getItem(STORAGE_KEYS.SUPERSTRUCTURE_TYPE),
           AsyncStorage.getItem(STORAGE_KEYS.SUBSTRUCTURE_TYPE),
+          AsyncStorage.getItem(STORAGE_KEYS.STRUCTURE_NUMBER),
         ]);
         if (defects) setSavedDefectsState(JSON.parse(defects));
         if (nbi) setNbiRatingsState(JSON.parse(nbi));
@@ -658,6 +697,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         if (insType) setInspectionTypeState(insType);
         if (superType) setSuperstructureTypeState(superType);
         if (subType) setSubstructureTypeState(subType);
+        if (structNum) setStructureNumberState(structNum);
       } catch {}
     };
     load();
@@ -693,6 +733,12 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const setSubstructureType = useCallback((v: string) => {
     setSubstructureTypeState(v);
     AsyncStorage.setItem(STORAGE_KEYS.SUBSTRUCTURE_TYPE, v).catch(() => {});
+  }, []);
+
+  const setStructureNumber = useCallback((v: string) => {
+    setStructureNumberState(v);
+    AsyncStorage.setItem(STORAGE_KEYS.STRUCTURE_NUMBER, v).catch(() => {});
+    setCifData((prev) => ({ ...prev, structureNumber: v }));
   }, []);
 
   // ── Derived ──
@@ -1085,6 +1131,148 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     }, 1500);
   }, [savedDefects, setSavedDefects, nbiRatings, setNbiRatings]);
 
+  const importFromPdf = useCallback(
+    async (source: File | { uri: string; name?: string }) => {
+      setParsingActive(true);
+      try {
+        const { structureNumber: parsedNum, elements, nbi } = await parseReport(source);
+
+        if (parsedNum) {
+          setStructureNumber(parsedNum);
+        }
+
+        const ts = Date.now();
+        const newDefects: DefectRecord[] = [];
+        let recIndex = 0;
+
+        let currentParentElementId = "";
+        let currentParentElementName = "";
+
+        for (const row of elements) {
+          const csMap: [ConditionState, number][] = [
+            ["CS1", row.cs1],
+            ["CS2", row.cs2],
+            ["CS3", row.cs3],
+            ["CS4", row.cs4],
+          ];
+
+          if (!row.isDefect) {
+            currentParentElementId = row.elementId;
+            const match = (SNBI_ELEMENTS as readonly { id: string; name: string }[]).find(
+              (e) => e.id === row.elementId
+            );
+            currentParentElementName = match?.name || row.elementName;
+
+            for (const [cs, qty] of csMap) {
+              if (qty <= 0) continue;
+              const defects = DEFECTS_BY_ELEMENT[row.elementId];
+              const defaultDefect = defects?.[0] || { id: "other", name: "General Defect", unit: row.unit || "ea" };
+              recIndex++;
+              newDefects.push({
+                id: `pdf-${ts}-${recIndex}`,
+                location: "Unassigned",
+                elementId: row.elementId,
+                element: currentParentElementName,
+                environment: row.environment || "2",
+                defect: defaultDefect.name,
+                defectId: defaultDefect.id,
+                cs,
+                quantityValue: String(qty),
+                maintenanceQuantityValue: String(qty),
+                quantity: `${qty} ${row.unit || "ea"}`,
+                size: "",
+                locationDesc: `${currentParentElementName} — ${cs} — Imported`,
+                needsVerification: true,
+                isLegacy: true,
+                isImported: true,
+                photos: [],
+                photosCount: 0,
+                isCritical: false,
+                isMaintenance: false,
+              });
+            }
+          } else {
+            const defectName = row.elementName;
+            const snbiCodeMatch = defectName.match(/^(\d{4,})[- ]/);
+            const snbiCode = snbiCodeMatch?.[1] || "";
+            const internalDefectId =
+              SNBI_CODE_TO_DEFECT_ID[snbiCode] ||
+              DEFECTS_BY_ELEMENT[currentParentElementId]?.[0]?.id ||
+              "other";
+            const unit =
+              DEFECTS_BY_ELEMENT[currentParentElementId]?.find((d) => d.id === internalDefectId)?.unit ||
+              "ea";
+
+            for (const [cs, qty] of csMap) {
+              if (qty <= 0) continue;
+              recIndex++;
+              newDefects.push({
+                id: `pdf-${ts}-${recIndex}`,
+                location: "Unassigned",
+                elementId: currentParentElementId,
+                element: currentParentElementName,
+                environment: row.environment || "2",
+                defect: defectName,
+                defectId: internalDefectId,
+                cs,
+                quantityValue: String(qty),
+                maintenanceQuantityValue: String(qty),
+                quantity: `${qty} ${unit}`,
+                size: "",
+                locationDesc: `${defectName} — ${cs} — Imported`,
+                needsVerification: true,
+                isLegacy: true,
+                isImported: true,
+                photos: [],
+                photosCount: 0,
+                isCritical: false,
+                isMaintenance: false,
+              });
+            }
+          }
+        }
+
+        setSavedDefects([...newDefects, ...savedDefects]);
+
+        if (nbi.length > 0) {
+          const updatedNbi = nbiRatings.map((item) => ({
+            ...item,
+            subComponents: item.subComponents.map((sub) => {
+              const match = nbi.find(
+                (r) => r.item === item.item && r.componentName === sub.name
+              );
+              if (!match) return sub;
+              const wasBlank = !sub.rating;
+              return {
+                ...sub,
+                rating: wasBlank ? match.rating : sub.rating,
+                previousComments: match.comment || sub.previousComments,
+                isImported: wasBlank && !!match.rating,
+              };
+            }),
+          }));
+          setNbiRatings(updatedNbi);
+        }
+
+        const { Alert } = require("react-native");
+        Alert.alert(
+          "Import Complete",
+          `Imported ${newDefects.length} element record(s) across ${
+            elements.filter((e) => !e.isDefect).length
+          } elements.\n${nbi.length} NBI rating(s) pre-filled.\n${
+            parsedNum ? `Structure: ${parsedNum}` : "Structure number not found."
+          }\n\nAssign locations and verify records before submitting.`
+        );
+      } catch (err: any) {
+        const { Alert } = require("react-native");
+        Alert.alert("Import Failed", err?.message || "Could not parse the PDF. Ensure the file is a valid TxDOT inspection report.");
+      } finally {
+        setParsingActive(false);
+      }
+    },
+    [savedDefects, setSavedDefects, nbiRatings, setNbiRatings, setStructureNumber]
+  );
+
   const value: InspectionContextType = {
     nomenclature,
     setNomenclature,
@@ -1159,7 +1347,10 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     completeCIF,
     completeFUA,
     updateSubComponent,
+    structureNumber,
+    setStructureNumber,
     simulateLegacyImport,
+    importFromPdf,
     parsingActive,
   };
 

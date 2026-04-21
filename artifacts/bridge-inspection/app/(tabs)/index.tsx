@@ -80,9 +80,13 @@ export default function InspectionScreen() {
     setRangeMax,
     syncToCurrentLoc,
     setSyncToCurrentLoc,
+    structureNumber,
+    setStructureNumber,
   } = useInspection();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [editingStructureNum, setEditingStructureNum] = useState(false);
+  const [structureNumDraft, setStructureNumDraft] = useState("");
   const [locationPickerOpen, setLocationPickerOpen] = useState(false);
   const [elementPickerOpen, setElementPickerOpen] = useState(false);
   const [defectPickerOpen, setDefectPickerOpen] = useState(false);
@@ -161,7 +165,64 @@ export default function InspectionScreen() {
         <View style={styles.headerRow}>
           <View style={styles.headerTitle}>
             <Feather name="activity" size={16} color="#38bdf8" />
-            <Text style={styles.headerTitleText}>Bridge Inspection</Text>
+            <View>
+              <Text style={styles.headerTitleText}>Bridge Inspection</Text>
+              {editingStructureNum ? (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
+                  <TextInput
+                    style={{
+                      color: "#f8fafc",
+                      fontSize: 11,
+                      backgroundColor: "#1e293b",
+                      paddingHorizontal: 6,
+                      paddingVertical: 2,
+                      borderRadius: 4,
+                      minWidth: 120,
+                      borderWidth: 1,
+                      borderColor: "#38bdf8",
+                    }}
+                    value={structureNumDraft}
+                    onChangeText={setStructureNumDraft}
+                    placeholder="Structure number..."
+                    placeholderTextColor="#475569"
+                    autoFocus
+                    onSubmitEditing={() => {
+                      setStructureNumber(structureNumDraft.trim());
+                      setEditingStructureNum(false);
+                    }}
+                    onBlur={() => {
+                      setStructureNumber(structureNumDraft.trim());
+                      setEditingStructureNum(false);
+                    }}
+                    returnKeyType="done"
+                  />
+                </View>
+              ) : (
+                <TouchableOpacity
+                  onPress={() => {
+                    if (Platform.OS === "ios") {
+                      Alert.prompt(
+                        "Structure Number",
+                        "Enter the bridge structure number",
+                        (text) => { if (text !== undefined) setStructureNumber(text.trim()); },
+                        "plain-text",
+                        structureNumber,
+                      );
+                    } else {
+                      setStructureNumDraft(structureNumber);
+                      setEditingStructureNum(true);
+                    }
+                  }}
+                  hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                >
+                  <Text style={{ color: "#94a3b8", fontSize: 11, marginTop: 1 }}>
+                    {structureNumber ? structureNumber : "Tap to set structure number"}
+                    {"  "}
+                    <Feather name="edit-2" size={10} color="#475569" />
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
           <View style={styles.headerActions}>
             <TouchableOpacity

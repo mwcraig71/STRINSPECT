@@ -35,7 +35,8 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 - **Description**: Field-ready bridge structural inspection tool, offline-first with AsyncStorage persistence
 - **Key Features**:
   - SNBI defect logging with photos (expo-image-picker)
-  - NBI ratings for items 58/59/60 (Deck, Superstructure, Substructure)
+  - SNBI element catalog: 12, 38, 107, 108, 109, 113, 205, 215, 225, 226, 228, 234, 310, 311, 313, 321, 330, 331, 300, 304, 515
+  - NBI ratings for items 58/59/60/61/65/36/71/72 (full TxDOT NBI sub-component set)
   - CIF (Critical Inspection Finding / Form 2598) modal with phone + AssetWise verification
   - FUA (Follow-Up Action) modal with priority levels (Level 1-4)
   - Critical/maintenance flags with automatic CIF/FUA workflow triggers
@@ -45,6 +46,8 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
   - Legacy defect verification workflow
   - Structural summary tables (element matrix, maintenance plan, critical findings)
   - CS color coding (CS1=green, CS2=blue, CS3=amber, CS4=red)
+  - **PDF import**: Real client-side PDF parsing via pdfjs-dist; parses ELEMENTS table (element+defect rows → DefectRecord), NBI ratings (BRIDGE INSPECTION RECORD sections), and structure number from TxDOT reports
+  - Structure number: persisted field shown in Inspection tab header (tappable to edit); auto-fills CIF form
 - **Persistence**: All data via @react-native-async-storage/async-storage (crash-safe, offline-first)
 - **State**: React Context (InspectionContext) — single provider in (tabs)/_layout.tsx
 - **Navigation**: expo-router tabs (NativeTabs with liquid glass on iOS 26+, classic Tabs fallback)
