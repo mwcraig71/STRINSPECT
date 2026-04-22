@@ -19,6 +19,8 @@ export interface ParsedElementRow {
 export interface ParsedNbiEntry {
   item: string;
   componentName: string;
+  desc: string;
+  min: string;
   rating: string;
   comment: string;
 }
@@ -233,12 +235,14 @@ export function parseNbiRatings(pages: string[][]): ParsedNbiEntry[] {
 
     if (currentItem) {
       const ratingMatch = line.match(
-        /^(.+?)\s{2,}(?:\S+\s+){0,3}(\d+|-)\s+([N\d])\b\s*(.*)?$/
+        /^(.+?)\s{2,}((?:\S+\s+){0,3})(\d+|-)\s+([N\d])\b\s*(.*)?$/
       );
       if (ratingMatch) {
         const rawName = ratingMatch[1].trim();
-        const rating = ratingMatch[3];
-        const comment = ratingMatch[4]?.trim() || "";
+        const desc = (ratingMatch[2] || "").trim();
+        const min = ratingMatch[3];
+        const rating = ratingMatch[4];
+        const comment = ratingMatch[5]?.trim() || "";
         const componentName = normalizeComponentName(rawName);
 
         if (
@@ -246,7 +250,7 @@ export function parseNbiRatings(pages: string[][]): ParsedNbiEntry[] {
           !rawName.match(/^\d{4,}/) &&
           !rawName.match(/Structure ID|Inspection Date|DO NOT DISCLOSE|ITEM\s*\d/i)
         ) {
-          results.push({ item: currentItem, componentName, rating, comment });
+          results.push({ item: currentItem, componentName, desc, min, rating, comment });
         }
       }
     }

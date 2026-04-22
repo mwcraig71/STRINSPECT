@@ -30,6 +30,7 @@ export default function NBIScreen() {
   const {
     nbiRatings,
     updateSubComponent,
+    reviewImportedSubComponent,
     savedDefects,
     inspectionType,
     environment,
@@ -110,6 +111,61 @@ export default function NBIScreen() {
 
               return (
                 <View key={compIdx} style={styles.compContainer}>
+                  {/* Previous Note from Imported Report */}
+                  {comp.isImported && (
+                    <View style={styles.prevNoteCard}>
+                      <View style={styles.prevNoteHeader}>
+                        <Feather name="file-text" size={13} color="#9a3412" />
+                        <Text style={styles.prevNoteTitle}>Previous Note from Imported Report</Text>
+                      </View>
+                      <View style={styles.prevNoteGrid}>
+                        <View style={styles.prevNoteField}>
+                          <Text style={styles.prevNoteKey}>Component</Text>
+                          <Text style={styles.prevNoteVal}>{comp.name}</Text>
+                        </View>
+                        <View style={styles.prevNoteField}>
+                          <Text style={styles.prevNoteKey}>Description</Text>
+                          <Text style={styles.prevNoteVal}>{comp.previousDesc || "—"}</Text>
+                        </View>
+                        <View style={styles.prevNoteField}>
+                          <Text style={styles.prevNoteKey}>Min. Rating</Text>
+                          <Text style={styles.prevNoteVal}>{comp.previousMin || "—"}</Text>
+                        </View>
+                        <View style={styles.prevNoteField}>
+                          <Text style={styles.prevNoteKey}>Rating</Text>
+                          <Text style={styles.prevNoteVal}>{comp.previousRating || "—"}</Text>
+                        </View>
+                        <View style={[styles.prevNoteField, { width: "100%" }]}>
+                          <Text style={styles.prevNoteKey}>Comment</Text>
+                          <Text style={styles.prevNoteVal}>{comp.previousComments || "—"}</Text>
+                        </View>
+                      </View>
+                      <View style={styles.prevNoteActions}>
+                        <TouchableOpacity
+                          style={[styles.prevNoteBtn, { backgroundColor: "#059669" }]}
+                          onPress={() => reviewImportedSubComponent(activeIdx, compIdx, "approve")}
+                        >
+                          <Feather name="check" size={13} color="#fff" />
+                          <Text style={styles.prevNoteBtnText}>Approve</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.prevNoteBtn, { backgroundColor: "#0284c7" }]}
+                          onPress={() => reviewImportedSubComponent(activeIdx, compIdx, "modify")}
+                        >
+                          <Feather name="edit-2" size={13} color="#fff" />
+                          <Text style={styles.prevNoteBtnText}>Modify</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.prevNoteBtn, { backgroundColor: "#dc2626" }]}
+                          onPress={() => reviewImportedSubComponent(activeIdx, compIdx, "disapprove")}
+                        >
+                          <Feather name="x" size={13} color="#fff" />
+                          <Text style={styles.prevNoteBtnText}>Disapprove</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
+
                   {/* Component Header */}
                   <View style={[styles.compHeader, { backgroundColor: c.background, borderColor: comp.isImported ? "#f97316" : c.border }]}>
                     <View style={styles.compHeaderLeft}>
@@ -247,7 +303,7 @@ export default function NBIScreen() {
                   </View>
 
                   {/* Previous comments */}
-                  {comp.previousComments ? (
+                  {comp.previousComments && !comp.isImported ? (
                     <View style={[styles.prevComments, { backgroundColor: c.secondary, borderColor: c.border }]}>
                       <Text style={[styles.prevCommentsLabel, { color: c.mutedForeground }]}>Previous Report</Text>
                       <Text style={[styles.prevCommentsText, { color: c.mutedForeground }]}>{comp.previousComments}</Text>
@@ -422,4 +478,29 @@ const styles = StyleSheet.create({
   linkedDefectLoc: { fontSize: 9, fontWeight: "800", textTransform: "uppercase" },
   linkedDefectName: { fontSize: 11, fontWeight: "800", textTransform: "uppercase" },
   linkedDefectQty: { fontSize: 11, fontWeight: "700" },
+  prevNoteCard: {
+    backgroundColor: "#fff7ed",
+    borderWidth: 1,
+    borderColor: "#f97316",
+    borderRadius: 10,
+    padding: 10,
+    gap: 8,
+  },
+  prevNoteHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
+  prevNoteTitle: { fontSize: 10, fontWeight: "900", color: "#9a3412", textTransform: "uppercase", letterSpacing: 0.4 },
+  prevNoteGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  prevNoteField: { width: "48%", gap: 2 },
+  prevNoteKey: { fontSize: 9, fontWeight: "800", color: "#9a3412", textTransform: "uppercase", letterSpacing: 0.3 },
+  prevNoteVal: { fontSize: 12, fontWeight: "700", color: "#7c2d12" },
+  prevNoteActions: { flexDirection: "row", gap: 6, marginTop: 4 },
+  prevNoteBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  prevNoteBtnText: { fontSize: 10, fontWeight: "900", color: "#fff", textTransform: "uppercase", letterSpacing: 0.3 },
 });

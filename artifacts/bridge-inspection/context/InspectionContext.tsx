@@ -216,6 +216,9 @@ export interface SubComponent {
   snbiIds: string[];
   comments: string;
   previousComments: string;
+  previousRating?: string;
+  previousDesc?: string;
+  previousMin?: string;
   isImported?: boolean;
 }
 
@@ -484,6 +487,11 @@ interface InspectionContextType {
     compIndex: number,
     field: string,
     value: string
+  ) => void;
+  reviewImportedSubComponent: (
+    itemIndex: number,
+    compIndex: number,
+    action: "approve" | "disapprove" | "modify"
   ) => void;
   importFromPdf: (source: File | { uri: string; name?: string }) => Promise<void>;
   parsingActive: boolean;
@@ -1015,6 +1023,48 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     [nbiRatings, setNbiRatings]
   );
 
+  const reviewImportedSubComponent = useCallback(
+    (itemIndex: number, compIndex: number, action: "approve" | "disapprove" | "modify") => {
+      const next = [...nbiRatings];
+      const nextItem = { ...next[itemIndex] };
+      const nextSub = [...nextItem.subComponents];
+      const cur = nextSub[compIndex];
+
+      if (action === "approve" || action === "modify") {
+        nextSub[compIndex] = {
+          ...cur,
+          rating: cur.previousRating || cur.rating,
+          desc: cur.previousDesc || cur.desc,
+          min: cur.previousMin || cur.min,
+          comments: cur.previousComments || cur.comments,
+          isImported: false,
+          ...(action === "approve"
+            ? {
+                previousRating: undefined,
+                previousDesc: undefined,
+                previousMin: undefined,
+                previousComments: "",
+              }
+            : {}),
+        };
+      } else {
+        nextSub[compIndex] = {
+          ...cur,
+          previousRating: undefined,
+          previousDesc: undefined,
+          previousMin: undefined,
+          previousComments: "",
+          isImported: false,
+        };
+      }
+
+      nextItem.subComponents = nextSub;
+      next[itemIndex] = nextItem;
+      setNbiRatings(next);
+    },
+    [nbiRatings, setNbiRatings]
+  );
+
   const importFromPdf = useCallback(
     async (source: File | { uri: string; name?: string }) => {
       setParsingActive(true);
@@ -1176,12 +1226,15 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
                 if (!result) return sub;
                 usedIndices.add(result.index);
                 const match = result.entry;
-                const wasBlank = !sub.rating;
+                const hasAny = !!(match.rating || match.comment || match.desc || match.min);
+                if (!hasAny) return sub;
                 return {
                   ...sub,
-                  rating: wasBlank ? match.rating : sub.rating,
+                  previousRating: match.rating || sub.previousRating,
+                  previousDesc: match.desc || sub.previousDesc,
+                  previousMin: match.min || sub.previousMin,
                   previousComments: match.comment || sub.previousComments,
-                  isImported: !!(match.rating || match.comment),
+                  isImported: true,
                 };
               }),
             }));
@@ -1290,6 +1343,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     completeCIF,
     completeFUA,
     updateSubComponent,
+    reviewImportedSubComponent,
     structureNumber,
     setStructureNumber,
     importFromPdf,
