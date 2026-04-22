@@ -281,12 +281,15 @@ function inferItemForComponent(componentName: string, currentItem: string): stri
 
 const RATING_LINE_PATTERNS: RegExp[] = [
   // name  [spec…]  min  rating  [comment]
-  /^(.+?)\s{2,}((?:\S+\s+){0,3})(\d+|-)\s+([N\d])\b\s*(.*)?$/,
+  // spec tokens must start with a non-digit so the min value isn't absorbed
+  /^(.+?)\s{2,}((?:[^\d\s\-][^\s]*\s+){0,3})(\d+|-|N)\s+([N\d])(?!\d)\s*(.*)?$/,
   // name  min  rating  [comment]
-  /^(.+?)\s{2,}(\d+|-|N)\s+([N\d])\b\s*(.*)?$/,
+  /^(.+?)\s{2,}(\d+|-|N)\s+([N\d])(?!\d)\s*(.*)?$/,
   // name  rating  [comment] (no min column)
-  /^(.+?)\s{2,}([N\d])\b\s*(.*)?$/,
+  /^(.+?)\s{2,}([N\d])(?!\d)\s*(.*)?$/,
 ];
+
+const STRUCTURAL_LINE_RE = /^\s*(?:\d{1,3}\s*-|page\s*\d|sheet\s*\d|date\s*[:\/]|time\s*[:\/]|inspector|firm|structure\s+id|inspection\s+date|do\s+not\s+disclose|item\s*(?:no\.?\s*)?\d|appendix)/i;
 
 export function parseNbiRatings(pages: string[][]): ParsedNbiEntry[] {
   const results: ParsedNbiEntry[] = [];
@@ -359,8 +362,28 @@ export function parseNbiRatings(pages: string[][]): ParsedNbiEntry[] {
     if (seen.has(key)) continue;
     seen.add(key);
 
-    debug.push(`[NBI] item=${item} comp="${componentName}" min=${min} rating=${rating} desc="${desc}" comment="${comment.slice(0, 60)}"`);
-    results.push({ item, componentName, desc, min, rating, comment });
+    // Append continuation lines (multi-line comments) until next structural line
+    let fullComment = comment;
+    let j = i + 1;
+    let continued = 0;
+    while (j < allLines.length && continued < 10) {
+      const cont = allLines[j];
+      if (!cont || !cont.trim()) break;
+      if (STRUCTURAL_LINE_RE.test(cont)) break;
+      if (RATING_LINE_PATTERNS.some((re) => re.test(cont))) break;
+      let isSection = false;
+      for (const { pattern } of NBI_SECTION_PATTERNS) {
+        if (pattern.test(cont)) { isSection = true; break; }
+      }
+      if (isSection) break;
+      fullComment = fullComment ? `${fullComment} ${cont.trim()}` : cont.trim();
+      j++;
+      continued++;
+    }
+    i = j - 1;
+
+    debug.push(`[NBI] item=${item} comp="${componentName}" min=${min} rating=${rating} desc="${desc}" comment="${fullComment.slice(0, 100)}"`);
+    results.push({ item, componentName, desc, min, rating, comment: fullComment });
   }
 
   if (typeof console !== "undefined") {
