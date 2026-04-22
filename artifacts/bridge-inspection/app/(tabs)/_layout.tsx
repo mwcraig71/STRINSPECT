@@ -57,10 +57,6 @@ function ClassicTabLayout() {
               tint={isDark ? "dark" : "light"}
               style={StyleSheet.absoluteFill}
             />
-          ) : isWeb ? (
-            <View
-              style={[StyleSheet.absoluteFill, { backgroundColor: colors.card }]}
-            />
           ) : null,
       }}
     >
