@@ -96,15 +96,75 @@ export function parseStructureNumber(pages: string[][]): string {
 }
 
 const NBI_SECTION_PATTERNS: { pattern: RegExp; item: string }[] = [
-  { pattern: /\bDECK\b.*ITEM\s*58|\bITEM\s*58\b.*DECK/i, item: "58" },
-  { pattern: /\bSUPERSTRUCTURE\b.*ITEM\s*59|\bITEM\s*59\b.*SUPER/i, item: "59" },
-  { pattern: /\bSUBSTRUCTURE\b.*ITEM\s*60|\bITEM\s*60\b.*SUB/i, item: "60" },
-  { pattern: /\bCHANNEL\b.*ITEM\s*61|\bITEM\s*61\b.*CHANNEL/i, item: "61" },
-  { pattern: /\bAPPROACH(ES)?\b.*ITEM\s*65|\bITEM\s*65\b/i, item: "65" },
-  { pattern: /\bTRAFFIC\b.*ITEM\s*36|\bITEM\s*36\b.*TRAFFIC/i, item: "36" },
-  { pattern: /\bWATERWAY\b.*ITEM\s*71|\bITEM\s*71\b/i, item: "71" },
-  { pattern: /\bAPPROACH\s+ROAD|\bITEM\s*72\b/i, item: "72" },
+  { pattern: /\b(?:item\s*(?:no\.?\s*)?)?58\b[^\n]{0,40}\bdeck\b|\bdeck\b[^\n]{0,40}\b(?:item\s*(?:no\.?\s*)?)?58\b/i, item: "58" },
+  { pattern: /\b(?:item\s*(?:no\.?\s*)?)?59\b[^\n]{0,40}\bsuper(?:structure)?\b|\bsuper(?:structure)?\b[^\n]{0,40}\b(?:item\s*(?:no\.?\s*)?)?59\b/i, item: "59" },
+  { pattern: /\b(?:item\s*(?:no\.?\s*)?)?60\b[^\n]{0,40}\bsub(?:structure)?\b|\bsub(?:structure)?\b[^\n]{0,40}\b(?:item\s*(?:no\.?\s*)?)?60\b/i, item: "60" },
+  { pattern: /\b(?:item\s*(?:no\.?\s*)?)?61\b[^\n]{0,40}\bchannel\b|\bchannel\b[^\n]{0,40}\b(?:item\s*(?:no\.?\s*)?)?61\b/i, item: "61" },
+  { pattern: /\b(?:item\s*(?:no\.?\s*)?)?65\b|\bapproach(?:es)?\b/i, item: "65" },
+  { pattern: /\b(?:item\s*(?:no\.?\s*)?)?36\b[^\n]{0,40}\btraffic\b|\btraffic\s+safety\b/i, item: "36" },
+  { pattern: /\b(?:item\s*(?:no\.?\s*)?)?71\b|\bwaterway\b/i, item: "71" },
+  { pattern: /\b(?:item\s*(?:no\.?\s*)?)?72\b|\bapproach\s+road(?:way)?\s+align/i, item: "72" },
 ];
+
+const COMPONENT_TO_ITEMS: Record<string, string[]> = {
+  "Deck - Component Rating": ["58"],
+  "Wearing Surface": ["58"],
+  "Joints, Expansion, Open": ["58"],
+  "Joints, Expansion, Sealed": ["58"],
+  "Joints, Other": ["58"],
+  "Drainage System": ["58"],
+  "Curbs, Sidewalk & Parapets": ["58"],
+  "Median Barrier": ["58"],
+  "Railings": ["58"],
+  "Railing Protective Coating": ["58"],
+  "Main Members - Steel": ["59"],
+  "Main Members - Concrete": ["59"],
+  "Main Members - Timber": ["59"],
+  "Main Members - Connections": ["59"],
+  "Floor System Members": ["59"],
+  "Floor System Connections": ["59"],
+  "Secondary Members": ["59"],
+  "Secondary Mem. Connections": ["59"],
+  "Expansion Bearings": ["59"],
+  "Fixed Bearings": ["59"],
+  "Abutment Caps": ["60"],
+  "Above Ground": ["60"],
+  "Below Ground or Foundation": ["60"],
+  "Backwalls & Wingwalls": ["60"],
+  "Caps - Concrete": ["60"],
+  "Caps - Steel": ["60"],
+  "Caps - Timber": ["60"],
+  "Above Ground - Concrete": ["60"],
+  "Above Ground - Steel": ["60"],
+  "Above Ground - Timber": ["60"],
+  "Above Ground - Masonry": ["60"],
+  "Below Ground (Int. Supports)": ["60"],
+  "Collision Protection System": ["60"],
+  "Channel Banks": ["61"],
+  "Channel Bed": ["61"],
+  "Rip Rap, Toe Walls & Apron": ["61"],
+  "Dikes": ["61"],
+  "Jetties": ["61"],
+  "Embankments": ["65"],
+  "Embankment Retaining Walls": ["65"],
+  "Slope Protection": ["65"],
+  "Roadway": ["65"],
+  "Relief Joints": ["65"],
+  "Drainage": ["65"],
+  "Guardfence": ["65"],
+  "Sight Distance": ["65"],
+  "Bridge Rails": ["36"],
+  "Transitions": ["36"],
+  "Approach Rails": ["36"],
+  "Approach Rail Ends": ["36"],
+  "Waterway Adequacy": ["71"],
+  "Approach Roadway Alignment": ["72"],
+  // Ambiguous (appear in multiple items) — order = preference
+  "Steel Protective Coating": ["59", "60"],
+  "Delineation": ["58", "65"],
+  "Other": ["58"],
+  "Overall Component Rating": ["59", "60", "61", "65"],
+};
 
 const NBI_COMPONENT_ALIASES: Record<string, string> = {
   "deck component rating": "Deck - Component Rating",
@@ -211,51 +271,101 @@ function normalizeComponentName(raw: string): string {
   return raw.trim();
 }
 
+function inferItemForComponent(componentName: string, currentItem: string): string {
+  const candidates = COMPONENT_TO_ITEMS[componentName];
+  if (!candidates || candidates.length === 0) return currentItem;
+  if (candidates.length === 1) return candidates[0];
+  if (currentItem && candidates.includes(currentItem)) return currentItem;
+  return candidates[0];
+}
+
+const RATING_LINE_PATTERNS: RegExp[] = [
+  // name  [spec…]  min  rating  [comment]
+  /^(.+?)\s{2,}((?:\S+\s+){0,3})(\d+|-)\s+([N\d])\b\s*(.*)?$/,
+  // name  min  rating  [comment]
+  /^(.+?)\s{2,}(\d+|-|N)\s+([N\d])\b\s*(.*)?$/,
+  // name  rating  [comment] (no min column)
+  /^(.+?)\s{2,}([N\d])\b\s*(.*)?$/,
+];
+
 export function parseNbiRatings(pages: string[][]): ParsedNbiEntry[] {
   const results: ParsedNbiEntry[] = [];
   const allLines = pages.flat();
+  const debug: string[] = [];
 
   let currentItem = "";
-  let i = 0;
+  const seen = new Set<string>();
 
-  while (i < allLines.length) {
+  for (let i = 0; i < allLines.length; i++) {
     const line = allLines[i];
     const next = allLines[i + 1] || "";
 
-    let matched = false;
     for (const { pattern, item } of NBI_SECTION_PATTERNS) {
       if (pattern.test(line) || pattern.test(line + " " + next)) {
         currentItem = item;
-        matched = true;
         break;
       }
     }
 
-    if (matched) { i++; continue; }
+    let matched: { rawName: string; desc: string; min: string; rating: string; comment: string } | null = null;
 
-    if (currentItem) {
-      const ratingMatch = line.match(
-        /^(.+?)\s{2,}((?:\S+\s+){0,3})(\d+|-)\s+([N\d])\b\s*(.*)?$/
-      );
-      if (ratingMatch) {
-        const rawName = ratingMatch[1].trim();
-        const desc = (ratingMatch[2] || "").trim();
-        const min = ratingMatch[3];
-        const rating = ratingMatch[4];
-        const comment = ratingMatch[5]?.trim() || "";
-        const componentName = normalizeComponentName(rawName);
-
-        if (
-          componentName.length > 3 &&
-          !rawName.match(/^\d{4,}/) &&
-          !rawName.match(/Structure ID|Inspection Date|DO NOT DISCLOSE|ITEM\s*\d/i)
-        ) {
-          results.push({ item: currentItem, componentName, desc, min, rating, comment });
+    const m1 = line.match(RATING_LINE_PATTERNS[0]);
+    if (m1) {
+      matched = {
+        rawName: m1[1].trim(),
+        desc: (m1[2] || "").trim(),
+        min: m1[3],
+        rating: m1[4],
+        comment: m1[5]?.trim() || "",
+      };
+    } else {
+      const m2 = line.match(RATING_LINE_PATTERNS[1]);
+      if (m2) {
+        matched = {
+          rawName: m2[1].trim(),
+          desc: "",
+          min: m2[2],
+          rating: m2[3],
+          comment: m2[4]?.trim() || "",
+        };
+      } else {
+        const m3 = line.match(RATING_LINE_PATTERNS[2]);
+        if (m3) {
+          matched = {
+            rawName: m3[1].trim(),
+            desc: "",
+            min: "",
+            rating: m3[2],
+            comment: m3[3]?.trim() || "",
+          };
         }
       }
     }
 
-    i++;
+    if (!matched) continue;
+
+    const { rawName, desc, min, rating, comment } = matched;
+    const componentName = normalizeComponentName(rawName);
+
+    if (componentName.length <= 3) continue;
+    if (rawName.match(/^\d{4,}/)) continue;
+    if (rawName.match(/Structure ID|Inspection Date|DO NOT DISCLOSE|ITEM\s*\d|Page\s*\d|^Date\b|^Time\b/i)) continue;
+    if (componentName.toLowerCase().match(/^(yes|no|n\/a|na|none|date|page|sheet)\b/)) continue;
+
+    const item = inferItemForComponent(componentName, currentItem);
+    if (!item) continue;
+
+    const key = `${item}|${componentName}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    debug.push(`[NBI] item=${item} comp="${componentName}" min=${min} rating=${rating} desc="${desc}" comment="${comment.slice(0, 60)}"`);
+    results.push({ item, componentName, desc, min, rating, comment });
+  }
+
+  if (typeof console !== "undefined") {
+    console.log(`[pdfParser] Parsed ${results.length} NBI entries:`);
+    debug.forEach((d) => console.log(d));
   }
 
   return results;
