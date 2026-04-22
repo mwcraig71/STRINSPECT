@@ -637,6 +637,7 @@ const STORAGE_KEYS = {
   SUPERSTRUCTURE_TYPE: "@bridge_superstructure_type",
   SUBSTRUCTURE_TYPE: "@bridge_substructure_type",
   STRUCTURE_NUMBER: "@bridge_structure_number",
+  DEMO_CLEARED: "@bridge_demo_cleared_v1",
 };
 
 export function InspectionProvider({ children }: { children: React.ReactNode }) {
@@ -681,6 +682,15 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     const load = async () => {
       try {
+        const demoCleared = await AsyncStorage.getItem(STORAGE_KEYS.DEMO_CLEARED);
+        if (!demoCleared) {
+          await AsyncStorage.multiRemove([
+            STORAGE_KEYS.SAVED_DEFECTS,
+            STORAGE_KEYS.NBI_RATINGS,
+            STORAGE_KEYS.STRUCTURE_NUMBER,
+          ]);
+          await AsyncStorage.setItem(STORAGE_KEYS.DEMO_CLEARED, "1");
+        }
         const [defects, nbi, nom, insType, superType, subType, structNum] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.SAVED_DEFECTS),
           AsyncStorage.getItem(STORAGE_KEYS.NBI_RATINGS),
