@@ -172,10 +172,39 @@ const NBI_COMPONENT_ALIASES: Record<string, string> = {
   "approach roadway alignment": "Approach Roadway Alignment",
 };
 
+export function normalizeForMatching(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/\s*[-–]\s*/g, " - ")
+    .replace(/[.,;:]+$/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function tokenOverlapScore(a: string, b: string): number {
+  const tokA = new Set(a.split(/[\s\-]+/).filter(Boolean));
+  const tokB = new Set(b.split(/[\s\-]+/).filter(Boolean));
+  const intersection = [...tokA].filter((t) => tokB.has(t)).length;
+  const union = new Set([...tokA, ...tokB]).size;
+  return union === 0 ? 0 : intersection / union;
+}
+
+export function nbiSubNameMatchScore(parsedName: string, subName: string): number {
+  const normParsed = normalizeForMatching(parsedName);
+  const normSub = normalizeForMatching(subName);
+  if (normParsed === normSub) return 1;
+  return tokenOverlapScore(normParsed, normSub);
+}
+
 function normalizeComponentName(raw: string): string {
+  const norm = normalizeForMatching(raw);
+  for (const [key, canonical] of Object.entries(NBI_COMPONENT_ALIASES)) {
+    const normKey = normalizeForMatching(key);
+    if (norm === normKey || norm.startsWith(normKey)) return canonical;
+  }
   const lower = raw.toLowerCase().trim();
   for (const [key, canonical] of Object.entries(NBI_COMPONENT_ALIASES)) {
-    if (lower.startsWith(key) || lower === key) return canonical;
+    if (lower === key || lower.startsWith(key)) return canonical;
   }
   return raw.trim();
 }

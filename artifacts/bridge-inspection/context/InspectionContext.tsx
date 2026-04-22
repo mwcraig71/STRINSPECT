@@ -7,7 +7,7 @@ import React, {
   useMemo,
   useState,
 } from "react";
-import { parseReport } from "../utils/pdfParser";
+import { nbiSubNameMatchScore, parseReport } from "../utils/pdfParser";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -1121,15 +1121,61 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           return merged;
         });
 
+        const FUZZY_THRESHOLD = 0.5;
+
+        function findFuzzyNbiEntry(
+          entries: typeof nbi,
+          itemId: string,
+          subName: string,
+          usedIndices: Set<number>
+        ): { entry: (typeof nbi)[number]; index: number } | null {
+          let bestScore = 0;
+          let bestIndex = -1;
+          for (let idx = 0; idx < entries.length; idx++) {
+            if (usedIndices.has(idx)) continue;
+            const r = entries[idx];
+            if (r.item !== itemId) continue;
+            const score = nbiSubNameMatchScore(r.componentName, subName);
+            if (score > bestScore) {
+              bestScore = score;
+              bestIndex = idx;
+            }
+          }
+          if (bestScore >= FUZZY_THRESHOLD && bestIndex >= 0) {
+            return { entry: entries[bestIndex], index: bestIndex };
+          }
+          return null;
+        }
+
+        const usedIndicesForAlert = new Set<number>();
+        let nbiMatchedCount = 0;
+        for (const item of nbiRatings) {
+          for (const sub of item.subComponents) {
+            const result = findFuzzyNbiEntry(nbi, item.item, sub.name, usedIndicesForAlert);
+            if (result) {
+              usedIndicesForAlert.add(result.index);
+              nbiMatchedCount++;
+            }
+          }
+        }
+        const unmatchedNbi = nbi.filter((_, i) => !usedIndicesForAlert.has(i));
+        if (unmatchedNbi.length > 0) {
+          console.warn(
+            "[NBI Import] Unmatched components (not imported):",
+            unmatchedNbi.map((r) => `Item ${r.item}: "${r.componentName}"`).join(", ")
+          );
+        }
+
         if (nbi.length > 0) {
           setNbiRatingsState((prevNbi) => {
+            const usedIndices = new Set<number>();
             const updated = prevNbi.map((item) => ({
               ...item,
               subComponents: item.subComponents.map((sub) => {
-                const match = nbi.find(
-                  (r) => r.item === item.item && r.componentName === sub.name
-                );
-                if (!match) return sub;
+                const result = findFuzzyNbiEntry(nbi, item.item, sub.name, usedIndices);
+                if (!result) return sub;
+                usedIndices.add(result.index);
+                const match = result.entry;
                 const wasBlank = !sub.rating;
                 return {
                   ...sub,
@@ -1144,12 +1190,18 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           });
         }
 
+        const unmatchedNames = unmatchedNbi.map((r) => `Item ${r.item}: ${r.componentName}`);
+        const unmatchedSummary =
+          unmatchedNames.length > 0
+            ? `\n\n${unmatchedNames.length} NBI component(s) not matched:\n${unmatchedNames.join("\n")}`
+            : "";
+
         const { Alert } = require("react-native");
         Alert.alert(
           "Import Complete",
           `Imported ${newDefects.length} element record(s) across ${
             elements.filter((e) => !e.isDefect).length
-          } elements.\n${nbi.length} NBI rating(s) pre-filled.\n${
+          } elements.\n${nbiMatchedCount} NBI rating(s) pre-filled.${unmatchedSummary}\n${
             parsedNum ? `Structure: ${parsedNum}` : "Structure number not found."
           }\n\nAssign locations and verify records before submitting.`
         );
@@ -1161,7 +1213,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         setParsingActive(false);
       }
     },
-    [setSavedDefectsState, setNbiRatingsState, setStructureNumber]
+    [setSavedDefectsState, setNbiRatingsState, setStructureNumber, nbiRatings]
   );
 
   const value: InspectionContextType = {
