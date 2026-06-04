@@ -21,3 +21,8 @@ re-read its config). Apply the same fix to any other Expo artifact that hits thi
 Note: on `react-native-web`, `<Modal>` children mount even when `visible={false}`, so a faulty
 child component crashes on page load before any interaction — don't assume the modal must be
 opened to reproduce.
+
+Troubleshooting heuristic: if an Expo component throws "Invalid hook call" on web *after* the
+metro alias is already in place, try switching namespace hook calls (`React.useState(...)`) to
+named imports (`import { useState } from "react"`). This resolved it at least once here; prefer
+named hook imports in this repo's Expo components as a precaution.

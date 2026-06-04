@@ -517,6 +517,9 @@ export interface ChannelData {
   comments: string;
   upstream: ChannelMeasurement[];
   downstream: ChannelMeasurement[];
+  // Optional bent stations per section (comma/space separated station values).
+  // When present, "Distance From Last Bent" is auto-calculated from Total Horizontal Distance.
+  bentStations: { upstream: string; downstream: string };
 }
 
 export const CHANNEL_REFERENCE_FEATURES: { code: string; label: string }[] = [
@@ -532,11 +535,14 @@ export const CHANNEL_REFERENCE_FEATURES: { code: string; label: string }[] = [
   { code: "RB", label: "Rubble Rip-Rap" },
 ];
 
-export function createChannelMeasurement(): ChannelMeasurement {
+export function createChannelMeasurement(
+  seed?: { topRef?: string; botRef?: string }
+): ChannelMeasurement {
   return {
     id: `ch_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-    topRef: "",
-    botRef: "",
+    // References default to Top of Railing / Water Surface and persist until changed.
+    topRef: seed?.topRef ?? "TR",
+    botRef: seed?.botRef ?? "WS",
     totalHoriz: "",
     distFromLastBent: "",
     vertDist: "",
@@ -556,6 +562,7 @@ const INITIAL_CHANNEL: ChannelData = {
   comments: "",
   upstream: [createChannelMeasurement()],
   downstream: [createChannelMeasurement()],
+  bentStations: { upstream: "", downstream: "" },
 };
 
 // ─── Context Types ────────────────────────────────────────────────────────────
@@ -930,6 +937,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
             const downstream = Array.isArray(parsed.downstream) && parsed.downstream.length
               ? parsed.downstream
               : [createChannelMeasurement()];
+            const pb = (parsed.bentStations ?? {}) as Partial<ChannelData["bentStations"]>;
             setChannelDataState({
               ...INITIAL_CHANNEL,
               ...parsed,
@@ -937,6 +945,10 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
               structureNumber: structNum || parsed.structureNumber || "",
               upstream,
               downstream,
+              bentStations: {
+                upstream: typeof pb.upstream === "string" ? pb.upstream : "",
+                downstream: typeof pb.downstream === "string" ? pb.downstream : "",
+              },
             });
           }
         } else if (structNum) {
@@ -1029,9 +1041,15 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
 
   const addChannelMeasurement = useCallback((section: ChannelSection) => {
     setChannelDataState((prev) => {
+      const rows = prev[section];
+      // References persist until changed: inherit them from the last row.
+      const last = rows[rows.length - 1];
+      const seeded = createChannelMeasurement(
+        last ? { topRef: last.topRef, botRef: last.botRef } : undefined
+      );
       const next = {
         ...prev,
-        [section]: [...prev[section], createChannelMeasurement()],
+        [section]: [...rows, seeded],
       };
       AsyncStorage.setItem(STORAGE_KEYS.CHANNEL, JSON.stringify(next)).catch(() => {});
       return next;

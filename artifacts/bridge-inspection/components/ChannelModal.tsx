@@ -1,5 +1,5 @@
 import { Feather } from "@expo/vector-icons";
-import React from "react";
+import React, { useState } from "react";
 import {
   Modal,
   ScrollView,
@@ -34,6 +34,13 @@ export function ChannelModal() {
 
   const d = channelData;
 
+  // Which Top/Bot reference cell currently has its dropdown open.
+  const [refPicker, setRefPicker] = useState<{
+    section: ChannelSection;
+    id: string;
+    field: "topRef" | "botRef";
+  } | null>(null);
+
   const setHeader = (field: keyof typeof d, value: string) => {
     // Structure # is globally synced (CIF + header); route through the source of truth.
     if (field === "structureNumber") {
@@ -43,15 +50,92 @@ export function ChannelModal() {
     setChannelData({ ...d, [field]: value });
   };
 
+  // Parse a bent-stations string ("0, 25, 50") into a sorted numeric list.
+  const parseBents = (raw: string): number[] =>
+    raw
+      .split(/[,\s]+/)
+      .map((s) => parseFloat(s))
+      .filter((n) => !isNaN(n))
+      .sort((a, b) => a - b);
+
+  // Distance from the last bent at or before the given station (Total Horizontal Distance).
+  const distFromLastBent = (totalHoriz: string, bents: number[]): string => {
+    const station = parseFloat(totalHoriz);
+    if (isNaN(station) || !bents.length) return "";
+    let preceding: number | null = null;
+    for (const b of bents) {
+      if (b <= station) preceding = b;
+      else break;
+    }
+    // No bent at or before this station → distance from last bent is undefined.
+    if (preceding === null) return "";
+    const dist = station - preceding;
+    return Number.isInteger(dist) ? String(dist) : dist.toFixed(2);
+  };
+
   const updateMeasure = (
     section: ChannelSection,
     id: string,
     patch: Partial<ChannelMeasurement>
   ) => {
+    const bents = parseBents(d.bentStations[section]);
     setChannelData({
       ...d,
-      [section]: d[section].map((m) => (m.id === id ? { ...m, ...patch } : m)),
+      [section]: d[section].map((m) => {
+        if (m.id !== id) return m;
+        const merged = { ...m, ...patch };
+        // Auto-calculate Distance From Last Bent when bent stations are provided.
+        if (bents.length && patch.totalHoriz !== undefined) {
+          merged.distFromLastBent = distFromLastBent(merged.totalHoriz, bents);
+        }
+        return merged;
+      }),
     });
+  };
+
+  const setBentStations = (section: ChannelSection, value: string) => {
+    const bents = parseBents(value);
+    setChannelData({
+      ...d,
+      bentStations: { ...d.bentStations, [section]: value },
+      // Recompute all rows in this section against the new bent list.
+      [section]: d[section].map((m) => ({
+        ...m,
+        distFromLastBent: bents.length
+          ? distFromLastBent(m.totalHoriz, bents)
+          : m.distFromLastBent,
+      })),
+    });
+  };
+
+  const hasBents = (section: ChannelSection): boolean =>
+    parseBents(d.bentStations[section]).length > 0;
+
+  const renderRefCell = (
+    section: ChannelSection,
+    m: ChannelMeasurement,
+    field: "topRef" | "botRef"
+  ) => {
+    const open =
+      refPicker?.section === section && refPicker?.id === m.id && refPicker?.field === field;
+    return (
+      <TouchableOpacity
+        style={[
+          styles.colRef,
+          styles.cell,
+          styles.refCell,
+          { backgroundColor: c.secondary, borderColor: open ? ACCENT : c.border },
+        ]}
+        onPress={() =>
+          setRefPicker(open ? null : { section, id: m.id, field })
+        }
+      >
+        <Text style={[styles.refCellText, { color: m[field] ? c.foreground : c.mutedForeground }]}>
+          {m[field] || "—"}
+        </Text>
+        <Feather name="chevron-down" size={10} color={c.mutedForeground} />
+      </TouchableOpacity>
+    );
   };
 
   const headerFields: { key: keyof typeof d; label: string; placeholder: string }[] = [
@@ -69,6 +153,25 @@ export function ChannelModal() {
     <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
       <Text style={[styles.cardTitle, { color: ACCENT }]}>{title}</Text>
 
+      {/* Bent stations (optional) — enables auto-calc of Distance From Last Bent */}
+      <View>
+        <Text style={[styles.fieldLabel, { color: c.mutedForeground }]}>
+          Bent Stations (optional)
+        </Text>
+        <TextInput
+          style={[styles.input, { backgroundColor: c.secondary, borderColor: c.border, color: c.foreground }]}
+          value={d.bentStations[section]}
+          onChangeText={(t) => setBentStations(section, t)}
+          placeholder="e.g. 0, 25, 50, 75"
+          placeholderTextColor={c.mutedForeground}
+        />
+        {hasBents(section) && (
+          <Text style={[styles.hintText, { color: ACCENT }]}>
+            Distance From Last Bent is auto-calculated from Total Horiz.
+          </Text>
+        )}
+      </View>
+
       {/* Column header */}
       <View style={styles.measureHeaderRow}>
         <Text style={[styles.colNo, styles.headTxt, { color: c.mutedForeground }]}>#</Text>
@@ -80,39 +183,34 @@ export function ChannelModal() {
         <View style={styles.colDel} />
       </View>
 
-      {d[section].map((m, idx) => (
+      {d[section].map((m, idx) => {
+        const autoDist = hasBents(section);
+        return (
         <View key={m.id} style={styles.measureBlock}>
           <View style={[styles.measureRow, { borderColor: c.border }]}>
             <Text style={[styles.colNo, styles.rowNo, { color: c.mutedForeground }]}>{idx + 1}</Text>
-            <TextInput
-              style={[styles.colRef, styles.cell, { backgroundColor: c.secondary, borderColor: c.border, color: c.foreground }]}
-              value={m.topRef}
-              onChangeText={(t) => updateMeasure(section, m.id, { topRef: t })}
-              placeholder="—"
-              placeholderTextColor={c.mutedForeground}
-              autoCapitalize="characters"
-            />
-            <TextInput
-              style={[styles.colRef, styles.cell, { backgroundColor: c.secondary, borderColor: c.border, color: c.foreground }]}
-              value={m.botRef}
-              onChangeText={(t) => updateMeasure(section, m.id, { botRef: t })}
-              placeholder="—"
-              placeholderTextColor={c.mutedForeground}
-              autoCapitalize="characters"
-            />
+            {renderRefCell(section, m, "topRef")}
+            {renderRefCell(section, m, "botRef")}
             <TextInput
               style={[styles.colNum, styles.cell, { backgroundColor: c.secondary, borderColor: c.border, color: c.foreground }]}
               value={m.totalHoriz}
               onChangeText={(t) => updateMeasure(section, m.id, { totalHoriz: t })}
               placeholder="—"
               placeholderTextColor={c.mutedForeground}
+              keyboardType="numeric"
             />
             <TextInput
-              style={[styles.colNum, styles.cell, { backgroundColor: c.secondary, borderColor: c.border, color: c.foreground }]}
+              style={[
+                styles.colNum,
+                styles.cell,
+                { backgroundColor: autoDist ? c.muted : c.secondary, borderColor: c.border, color: autoDist ? c.mutedForeground : c.foreground },
+              ]}
               value={m.distFromLastBent}
               onChangeText={(t) => updateMeasure(section, m.id, { distFromLastBent: t })}
               placeholder="—"
               placeholderTextColor={c.mutedForeground}
+              keyboardType="numeric"
+              editable={!autoDist}
             />
             <TextInput
               style={[styles.colNum, styles.cell, { backgroundColor: c.secondary, borderColor: c.border, color: c.foreground }]}
@@ -120,6 +218,7 @@ export function ChannelModal() {
               onChangeText={(t) => updateMeasure(section, m.id, { vertDist: t })}
               placeholder="—"
               placeholderTextColor={c.mutedForeground}
+              keyboardType="numeric"
             />
             <TouchableOpacity
               onPress={() => removeChannelMeasurement(section, m.id)}
@@ -129,6 +228,40 @@ export function ChannelModal() {
               <Feather name="trash-2" size={14} color="#dc2626" />
             </TouchableOpacity>
           </View>
+
+          {/* Reference dropdown (opens under the row) */}
+          {refPicker && refPicker.section === section && refPicker.id === m.id && (
+            <View style={[styles.refDropdown, { backgroundColor: c.card, borderColor: c.border }]}>
+              <Text style={[styles.refDropdownTitle, { color: c.mutedForeground }]}>
+                {refPicker.field === "topRef" ? "Top Reference" : "Bottom Reference"}
+              </Text>
+              <View style={styles.refOptions}>
+                {CHANNEL_REFERENCE_FEATURES.map((r) => {
+                  const selected = m[refPicker.field] === r.code;
+                  return (
+                    <TouchableOpacity
+                      key={r.code}
+                      style={[
+                        styles.refOption,
+                        { borderColor: c.border },
+                        selected && { backgroundColor: ACCENT, borderColor: ACCENT },
+                      ]}
+                      onPress={() => {
+                        updateMeasure(section, m.id, { [refPicker.field]: r.code });
+                        setRefPicker(null);
+                      }}
+                    >
+                      <Text style={[styles.refOptionCode, { color: selected ? "#fff" : ACCENT }]}>{r.code}</Text>
+                      <Text style={[styles.refOptionLabel, { color: selected ? "#fff" : c.foreground }]} numberOfLines={1}>
+                        {r.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
           <TextInput
             style={[styles.notesInput, { backgroundColor: c.secondary, borderColor: c.border, color: c.foreground }]}
             value={m.notes}
@@ -137,7 +270,8 @@ export function ChannelModal() {
             placeholderTextColor={c.mutedForeground}
           />
         </View>
-      ))}
+        );
+      })}
 
       <TouchableOpacity
         style={[styles.addBtn, { borderColor: ACCENT }]}
@@ -282,6 +416,15 @@ const styles = StyleSheet.create({
   colNum: { flex: 1.1, minWidth: 0 },
   colDel: { width: 22, alignItems: "center", justifyContent: "center" },
   cell: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 2, paddingVertical: 6, fontSize: 11, fontWeight: "700", textAlign: "center", width: "100%" },
+  refCell: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 1, paddingHorizontal: 1 },
+  refCellText: { fontSize: 11, fontWeight: "800" },
+  refDropdown: { borderWidth: 1, borderRadius: 8, padding: 8, gap: 6, marginTop: 2 },
+  refDropdownTitle: { fontSize: 9, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.5 },
+  refOptions: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  refOption: { flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 6, width: "47%" },
+  refOptionCode: { fontSize: 10, fontWeight: "900", minWidth: 20 },
+  refOptionLabel: { fontSize: 10, fontWeight: "600", flex: 1 },
+  hintText: { fontSize: 9, fontWeight: "700", marginTop: 4, fontStyle: "italic" },
   notesInput: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 6, fontSize: 11, fontWeight: "600", marginBottom: 4 },
   commentsInput: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 12, fontWeight: "600", minHeight: 70 },
   addBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, padding: 12, borderRadius: 12, borderWidth: 2, borderStyle: "dashed" },
