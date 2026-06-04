@@ -18,6 +18,19 @@ catalog lives in `SNBI_ELEMENTS` in `context/InspectionContext.tsx`.
   `app/(tabs)/index.tsx`), and the `DEFECT_OVERRIDES` remaining-section entry is
   keyed "900". Don't reintroduce 226 as Steel Pipe Pile.
 
+## Default element selection per location (auto-select effect)
+- An effect in `InspectionContext.tsx` auto-sets `element` to `filteredElements[0]`
+  whenever location/filter changes (unless editing). Two location families override
+  this default: **Topside spans** (deck + railing + wearing surface 510 only) and
+  **Joints** (default to the last joint type the inspector picked).
+- The **last-chosen joint type is persisted** (`@bridge_last_joint_element`) and
+  reused for subsequent joints and across sessions — bridges repeat the same joint
+  across spans, so this saves a re-selection. Recorded only when `element.category
+  === "Joint"`, location includes "Joint", and not in edit mode.
+- **How to apply:** when adding new location-specific default rules, layer them in
+  the same auto-select effect before the `filteredElements[0]` fallback, and gate
+  any persistence/record effects on `!editId`.
+
 ## core vs. search reachability
 - `core: true` elements show in the location dropdown by default; everything else
   (the majority, including all culverts 240–245) is reachable **only via the

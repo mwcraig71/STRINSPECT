@@ -1339,6 +1339,7 @@ const STORAGE_KEYS = {
   SNBI: "@bridge_snbi",
   STEEL_PIPE_PILE: "@bridge_steel_pipe_pile",
   IMPORT_SUMMARY: "@bridge_import_summary",
+  LAST_JOINT_ELEMENT: "@bridge_last_joint_element",
   DEMO_CLEARED: "@bridge_demo_cleared_v1",
 };
 
@@ -1359,6 +1360,9 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const [editId, setEditId] = useState<string | null>(null);
   const [currentLocation, setCurrentLocation] = useState("");
   const [element, setElement] = useState<SnbiElement | null>(null);
+  // Remember the last joint type chosen so subsequent joints default to it —
+  // bridges typically repeat the same joint across spans. Persisted across sessions.
+  const [lastJointElementId, setLastJointElementIdState] = useState("");
   const [environment, setEnvironment] = useState("2");
   const [defect, setDefect] = useState<DefectType | null>(null);
   const [conditionState, setConditionState] = useState<ConditionState>("CS1");
@@ -1411,7 +1415,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           ]);
           await AsyncStorage.setItem(STORAGE_KEYS.DEMO_CLEARED, "1");
         }
-        const [defects, nbi, nom, insType, superType, subType, superMat, subMat, structNum, uc, ch, sb, sn, spp, impSummary] = await Promise.all([
+        const [defects, nbi, nom, insType, superType, subType, superMat, subMat, structNum, uc, ch, sb, sn, spp, impSummary, lastJoint] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.SAVED_DEFECTS),
           AsyncStorage.getItem(STORAGE_KEYS.NBI_RATINGS),
           AsyncStorage.getItem(STORAGE_KEYS.NOMENCLATURE),
@@ -1427,7 +1431,9 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           AsyncStorage.getItem(STORAGE_KEYS.SNBI),
           AsyncStorage.getItem(STORAGE_KEYS.STEEL_PIPE_PILE),
           AsyncStorage.getItem(STORAGE_KEYS.IMPORT_SUMMARY),
+          AsyncStorage.getItem(STORAGE_KEYS.LAST_JOINT_ELEMENT),
         ]);
+        if (lastJoint) setLastJointElementIdState(lastJoint);
         if (defects) setSavedDefectsState(JSON.parse(defects));
         if (nbi) setNbiRatingsState(JSON.parse(nbi));
         if (impSummary) {
@@ -1745,9 +1751,28 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
 
   useEffect(() => {
     if (filteredElements.length > 0 && !editId) {
+      // On joint locations, default to the last joint type the inspector chose —
+      // bridges usually repeat the same joint across spans, saving a re-selection.
+      if (currentLocation.includes("Joint") && lastJointElementId) {
+        const remembered = filteredElements.find((e) => e.id === lastJointElementId);
+        if (remembered) {
+          setElement(remembered);
+          return;
+        }
+      }
       setElement(filteredElements[0]);
     }
-  }, [filteredElements, editId]);
+  }, [filteredElements, editId, currentLocation, lastJointElementId]);
+
+  // Persist the chosen joint type so it carries to the next joint and next session.
+  useEffect(() => {
+    if (!editId && element && element.category === "Joint" && currentLocation.includes("Joint")) {
+      if (element.id !== lastJointElementId) {
+        setLastJointElementIdState(element.id);
+        AsyncStorage.setItem(STORAGE_KEYS.LAST_JOINT_ELEMENT, element.id).catch(() => {});
+      }
+    }
+  }, [element, currentLocation, editId, lastJointElementId]);
 
   useEffect(() => {
     if (element && !editId) {
