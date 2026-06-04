@@ -667,6 +667,66 @@ const INITIAL_SAFETY_BRIEFING: SafetyBriefingData = {
   crew: [createSafetyCrewSignoff()],
 };
 
+// ─── SNBI Field Collection ────────────────────────────────────────────────────
+
+export interface SnbiRoadway {
+  id: string;
+  name: string; // Roadway name
+  width: string; // Clear/Approach roadway width
+  lanes: string; // No. of lanes
+}
+
+export type SnbiEquipment = "" | "Waders" | "Boat" | "Ladder" | "D-Meter" | "Other";
+
+export interface SnbiData {
+  sidewalkLeft: string; // ft (one decimal)
+  sidewalkRight: string; // ft (one decimal)
+  nbisBridgeLength: string; // feet (nearest tenth)
+  totalBridgeLength: string; // feet (nearest tenth)
+  maxSpanLength: string; // feet (nearest tenth)
+  minSpanLength: string; // feet (nearest tenth)
+  abutBrgToBackwall: string; // inches (for max/min span length)
+  backwallToCapFace: string; // inches (for NBIS bridge length)
+  backwallThickness: string; // inches (for total bridge length)
+  culvertBridgeHeight: string; // feet (no decimal)
+  culvertWallThickness: string; // inches (for NBIS bridge length)
+  fatigueDetailsPresent: "" | "Yes" | "No"; // Steel superstructure E/E' details
+  scourRating: string; // condition rating
+  railingTransitionsRating: string; // condition rating
+  equipmentRequired: SnbiEquipment; // only one selectable
+  equipmentOtherText: string;
+  roadways: SnbiRoadway[];
+}
+
+export function createSnbiRoadway(): SnbiRoadway {
+  return {
+    id: `snbi_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    name: "",
+    width: "",
+    lanes: "",
+  };
+}
+
+const INITIAL_SNBI: SnbiData = {
+  sidewalkLeft: "",
+  sidewalkRight: "",
+  nbisBridgeLength: "",
+  totalBridgeLength: "",
+  maxSpanLength: "",
+  minSpanLength: "",
+  abutBrgToBackwall: "",
+  backwallToCapFace: "",
+  backwallThickness: "",
+  culvertBridgeHeight: "",
+  culvertWallThickness: "",
+  fatigueDetailsPresent: "",
+  scourRating: "",
+  railingTransitionsRating: "",
+  equipmentRequired: "",
+  equipmentOtherText: "",
+  roadways: [createSnbiRoadway()],
+};
+
 // ─── Context Types ────────────────────────────────────────────────────────────
 
 interface InspectionContextType {
@@ -742,6 +802,10 @@ interface InspectionContextType {
   setShowDailySafetyModal: (v: boolean) => void;
   safetyBriefingData: SafetyBriefingData;
   setSafetyBriefingData: (v: SafetyBriefingData) => void;
+  showSnbiModal: boolean;
+  setShowSnbiModal: (v: boolean) => void;
+  snbiData: SnbiData;
+  setSnbiData: (v: SnbiData) => void;
 
   // Filters
   sortCriteria: string;
@@ -941,6 +1005,7 @@ const STORAGE_KEYS = {
   UNDERCLEARANCE: "@bridge_underclearance",
   CHANNEL: "@bridge_channel",
   SAFETY_BRIEFING: "@bridge_safety_briefing",
+  SNBI: "@bridge_snbi",
   DEMO_CLEARED: "@bridge_demo_cleared_v1",
 };
 
@@ -982,6 +1047,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const [showDailySafetyModal, setShowDailySafetyModal] = useState(false);
   const [safetyBriefingData, setSafetyBriefingDataState] =
     useState<SafetyBriefingData>(INITIAL_SAFETY_BRIEFING);
+  const [showSnbiModal, setShowSnbiModal] = useState(false);
+  const [snbiData, setSnbiDataState] = useState<SnbiData>(INITIAL_SNBI);
 
   const [sortCriteria, setSortCriteria] = useState("location");
   const [filterType, setFilterType] = useState("All");
@@ -1003,7 +1070,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           ]);
           await AsyncStorage.setItem(STORAGE_KEYS.DEMO_CLEARED, "1");
         }
-        const [defects, nbi, nom, insType, superType, subType, structNum, uc, ch, sb] = await Promise.all([
+        const [defects, nbi, nom, insType, superType, subType, structNum, uc, ch, sb, sn] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.SAVED_DEFECTS),
           AsyncStorage.getItem(STORAGE_KEYS.NBI_RATINGS),
           AsyncStorage.getItem(STORAGE_KEYS.NOMENCLATURE),
@@ -1014,6 +1081,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           AsyncStorage.getItem(STORAGE_KEYS.UNDERCLEARANCE),
           AsyncStorage.getItem(STORAGE_KEYS.CHANNEL),
           AsyncStorage.getItem(STORAGE_KEYS.SAFETY_BRIEFING),
+          AsyncStorage.getItem(STORAGE_KEYS.SNBI),
         ]);
         if (defects) setSavedDefectsState(JSON.parse(defects));
         if (nbi) setNbiRatingsState(JSON.parse(nbi));
@@ -1078,6 +1146,19 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
                 Array.isArray(parsed.crew) && parsed.crew.length
                   ? parsed.crew
                   : [createSafetyCrewSignoff()],
+            });
+          }
+        }
+        if (sn) {
+          const parsed = JSON.parse(sn) as Partial<SnbiData>;
+          if (parsed && typeof parsed === "object") {
+            setSnbiDataState({
+              ...INITIAL_SNBI,
+              ...parsed,
+              roadways:
+                Array.isArray(parsed.roadways) && parsed.roadways.length
+                  ? parsed.roadways
+                  : [createSnbiRoadway()],
             });
           }
         }
@@ -1179,6 +1260,11 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const setSafetyBriefingData = useCallback((v: SafetyBriefingData) => {
     setSafetyBriefingDataState(v);
     AsyncStorage.setItem(STORAGE_KEYS.SAFETY_BRIEFING, JSON.stringify(v)).catch(() => {});
+  }, []);
+
+  const setSnbiData = useCallback((v: SnbiData) => {
+    setSnbiDataState(v);
+    AsyncStorage.setItem(STORAGE_KEYS.SNBI, JSON.stringify(v)).catch(() => {});
   }, []);
 
   const addChannelMeasurement = useCallback((section: ChannelSection) => {
@@ -1784,6 +1870,10 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     setShowDailySafetyModal,
     safetyBriefingData,
     setSafetyBriefingData,
+    showSnbiModal,
+    setShowSnbiModal,
+    snbiData,
+    setSnbiData,
     sortCriteria,
     setSortCriteria,
     filterType,

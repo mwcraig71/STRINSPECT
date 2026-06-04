@@ -30,6 +30,7 @@ import { FUAModal } from "@/components/FUAModal";
 import { UnderclearanceModal } from "@/components/UnderclearanceModal";
 import { ChannelModal } from "@/components/ChannelModal";
 import { DailySafetyBriefingModal } from "@/components/DailySafetyBriefingModal";
+import { SnbiModal } from "@/components/SnbiModal";
 import { SettingsModal } from "@/components/SettingsModal";
 import colors from "@/constants/colors";
 
@@ -90,6 +91,7 @@ export default function InspectionScreen() {
     setShowUnderclearanceModal,
     setShowChannelModal,
     setShowDailySafetyModal,
+    setShowSnbiModal,
   } = useInspection();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -329,6 +331,23 @@ export default function InspectionScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={[styles.menuItemTitle, { color: c.foreground }]}>Underclearance Record</Text>
                 <Text style={[styles.menuItemSub, { color: c.mutedForeground }]}>Form 2601</Text>
+              </View>
+              <Feather name="chevron-right" size={16} color={c.mutedForeground} />
+            </TouchableOpacity>
+            <View style={[styles.menuDivider, { backgroundColor: c.border }]} />
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setModuleMenuOpen(false);
+                setShowSnbiModal(true);
+              }}
+            >
+              <View style={[styles.menuIcon, { backgroundColor: "#6d28d9" }]}>
+                <Feather name="clipboard" size={15} color="#fff" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.menuItemTitle, { color: c.foreground }]}>SNBI</Text>
+                <Text style={[styles.menuItemSub, { color: c.mutedForeground }]}>Field Collection</Text>
               </View>
               <Feather name="chevron-right" size={16} color={c.mutedForeground} />
             </TouchableOpacity>
@@ -755,6 +774,7 @@ export default function InspectionScreen() {
       <UnderclearanceModal />
       <ChannelModal />
       <DailySafetyBriefingModal />
+      <SnbiModal />
     </View>
   );
 }
