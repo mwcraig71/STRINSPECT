@@ -260,6 +260,12 @@ export interface UcMeasure {
   refer: string;
 }
 
+export interface SketchStroke {
+  d: string; // SVG path data
+  color: string;
+  width: number;
+}
+
 export interface UnderclearanceEntry {
   id: string;
   psn: string;
@@ -282,6 +288,7 @@ export interface UnderclearanceData {
   company: string;
   inspectionDate: string;
   entries: UnderclearanceEntry[];
+  sketch: SketchStroke[];
 }
 
 export const UC_MEASURE_ROWS: {
@@ -481,6 +488,7 @@ const INITIAL_UNDERCLEARANCE: UnderclearanceData = {
   company: "",
   inspectionDate: new Date().toLocaleDateString("en-US"),
   entries: [createUnderclearanceEntry()],
+  sketch: [],
 };
 
 // ─── Context Types ────────────────────────────────────────────────────────────
@@ -830,6 +838,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
               // Global structure number is the source of truth; override any stale persisted value.
               structureNumber: structNum || parsed.structureNumber,
               entries: parsed.entries.length ? parsed.entries : [createUnderclearanceEntry()],
+              sketch: Array.isArray(parsed.sketch) ? parsed.sketch : [],
             });
           }
         } else if (structNum) {

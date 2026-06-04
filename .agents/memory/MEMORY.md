@@ -1,1 +1,2 @@
 - [structure-number sync](structure-number-sync.md) — global structureNumber is source of truth; CIF/Underclearance mirror it via setStructureNumber, never write their own copy.
+- [Metro react dedup for Expo web](metro-react-dedup-web.md) — pnpm symlinks cause "Invalid hook call" on web; alias react/react-dom in metro.config.js to one resolved path.

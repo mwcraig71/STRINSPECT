@@ -1,5 +1,5 @@
 import { Feather } from "@expo/vector-icons";
-import React from "react";
+import React, { useState } from "react";
 import {
   Modal,
   ScrollView,
@@ -11,7 +11,9 @@ import {
 } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
+import { SketchPad } from "@/components/SketchPad";
 import {
+  SketchStroke,
   UC_MEASURE_ROWS,
   UC_REFERENCE_FEATURES,
   UcMeasure,
@@ -32,6 +34,7 @@ export function UnderclearanceModal() {
   } = useInspection();
 
   const d = underclearanceData;
+  const [scrollEnabled, setScrollEnabled] = useState(true);
 
   const setHeader = (field: keyof typeof d, value: string) => {
     // Structure # is globally synced (CIF + header); route through the source of truth.
@@ -40,6 +43,10 @@ export function UnderclearanceModal() {
       return;
     }
     setUnderclearanceData({ ...d, [field]: value });
+  };
+
+  const setSketch = (strokes: SketchStroke[]) => {
+    setUnderclearanceData({ ...d, sketch: strokes });
   };
 
   const updateEntry = (id: string, patch: Partial<UnderclearanceEntry>) => {
@@ -95,7 +102,11 @@ export function UnderclearanceModal() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
+        <ScrollView
+          style={styles.body}
+          contentContainerStyle={styles.bodyContent}
+          scrollEnabled={scrollEnabled}
+        >
           {/* Structure header info */}
           <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
             <Text style={[styles.cardTitle, { color: c.foreground }]}>Record Information</Text>
@@ -230,6 +241,16 @@ export function UnderclearanceModal() {
             <Feather name="plus" size={16} color="#0f766e" />
             <Text style={[styles.addBtnText, { color: "#0f766e" }]}>Add Feature Crossed</Text>
           </TouchableOpacity>
+
+          {/* Vertical clearance sketch */}
+          <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
+            <Text style={[styles.cardTitle, { color: c.foreground }]}>Vertical Clearance Sketch</Text>
+            <SketchPad
+              strokes={d.sketch}
+              onChange={setSketch}
+              onDrawStateChange={(drawing) => setScrollEnabled(!drawing)}
+            />
+          </View>
 
           <View style={{ height: 24 }} />
         </ScrollView>
