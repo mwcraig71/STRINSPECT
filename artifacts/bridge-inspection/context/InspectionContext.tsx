@@ -762,17 +762,10 @@ export interface SteelPipePileRow {
   wallSec2: string; // wall of cross sec 2 (in)
   wallSec3: string; // wall of cross sec 3 (in)
   wallSec4: string; // wall of cross sec 4 (in)
-  photo: string; // photo reference / note
+  photos: PhotoItem[]; // photos tied to this defect (pile)
 }
 
 export interface SteelPipePileData {
-  // Header
-  nbiNumber: string;
-  districtCounty: string;
-  facilityCarried: string;
-  featureIntersected: string;
-  measurementTakenBy: string;
-  date: string;
   // Reference field measurements (inches)
   outsideDiameterRef: string; // A - Outside Diameter
   insideDiameterRef: string; // B - Inside Diameter
@@ -794,17 +787,11 @@ export function createSteelPipePileRow(): SteelPipePileRow {
     wallSec2: "",
     wallSec3: "",
     wallSec4: "",
-    photo: "",
+    photos: [],
   };
 }
 
 const INITIAL_STEEL_PIPE_PILE: SteelPipePileData = {
-  nbiNumber: "",
-  districtCounty: "",
-  facilityCarried: "",
-  featureIntersected: "",
-  measurementTakenBy: "",
-  date: "",
   outsideDiameterRef: "",
   insideDiameterRef: "",
   wallThicknessRef: "",
@@ -1281,7 +1268,11 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
               ...parsed,
               rows:
                 Array.isArray(parsed.rows) && parsed.rows.length
-                  ? parsed.rows
+                  ? parsed.rows.map((row) => ({
+                      ...createSteelPipePileRow(),
+                      ...row,
+                      photos: Array.isArray(row?.photos) ? row.photos : [],
+                    }))
                   : [createSteelPipePileRow()],
             });
           }

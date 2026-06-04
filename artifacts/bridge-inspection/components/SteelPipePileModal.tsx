@@ -1,6 +1,10 @@
 import { Feather } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import {
+  Alert,
+  Image,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,6 +15,7 @@ import {
 
 import { useColors } from "@/hooks/useColors";
 import {
+  PhotoItem,
   SteelPipePileData,
   SteelPipePileRow,
   createSteelPipePileRow,
@@ -31,7 +36,7 @@ function sanitizeNumeric(text: string): string {
   return decPart !== undefined ? `${intPart}.${decPart.slice(0, 1)}` : intPart;
 }
 
-type RowNumericField = Exclude<keyof SteelPipePileRow, "id" | "bent" | "pile" | "photo">;
+type RowNumericField = Exclude<keyof SteelPipePileRow, "id" | "bent" | "pile" | "photos">;
 
 const ROW_COLUMNS: { key: RowNumericField; label: string }[] = [
   { key: "lengthH", label: "H" },
@@ -75,22 +80,55 @@ export function SteelPipePileModal() {
     setSteelPipePileData({ ...d, rows: remaining.length ? remaining : [createSteelPipePileRow()] });
   };
 
-  const headerField = (
-    label: string,
-    field: keyof SteelPipePileData,
-    placeholder = ""
-  ) => (
-    <View style={styles.fieldGroup}>
-      <Text style={[styles.fieldLabel, { color: c.mutedForeground }]}>{label}</Text>
-      <TextInput
-        style={[styles.input, { backgroundColor: c.secondary, borderColor: c.border, color: c.foreground }]}
-        value={d[field] as string}
-        onChangeText={(t) => setField(field, t as SteelPipePileData[typeof field])}
-        placeholder={placeholder}
-        placeholderTextColor={c.mutedForeground}
-      />
-    </View>
-  );
+  const addRowPhotos = (id: string, newPhotos: PhotoItem[]) => {
+    const row = d.rows.find((r) => r.id === id);
+    if (!row) return;
+    updateRow(id, { photos: [...row.photos, ...newPhotos] });
+  };
+
+  const pickFromLibrary = async (id: string) => {
+    if (Platform.OS === "web") {
+      Alert.alert("Info", "Photo capture not available on web preview.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      quality: 0.8,
+    });
+    if (!result.canceled) {
+      addRowPhotos(id, result.assets.map((a) => ({ uri: a.uri, description: "" })));
+    }
+  };
+
+  const capturePhoto = async (id: string) => {
+    if (Platform.OS === "web") {
+      Alert.alert("Info", "Camera not available on web preview.");
+      return;
+    }
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission Denied", "Camera permission is required.");
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
+    if (!result.canceled) {
+      addRowPhotos(id, [{ uri: result.assets[0].uri, description: "" }]);
+    }
+  };
+
+  const updatePhotoDesc = (rowId: string, idx: number, desc: string) => {
+    const row = d.rows.find((r) => r.id === rowId);
+    if (!row) return;
+    const photos = row.photos.map((p, i) => (i === idx ? { ...p, description: desc } : p));
+    updateRow(rowId, { photos });
+  };
+
+  const removePhoto = (rowId: string, idx: number) => {
+    const row = d.rows.find((r) => r.id === rowId);
+    if (!row) return;
+    updateRow(rowId, { photos: row.photos.filter((_, i) => i !== idx) });
+  };
 
   const refMeasure = (label: string, sub: string, field: keyof SteelPipePileData) => (
     <View style={styles.measureRow}>
@@ -135,17 +173,6 @@ export function SteelPipePileModal() {
         </View>
 
         <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
-          {/* Identification */}
-          <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
-            <Text style={[styles.cardTitle, { color: c.foreground }]}>Identification</Text>
-            {headerField("NBI Number", "nbiNumber")}
-            {headerField("District and County", "districtCounty")}
-            {headerField("Facility Carried", "facilityCarried")}
-            {headerField("Feature Intersected", "featureIntersected")}
-            {headerField("Measurement Taken By", "measurementTakenBy")}
-            {headerField("Date", "date", "MM/DD/YYYY")}
-          </View>
-
           {/* Reference field measurements */}
           <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
             <Text style={[styles.cardTitle, { color: c.foreground }]}>
@@ -228,14 +255,49 @@ export function SteelPipePileModal() {
                   ))}
                 </View>
                 <View style={styles.fieldGroup}>
-                  <Text style={[styles.fieldLabel, { color: c.mutedForeground }]}>Photo Reference</Text>
-                  <TextInput
-                    style={[styles.input, { backgroundColor: c.background, borderColor: c.border, color: c.foreground }]}
-                    value={r.photo}
-                    onChangeText={(t) => updateRow(r.id, { photo: t })}
-                    placeholder="Photo number / note..."
-                    placeholderTextColor={c.mutedForeground}
-                  />
+                  <View style={styles.photoHeader}>
+                    <Text style={[styles.fieldLabel, { color: c.mutedForeground }]}>
+                      Photos ({r.photos.length})
+                    </Text>
+                    <View style={styles.photoButtons}>
+                      <TouchableOpacity
+                        style={[styles.photoBtn, { backgroundColor: c.background, borderColor: c.border }]}
+                        onPress={() => pickFromLibrary(r.id)}
+                      >
+                        <Feather name="image" size={13} color={c.foreground} />
+                        <Text style={[styles.photoBtnText, { color: c.foreground }]}>Library</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.photoBtn, { backgroundColor: ACCENT, borderColor: ACCENT }]}
+                        onPress={() => capturePhoto(r.id)}
+                      >
+                        <Feather name="camera" size={13} color="#fff" />
+                        <Text style={[styles.photoBtnText, { color: "#fff" }]}>Camera</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                  {r.photos.map((p, pIdx) => (
+                    <View
+                      key={pIdx}
+                      style={[styles.photoRow, { backgroundColor: c.background, borderColor: c.border }]}
+                    >
+                      <Image source={{ uri: p.uri }} style={styles.photoThumb} />
+                      <TextInput
+                        style={[styles.photoInput, { backgroundColor: c.secondary, borderColor: c.border, color: c.foreground }]}
+                        value={p.description}
+                        onChangeText={(t) => updatePhotoDesc(r.id, pIdx, t)}
+                        placeholder="Describe defect in photo..."
+                        placeholderTextColor={c.mutedForeground}
+                        multiline
+                      />
+                      <TouchableOpacity
+                        onPress={() => removePhoto(r.id, pIdx)}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Feather name="trash-2" size={16} color="#dc2626" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
                 </View>
               </View>
             ))}
@@ -301,6 +363,13 @@ const styles = StyleSheet.create({
   gridCell: { width: "30%", gap: 4 },
   gridLabel: { fontSize: 8, fontWeight: "800", textTransform: "uppercase", textAlign: "center" },
   gridInput: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 4, paddingVertical: 7, fontSize: 12, fontWeight: "700", textAlign: "center" },
+  photoHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  photoButtons: { flexDirection: "row", gap: 6 },
+  photoBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1 },
+  photoBtnText: { fontSize: 10, fontWeight: "800", textTransform: "uppercase" },
+  photoRow: { flexDirection: "row", alignItems: "center", gap: 8, padding: 8, borderRadius: 10, borderWidth: 1 },
+  photoThumb: { width: 52, height: 52, borderRadius: 8 },
+  photoInput: { flex: 1, minWidth: 0, borderWidth: 1, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 6, fontSize: 11, fontWeight: "600", minHeight: 40 },
   addBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, padding: 12, borderRadius: 12, borderWidth: 2, borderStyle: "dashed", marginTop: 4 },
   addBtnText: { fontSize: 13, fontWeight: "900", textTransform: "uppercase", letterSpacing: 0.5 },
   footer: { padding: 16, borderTopWidth: 1 },
