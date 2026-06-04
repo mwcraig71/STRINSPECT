@@ -1251,6 +1251,9 @@ function getFilteredElements(
 
   if (materialApplies) list = list.filter((e) => e.material === material);
 
+  // Joints are a small, fixed set — show every joint element, not just core ones.
+  if (location.includes("Joint")) return list;
+
   const coreList = list.filter((e) => e.core);
   // Fall back to the full narrowed list if a filter leaves no core elements.
   if (coreList.length > 0) list = coreList;
