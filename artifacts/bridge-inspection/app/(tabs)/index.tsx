@@ -31,6 +31,7 @@ import { UnderclearanceModal } from "@/components/UnderclearanceModal";
 import { ChannelModal } from "@/components/ChannelModal";
 import { DailySafetyBriefingModal } from "@/components/DailySafetyBriefingModal";
 import { SnbiModal } from "@/components/SnbiModal";
+import { SteelPipePileModal } from "@/components/SteelPipePileModal";
 import { SettingsModal } from "@/components/SettingsModal";
 import colors from "@/constants/colors";
 
@@ -92,6 +93,7 @@ export default function InspectionScreen() {
     setShowChannelModal,
     setShowDailySafetyModal,
     setShowSnbiModal,
+    setShowSteelPipePileModal,
   } = useInspection();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -447,6 +449,21 @@ export default function InspectionScreen() {
             </ScrollView>
           )}
 
+          {/* Element 226 — Steel Pipe Pile remaining-section form */}
+          {element?.id === "226" && (
+            <TouchableOpacity
+              style={[styles.sppFormBtn, { backgroundColor: "#fff7ed", borderColor: "#fdba74" }]}
+              onPress={() => setShowSteelPipePileModal(true)}
+            >
+              <Feather name="git-commit" size={16} color="#b45309" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.sppFormBtnTitle}>Remaining Section Measurements</Text>
+                <Text style={styles.sppFormBtnSub}>Steel Pipe Pile field form</Text>
+              </View>
+              <Feather name="chevron-right" size={18} color="#b45309" />
+            </TouchableOpacity>
+          )}
+
           {/* Defect + CS row */}
           <View style={styles.twoCol}>
             <View style={styles.colLeft}>
@@ -775,6 +792,7 @@ export default function InspectionScreen() {
       <ChannelModal />
       <DailySafetyBriefingModal />
       <SnbiModal />
+      <SteelPipePileModal />
     </View>
   );
 }
@@ -868,6 +886,17 @@ const styles = StyleSheet.create({
   },
   dropdownItemText: { fontSize: 13, fontWeight: "700" },
   dropdownItemSub: { fontSize: 10, fontWeight: "600" },
+  sppFormBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 10,
+  },
+  sppFormBtnTitle: { fontSize: 13, fontWeight: "800", color: "#9a3412" },
+  sppFormBtnSub: { fontSize: 10, fontWeight: "600", color: "#c2730a", marginTop: 1 },
   twoCol: { flexDirection: "row", gap: 10 },
   colLeft: { flex: 1, gap: 4 },
   colRight: { flex: 1, gap: 4 },

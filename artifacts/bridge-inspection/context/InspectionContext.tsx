@@ -748,6 +748,69 @@ const INITIAL_SNBI: SnbiData = {
   roadways: [createSnbiRoadway()],
 };
 
+// ─── Steel Pipe Pile: Remaining Section Measurements (element 226) ────────────
+export interface SteelPipePileRow {
+  id: string;
+  bent: string; // Bent (per plans / sketch)
+  pile: string; // Pile (L to R)
+  lengthH: string; // H - ground to bottom of cap (in)
+  lengthY: string; // Y - bottom of cap to section loss (in)
+  lengthX: string; // X - length of area of corrosion (in)
+  outsideDiameter: string; // outside diameter measured (in)
+  pittingDepth: string; // depth of pitting (in)
+  wallSec1: string; // wall of cross sec 1 (in)
+  wallSec2: string; // wall of cross sec 2 (in)
+  wallSec3: string; // wall of cross sec 3 (in)
+  wallSec4: string; // wall of cross sec 4 (in)
+  photo: string; // photo reference / note
+}
+
+export interface SteelPipePileData {
+  // Header
+  nbiNumber: string;
+  districtCounty: string;
+  facilityCarried: string;
+  featureIntersected: string;
+  measurementTakenBy: string;
+  date: string;
+  // Reference field measurements (inches)
+  outsideDiameterRef: string; // A - Outside Diameter
+  insideDiameterRef: string; // B - Inside Diameter
+  wallThicknessRef: string; // C - Wall Thickness
+  rows: SteelPipePileRow[];
+}
+
+export function createSteelPipePileRow(): SteelPipePileRow {
+  return {
+    id: `spp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    bent: "",
+    pile: "",
+    lengthH: "",
+    lengthY: "",
+    lengthX: "",
+    outsideDiameter: "",
+    pittingDepth: "",
+    wallSec1: "",
+    wallSec2: "",
+    wallSec3: "",
+    wallSec4: "",
+    photo: "",
+  };
+}
+
+const INITIAL_STEEL_PIPE_PILE: SteelPipePileData = {
+  nbiNumber: "",
+  districtCounty: "",
+  facilityCarried: "",
+  featureIntersected: "",
+  measurementTakenBy: "",
+  date: "",
+  outsideDiameterRef: "",
+  insideDiameterRef: "",
+  wallThicknessRef: "",
+  rows: [createSteelPipePileRow()],
+};
+
 // ─── Context Types ────────────────────────────────────────────────────────────
 
 interface InspectionContextType {
@@ -827,6 +890,10 @@ interface InspectionContextType {
   setShowSnbiModal: (v: boolean) => void;
   snbiData: SnbiData;
   setSnbiData: (v: SnbiData) => void;
+  showSteelPipePileModal: boolean;
+  setShowSteelPipePileModal: (v: boolean) => void;
+  steelPipePileData: SteelPipePileData;
+  setSteelPipePileData: (v: SteelPipePileData) => void;
 
   // Filters
   sortCriteria: string;
@@ -1029,6 +1096,7 @@ const STORAGE_KEYS = {
   CHANNEL: "@bridge_channel",
   SAFETY_BRIEFING: "@bridge_safety_briefing",
   SNBI: "@bridge_snbi",
+  STEEL_PIPE_PILE: "@bridge_steel_pipe_pile",
   IMPORT_SUMMARY: "@bridge_import_summary",
   DEMO_CLEARED: "@bridge_demo_cleared_v1",
 };
@@ -1073,6 +1141,9 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     useState<SafetyBriefingData>(INITIAL_SAFETY_BRIEFING);
   const [showSnbiModal, setShowSnbiModal] = useState(false);
   const [snbiData, setSnbiDataState] = useState<SnbiData>(INITIAL_SNBI);
+  const [showSteelPipePileModal, setShowSteelPipePileModal] = useState(false);
+  const [steelPipePileData, setSteelPipePileDataState] =
+    useState<SteelPipePileData>(INITIAL_STEEL_PIPE_PILE);
 
   const [sortCriteria, setSortCriteria] = useState("location");
   const [filterType, setFilterType] = useState("All");
@@ -1096,7 +1167,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           ]);
           await AsyncStorage.setItem(STORAGE_KEYS.DEMO_CLEARED, "1");
         }
-        const [defects, nbi, nom, insType, superType, subType, structNum, uc, ch, sb, sn, impSummary] = await Promise.all([
+        const [defects, nbi, nom, insType, superType, subType, structNum, uc, ch, sb, sn, spp, impSummary] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.SAVED_DEFECTS),
           AsyncStorage.getItem(STORAGE_KEYS.NBI_RATINGS),
           AsyncStorage.getItem(STORAGE_KEYS.NOMENCLATURE),
@@ -1108,6 +1179,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           AsyncStorage.getItem(STORAGE_KEYS.CHANNEL),
           AsyncStorage.getItem(STORAGE_KEYS.SAFETY_BRIEFING),
           AsyncStorage.getItem(STORAGE_KEYS.SNBI),
+          AsyncStorage.getItem(STORAGE_KEYS.STEEL_PIPE_PILE),
           AsyncStorage.getItem(STORAGE_KEYS.IMPORT_SUMMARY),
         ]);
         if (defects) setSavedDefectsState(JSON.parse(defects));
@@ -1198,6 +1270,19 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
                 Array.isArray(parsed.roadways) && parsed.roadways.length
                   ? parsed.roadways
                   : [createSnbiRoadway()],
+            });
+          }
+        }
+        if (spp) {
+          const parsed = JSON.parse(spp) as Partial<SteelPipePileData>;
+          if (parsed && typeof parsed === "object") {
+            setSteelPipePileDataState({
+              ...INITIAL_STEEL_PIPE_PILE,
+              ...parsed,
+              rows:
+                Array.isArray(parsed.rows) && parsed.rows.length
+                  ? parsed.rows
+                  : [createSteelPipePileRow()],
             });
           }
         }
@@ -1313,6 +1398,11 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const setSafetyBriefingData = useCallback((v: SafetyBriefingData) => {
     setSafetyBriefingDataState(v);
     AsyncStorage.setItem(STORAGE_KEYS.SAFETY_BRIEFING, JSON.stringify(v)).catch(() => {});
+  }, []);
+
+  const setSteelPipePileData = useCallback((v: SteelPipePileData) => {
+    setSteelPipePileDataState(v);
+    AsyncStorage.setItem(STORAGE_KEYS.STEEL_PIPE_PILE, JSON.stringify(v)).catch(() => {});
   }, []);
 
   const setSnbiData = useCallback((v: SnbiData) => {
@@ -1965,6 +2055,10 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     setShowSnbiModal,
     snbiData,
     setSnbiData,
+    showSteelPipePileModal,
+    setShowSteelPipePileModal,
+    steelPipePileData,
+    setSteelPipePileData,
     sortCriteria,
     setSortCriteria,
     filterType,
