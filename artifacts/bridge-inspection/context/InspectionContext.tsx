@@ -253,6 +253,73 @@ export interface FuaData {
   photos: PhotoItem[];
 }
 
+// ─── Underclearance (TxDOT Form 2601) ────────────────────────────────────────
+
+export interface UcMeasure {
+  data: string;
+  refer: string;
+}
+
+export interface UnderclearanceEntry {
+  id: string;
+  psn: string;
+  rightLateral: UcMeasure; // Item 55.2
+  leftLateral: UcMeasure; // Item 56
+  totalHorizontal: UcMeasure; // Item 47 / 47A
+  maxPracticalVert: UcMeasure; // Item 10 / 10A
+  minMeasuredVert: UcMeasure; // Item 54.2
+  signedVertData: string;
+  signedVertTolerance: string;
+}
+
+export interface UnderclearanceData {
+  district: string;
+  county: string;
+  controlSection: string;
+  structureNumber: string;
+  route: string;
+  featureCrossed: string;
+  company: string;
+  inspectionDate: string;
+  entries: UnderclearanceEntry[];
+}
+
+export const UC_MEASURE_ROWS: {
+  key: keyof Pick<
+    UnderclearanceEntry,
+    | "rightLateral"
+    | "leftLateral"
+    | "totalHorizontal"
+    | "maxPracticalVert"
+    | "minMeasuredVert"
+  >;
+  label: string;
+  itemNo: string;
+}[] = [
+  { key: "rightLateral", label: "Right Lateral Clearance", itemNo: "55.2" },
+  { key: "leftLateral", label: "Left Lateral Clearance", itemNo: "56" },
+  { key: "totalHorizontal", label: "Total Horizontal Clr", itemNo: "47" },
+  { key: "maxPracticalVert", label: "Max Practical Vert Clr", itemNo: "10" },
+  { key: "minMeasuredVert", label: "Min Measured Vert Clr", itemNo: "54.2" },
+];
+
+export const UC_REFERENCE_FEATURES = [
+  { code: "A", label: "Beam" },
+  { code: "B", label: "Slab" },
+  { code: "C", label: "Cap" },
+  { code: "D", label: "Railing" },
+  { code: "E", label: "Guard fence" },
+  { code: "F", label: "Column" },
+  { code: "G", label: "Pile" },
+  { code: "H", label: "Curb" },
+  { code: "I", label: "Toe of >3:1 Slope" },
+  { code: "J", label: "Barrier" },
+  { code: "K", label: "Middle of Yellow Stripe" },
+  { code: "L", label: "Middle of White Stripe" },
+  { code: "M", label: "Retaining Wall" },
+  { code: "N", label: "Pavement" },
+];
+
 const INITIAL_NBI_RATINGS: NbiRating[] = [
   {
     item: "58",
@@ -390,6 +457,32 @@ const INITIAL_FUA: FuaData = {
   photos: [],
 };
 
+export function createUnderclearanceEntry(): UnderclearanceEntry {
+  return {
+    id: `uc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    psn: "",
+    rightLateral: { data: "", refer: "" },
+    leftLateral: { data: "", refer: "" },
+    totalHorizontal: { data: "", refer: "" },
+    maxPracticalVert: { data: "", refer: "" },
+    minMeasuredVert: { data: "", refer: "" },
+    signedVertData: "",
+    signedVertTolerance: "",
+  };
+}
+
+const INITIAL_UNDERCLEARANCE: UnderclearanceData = {
+  district: "",
+  county: "",
+  controlSection: "",
+  structureNumber: "",
+  route: "",
+  featureCrossed: "",
+  company: "",
+  inspectionDate: new Date().toLocaleDateString("en-US"),
+  entries: [createUnderclearanceEntry()],
+};
+
 // ─── Context Types ────────────────────────────────────────────────────────────
 
 interface InspectionContextType {
@@ -449,6 +542,12 @@ interface InspectionContextType {
   setCifData: (v: CifData) => void;
   fuaData: FuaData;
   setFuaData: (v: FuaData) => void;
+  showUnderclearanceModal: boolean;
+  setShowUnderclearanceModal: (v: boolean) => void;
+  underclearanceData: UnderclearanceData;
+  setUnderclearanceData: (v: UnderclearanceData) => void;
+  addUnderclearanceEntry: () => void;
+  removeUnderclearanceEntry: (id: string) => void;
 
   // Filters
   sortCriteria: string;
@@ -645,6 +744,7 @@ const STORAGE_KEYS = {
   SUPERSTRUCTURE_TYPE: "@bridge_superstructure_type",
   SUBSTRUCTURE_TYPE: "@bridge_substructure_type",
   STRUCTURE_NUMBER: "@bridge_structure_number",
+  UNDERCLEARANCE: "@bridge_underclearance",
   DEMO_CLEARED: "@bridge_demo_cleared_v1",
 };
 
@@ -678,6 +778,9 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const [pendingFUA, setPendingFUA] = useState(false);
   const [cifData, setCifData] = useState<CifData>(INITIAL_CIF);
   const [fuaData, setFuaData] = useState<FuaData>(INITIAL_FUA);
+  const [showUnderclearanceModal, setShowUnderclearanceModal] = useState(false);
+  const [underclearanceData, setUnderclearanceDataState] =
+    useState<UnderclearanceData>(INITIAL_UNDERCLEARANCE);
 
   const [sortCriteria, setSortCriteria] = useState("location");
   const [filterType, setFilterType] = useState("All");
@@ -699,7 +802,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           ]);
           await AsyncStorage.setItem(STORAGE_KEYS.DEMO_CLEARED, "1");
         }
-        const [defects, nbi, nom, insType, superType, subType, structNum] = await Promise.all([
+        const [defects, nbi, nom, insType, superType, subType, structNum, uc] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.SAVED_DEFECTS),
           AsyncStorage.getItem(STORAGE_KEYS.NBI_RATINGS),
           AsyncStorage.getItem(STORAGE_KEYS.NOMENCLATURE),
@@ -707,6 +810,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           AsyncStorage.getItem(STORAGE_KEYS.SUPERSTRUCTURE_TYPE),
           AsyncStorage.getItem(STORAGE_KEYS.SUBSTRUCTURE_TYPE),
           AsyncStorage.getItem(STORAGE_KEYS.STRUCTURE_NUMBER),
+          AsyncStorage.getItem(STORAGE_KEYS.UNDERCLEARANCE),
         ]);
         if (defects) setSavedDefectsState(JSON.parse(defects));
         if (nbi) setNbiRatingsState(JSON.parse(nbi));
@@ -717,6 +821,19 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         if (structNum) {
           setStructureNumberState(structNum);
           setCifData((prev) => ({ ...prev, structureNumber: structNum }));
+        }
+        if (uc) {
+          const parsed = JSON.parse(uc) as UnderclearanceData;
+          if (parsed && Array.isArray(parsed.entries)) {
+            setUnderclearanceDataState({
+              ...parsed,
+              // Global structure number is the source of truth; override any stale persisted value.
+              structureNumber: structNum || parsed.structureNumber,
+              entries: parsed.entries.length ? parsed.entries : [createUnderclearanceEntry()],
+            });
+          }
+        } else if (structNum) {
+          setUnderclearanceDataState((prev) => ({ ...prev, structureNumber: structNum }));
         }
       } catch {}
     };
@@ -759,6 +876,37 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     setStructureNumberState(v);
     AsyncStorage.setItem(STORAGE_KEYS.STRUCTURE_NUMBER, v).catch(() => {});
     setCifData((prev) => ({ ...prev, structureNumber: v }));
+    setUnderclearanceDataState((prev) => {
+      const next = { ...prev, structureNumber: v };
+      AsyncStorage.setItem(STORAGE_KEYS.UNDERCLEARANCE, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  }, []);
+
+  // ── Persist underclearance ──
+  const setUnderclearanceData = useCallback((v: UnderclearanceData) => {
+    setUnderclearanceDataState(v);
+    AsyncStorage.setItem(STORAGE_KEYS.UNDERCLEARANCE, JSON.stringify(v)).catch(() => {});
+  }, []);
+
+  const addUnderclearanceEntry = useCallback(() => {
+    setUnderclearanceDataState((prev) => {
+      const next = { ...prev, entries: [...prev.entries, createUnderclearanceEntry()] };
+      AsyncStorage.setItem(STORAGE_KEYS.UNDERCLEARANCE, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  }, []);
+
+  const removeUnderclearanceEntry = useCallback((id: string) => {
+    setUnderclearanceDataState((prev) => {
+      const remaining = prev.entries.filter((e) => e.id !== id);
+      const next = {
+        ...prev,
+        entries: remaining.length ? remaining : [createUnderclearanceEntry()],
+      };
+      AsyncStorage.setItem(STORAGE_KEYS.UNDERCLEARANCE, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
   }, []);
 
   // ── Derived ──
@@ -1319,6 +1467,12 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     setCifData,
     fuaData,
     setFuaData,
+    showUnderclearanceModal,
+    setShowUnderclearanceModal,
+    underclearanceData,
+    setUnderclearanceData,
+    addUnderclearanceEntry,
+    removeUnderclearanceEntry,
     sortCriteria,
     setSortCriteria,
     filterType,

@@ -1,0 +1,1 @@
+- [structure-number sync](structure-number-sync.md) — global structureNumber is source of truth; CIF/Underclearance mirror it via setStructureNumber, never write their own copy.

@@ -20,12 +20,14 @@ import { useColors } from "@/hooks/useColors";
 import {
   DEFECTS_BY_ELEMENT,
   INSPECTION_TYPES,
+  NOMENCLATURES,
   PhotoItem,
   useInspection,
 } from "@/context/InspectionContext";
 import { DefectCard } from "@/components/DefectCard";
 import { CIFModal } from "@/components/CIFModal";
 import { FUAModal } from "@/components/FUAModal";
+import { UnderclearanceModal } from "@/components/UnderclearanceModal";
 import { SettingsModal } from "@/components/SettingsModal";
 import colors from "@/constants/colors";
 
@@ -82,9 +84,12 @@ export default function InspectionScreen() {
     setSyncToCurrentLoc,
     structureNumber,
     setStructureNumber,
+    nomenclature,
+    setShowUnderclearanceModal,
   } = useInspection();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const isTxDot = nomenclature === NOMENCLATURES.TXDOT;
   const [editingStructureNum, setEditingStructureNum] = useState(false);
   const [structureNumDraft, setStructureNumDraft] = useState("");
   const [locationPickerOpen, setLocationPickerOpen] = useState(false);
@@ -225,6 +230,15 @@ export default function InspectionScreen() {
             </View>
           </View>
           <View style={styles.headerActions}>
+            {isTxDot && (
+              <TouchableOpacity
+                style={[styles.moduleToggleHeaderBtn, { backgroundColor: "#0f766e" }]}
+                onPress={() => setShowUnderclearanceModal(true)}
+              >
+                <Feather name="minimize-2" size={12} color="#fff" />
+                <Text style={[styles.moduleToggleHeaderText, { color: "#fff" }]}>UC</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               style={[
                 styles.moduleToggleHeaderBtn,
@@ -670,6 +684,7 @@ export default function InspectionScreen() {
 
       <CIFModal />
       <FUAModal />
+      <UnderclearanceModal />
     </View>
   );
 }
