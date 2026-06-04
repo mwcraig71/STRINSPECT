@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/bridge-web/"
+title = "Bridge Inspection Manager"
+version = "1.0.0"
+id = "artifacts/bridge-web"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/bridge-web/" ]
+localPort = 25606
+
+[services.development]
+run = "pnpm --filter @workspace/bridge-web run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/bridge-web", "run", "build" ]
+publicDir = "artifacts/bridge-web/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25606"
+BASE_PATH = "/bridge-web/"
