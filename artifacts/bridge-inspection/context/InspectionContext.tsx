@@ -1060,6 +1060,7 @@ interface InspectionContextType {
     action: "approve" | "disapprove" | "modify"
   ) => void;
   importFromPdf: (source: File | { uri: string; name?: string }) => Promise<void>;
+  simulateLegacyImport: () => void;
   parsingActive: boolean;
   importSummary: ImportSummary | null;
   clearImportSummary: () => void;
@@ -2143,12 +2144,17 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
                 const match = result.entry;
                 const hasAny = !!(match.rating || match.comment || match.desc || match.min);
                 if (!hasAny) return sub;
+                const isBlank = (v?: string) => !v || v.trim() === "";
                 return {
                   ...sub,
                   previousRating: match.rating || sub.previousRating,
                   previousDesc: match.desc || sub.previousDesc,
                   previousMin: match.min || sub.previousMin,
                   previousComments: match.comment || sub.previousComments,
+                  rating: isBlank(sub.rating) && match.rating ? match.rating : sub.rating,
+                  desc: isBlank(sub.desc) && match.desc ? match.desc : sub.desc,
+                  min: isBlank(sub.min) && match.min ? match.min : sub.min,
+                  comments: isBlank(sub.comments) && match.comment ? match.comment : sub.comments,
                   isImported: true,
                 };
               }),
@@ -2203,6 +2209,17 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     },
     [setSavedDefectsState, setNbiRatingsState, setStructureNumber, nbiRatings, setImportSummary]
   );
+
+  // Retained fallback hook. The UI always triggers a real PDF import via
+  // importFromPdf; this named entry point exists for environments where no
+  // machine-readable report is available. It runs the parsing lifecycle
+  // without fabricating any placeholder/demo defect records.
+  const simulateLegacyImport = useCallback(() => {
+    setParsingActive(true);
+    setTimeout(() => {
+      setParsingActive(false);
+    }, 600);
+  }, []);
 
   const value: InspectionContextType = {
     nomenclature,
@@ -2312,6 +2329,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     structureNumber,
     setStructureNumber,
     importFromPdf,
+    simulateLegacyImport,
     parsingActive,
     importSummary,
     clearImportSummary,
