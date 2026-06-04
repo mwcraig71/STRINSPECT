@@ -72,6 +72,8 @@ export default function InspectionScreen() {
     setPhotos,
     locationSequence,
     filteredElements,
+    elementSearch,
+    setElementSearch,
     sessionManifest,
     legacyManifest,
     handleSave,
@@ -426,7 +428,35 @@ export default function InspectionScreen() {
             <Feather name={elementPickerOpen ? "chevron-up" : "chevron-down"} size={18} color={c.mutedForeground} />
           </TouchableOpacity>
           {elementPickerOpen && (
-            <ScrollView style={[styles.dropdownList, { borderColor: c.border }]} nestedScrollEnabled>
+            <View style={[styles.dropdownPanel, { borderColor: c.border, backgroundColor: c.background }]}>
+              <View style={[styles.elementSearchRow, { backgroundColor: c.background, borderBottomColor: c.border }]}>
+                <Feather name="search" size={14} color={c.mutedForeground} />
+                <TextInput
+                  style={[styles.elementSearchInput, { color: c.foreground }]}
+                  placeholder="Search all elements by name or #..."
+                  placeholderTextColor={c.mutedForeground}
+                  value={elementSearch}
+                  onChangeText={setElementSearch}
+                  autoCorrect={false}
+                  autoCapitalize="none"
+                />
+                {elementSearch.length > 0 && (
+                  <TouchableOpacity onPress={() => setElementSearch("")} hitSlop={8}>
+                    <Feather name="x" size={14} color={c.mutedForeground} />
+                  </TouchableOpacity>
+                )}
+              </View>
+              <Text style={[styles.elementSearchHint, { color: c.mutedForeground, borderBottomColor: c.border }]}>
+                {elementSearch.trim().length > 0
+                  ? `${filteredElements.length} match${filteredElements.length === 1 ? "" : "es"}`
+                  : `${filteredElements.length} common element${filteredElements.length === 1 ? "" : "s"} · search to find more`}
+              </Text>
+              <ScrollView style={styles.dropdownScroll} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+              {filteredElements.length === 0 && (
+                <Text style={[styles.dropdownEmpty, { color: c.mutedForeground }]}>
+                  No elements match. Try a different search.
+                </Text>
+              )}
               {filteredElements.map((el) => (
                 <TouchableOpacity
                   key={el.id}
@@ -446,7 +476,8 @@ export default function InspectionScreen() {
                   <Text style={[styles.dropdownItemSub, { color: c.mutedForeground }]}>{el.category}</Text>
                 </TouchableOpacity>
               ))}
-            </ScrollView>
+              </ScrollView>
+            </View>
           )}
 
           {/* Element 226 — Steel Pipe Pile remaining-section form */}
@@ -876,6 +907,43 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     maxHeight: 200,
     overflow: "hidden",
+  },
+  dropdownPanel: {
+    borderWidth: 1,
+    borderRadius: 10,
+    overflow: "hidden",
+  },
+  dropdownScroll: {
+    maxHeight: 220,
+  },
+  elementSearchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+  },
+  elementSearchInput: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "600",
+    padding: 0,
+  },
+  elementSearchHint: {
+    fontSize: 10,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+  },
+  dropdownEmpty: {
+    fontSize: 12,
+    fontWeight: "600",
+    padding: 16,
+    textAlign: "center",
   },
   dropdownItem: {
     flexDirection: "row",

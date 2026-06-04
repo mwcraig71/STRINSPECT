@@ -68,38 +68,38 @@ export const SUBSTRUCTURE_TYPES = [
   {
     id: "CONCRETE_COLUMN",
     label: "Concrete Column/Pier",
-    sub: "RC Column · Drilled Shaft · Cap",
-    elementIds: ["205", "234"],
+    sub: "RC Column · Pier Wall · Cap",
+    elementIds: ["205", "204", "210", "234", "220"],
   },
   {
     id: "CONCRETE_ABUTMENT",
     label: "Concrete Abutment",
     sub: "RC Abutment · Backwall · Wingwall",
-    elementIds: ["215"],
+    elementIds: ["215", "220"],
   },
   {
     id: "CONCRETE_PILE",
     label: "Concrete Pile/Cap",
-    sub: "RC Pile · Prestressed Pile",
-    elementIds: ["225", "234"],
+    sub: "RC Pile · Pile Cap · Cap",
+    elementIds: ["227", "220", "234"],
   },
   {
     id: "STEEL_PILE",
     label: "Steel Pile",
     sub: "H-Pile · Steel Pipe Pile",
-    elementIds: ["226"],
+    elementIds: ["225", "226"],
   },
   {
     id: "TIMBER_PILE",
     label: "Timber Pile/Bent",
     sub: "Timber Pile · Timber Cap",
-    elementIds: ["228"],
+    elementIds: ["228", "235", "206"],
   },
   {
     id: "OTHER",
     label: "Other / Not Set",
     sub: "Show all substructure elements",
-    elementIds: ["205", "215", "225", "226", "228", "234"],
+    elementIds: ["205", "215", "225", "226", "227", "228", "234"],
   },
 ];
 
@@ -110,53 +110,165 @@ export const ENVIRONMENTS = [
   { id: "4", name: "4 - Severe" },
 ];
 
+// Element catalog based on the AASHTO Manual for Bridge Element Inspection (MBEI)
+// National Bridge Elements (NBE). `core: true` elements show in the dropdown by
+// default; the rest are reachable via the in-dropdown search. Element 226 is a
+// custom TxDOT-style "Steel Pipe Pile" (overrides the AASHTO 226 = P/S Concrete Pile).
 export const SNBI_ELEMENTS = [
-  { id: "12", name: "RC Deck", category: "Deck", material: "Concrete", unit: "sq ft" },
-  { id: "38", name: "RC Slab", category: "Deck", material: "Concrete", unit: "sq ft" },
-  { id: "107", name: "Steel Girder", category: "Superstructure", material: "Steel", unit: "ft" },
-  { id: "108", name: "PSC Open Girder/Beam", category: "Superstructure", material: "Concrete", unit: "ft" },
-  { id: "109", name: "PSC Girder", category: "Superstructure", material: "Concrete", unit: "ft" },
-  { id: "113", name: "RC Open Girder/Beam", category: "Superstructure", material: "Concrete", unit: "ft" },
-  { id: "205", name: "RC Column", category: "Substructure", material: "Concrete", unit: "ea" },
-  { id: "215", name: "RC Abutment", category: "Substructure", material: "Concrete", unit: "ft" },
-  { id: "225", name: "RC Pile", category: "Substructure", material: "Concrete", unit: "ea" },
-  { id: "226", name: "Steel Pipe Pile", category: "Substructure", material: "Steel", unit: "ea" },
-  { id: "228", name: "Timber Pile", category: "Substructure", material: "Timber", unit: "ea" },
-  { id: "234", name: "RC Cap", category: "Substructure", material: "Concrete", unit: "ft" },
-  { id: "310", name: "Elastomeric Bearing", category: "Bearing", material: "Other", unit: "ea" },
-  { id: "311", name: "Movable Bearing", category: "Bearing", material: "Steel", unit: "ea" },
-  { id: "313", name: "Fixed Bearing", category: "Bearing", material: "Steel", unit: "ea" },
-  { id: "321", name: "RC Approach Slab", category: "Deck", material: "Concrete", unit: "sq ft" },
-  { id: "330", name: "Metal Bridge Railing", category: "Railing", material: "Steel", unit: "ft" },
-  { id: "331", name: "RC Bridge Railing", category: "Railing", material: "Concrete", unit: "ft" },
-  { id: "300", name: "Strip Seal Joint", category: "Joint", material: "Other", unit: "ft" },
-  { id: "304", name: "Open Joint", category: "Joint", material: "Other", unit: "ft" },
-  { id: "515", name: "Protective Coating", category: "Other", material: "Steel", unit: "sq ft" },
+  // --- Deck / Slab ---
+  { id: "12", name: "RC Deck", category: "Deck", material: "Concrete", unit: "sq ft", core: true },
+  { id: "28", name: "Steel Deck — Open Grid", category: "Deck", material: "Steel", unit: "sq ft", core: false },
+  { id: "29", name: "Steel Deck — Concrete Filled Grid", category: "Deck", material: "Steel", unit: "sq ft", core: false },
+  { id: "31", name: "Timber Deck", category: "Deck", material: "Timber", unit: "sq ft", core: true },
+  { id: "38", name: "RC Slab", category: "Deck", material: "Concrete", unit: "sq ft", core: true },
+  { id: "54", name: "Timber Slab", category: "Deck", material: "Timber", unit: "sq ft", core: false },
+  { id: "60", name: "Other Deck/Slab", category: "Deck", material: "Other", unit: "sq ft", core: false },
+  { id: "321", name: "RC Approach Slab", category: "Deck", material: "Concrete", unit: "sq ft", core: true },
+  // --- Superstructure ---
+  { id: "102", name: "Steel Box/Closed Web Girder", category: "Superstructure", material: "Steel", unit: "ft", core: false },
+  { id: "104", name: "PSC Box/Closed Web Girder", category: "Superstructure", material: "Concrete", unit: "ft", core: false },
+  { id: "105", name: "RC Box/Closed Web Girder", category: "Superstructure", material: "Concrete", unit: "ft", core: false },
+  { id: "107", name: "Steel Girder/Beam", category: "Superstructure", material: "Steel", unit: "ft", core: true },
+  { id: "108", name: "PSC Open Girder/Beam", category: "Superstructure", material: "Concrete", unit: "ft", core: true },
+  { id: "109", name: "PSC Girder", category: "Superstructure", material: "Concrete", unit: "ft", core: true },
+  { id: "110", name: "RC Girder/Beam", category: "Superstructure", material: "Concrete", unit: "ft", core: true },
+  { id: "111", name: "Timber Girder/Beam", category: "Superstructure", material: "Timber", unit: "ft", core: true },
+  { id: "113", name: "RC Open Girder/Beam", category: "Superstructure", material: "Concrete", unit: "ft", core: false },
+  { id: "115", name: "PSC Stringer", category: "Superstructure", material: "Concrete", unit: "ft", core: false },
+  { id: "116", name: "RC Stringer", category: "Superstructure", material: "Concrete", unit: "ft", core: false },
+  { id: "117", name: "Timber Stringer", category: "Superstructure", material: "Timber", unit: "ft", core: false },
+  { id: "120", name: "Steel Truss", category: "Superstructure", material: "Steel", unit: "ft", core: true },
+  { id: "135", name: "Timber Truss", category: "Superstructure", material: "Timber", unit: "ft", core: false },
+  { id: "141", name: "Steel Arch", category: "Superstructure", material: "Steel", unit: "ft", core: false },
+  { id: "144", name: "RC Arch", category: "Superstructure", material: "Concrete", unit: "ft", core: false },
+  { id: "152", name: "Steel Floor Beam", category: "Superstructure", material: "Steel", unit: "ft", core: false },
+  { id: "156", name: "RC Floor Beam", category: "Superstructure", material: "Concrete", unit: "ft", core: false },
+  { id: "161", name: "Steel Pin & Hanger Assembly", category: "Superstructure", material: "Steel", unit: "ea", core: false },
+  { id: "162", name: "Steel Gusset Plate", category: "Superstructure", material: "Steel", unit: "ea", core: false },
+  // --- Substructure ---
+  { id: "202", name: "Steel Column", category: "Substructure", material: "Steel", unit: "ea", core: true },
+  { id: "204", name: "PSC Column", category: "Substructure", material: "Concrete", unit: "ea", core: false },
+  { id: "205", name: "RC Column", category: "Substructure", material: "Concrete", unit: "ea", core: true },
+  { id: "206", name: "Timber Column", category: "Substructure", material: "Timber", unit: "ea", core: false },
+  { id: "207", name: "Steel Tower", category: "Substructure", material: "Steel", unit: "ea", core: false },
+  { id: "210", name: "RC Pier Wall", category: "Substructure", material: "Concrete", unit: "ft", core: true },
+  { id: "211", name: "Other Pier Wall", category: "Substructure", material: "Other", unit: "ft", core: false },
+  { id: "212", name: "Timber Pier Wall", category: "Substructure", material: "Timber", unit: "ft", core: false },
+  { id: "213", name: "Masonry Pier Wall", category: "Substructure", material: "Masonry", unit: "ft", core: false },
+  { id: "215", name: "RC Abutment", category: "Substructure", material: "Concrete", unit: "ft", core: true },
+  { id: "216", name: "Timber Abutment", category: "Substructure", material: "Timber", unit: "ft", core: false },
+  { id: "217", name: "Masonry Abutment", category: "Substructure", material: "Masonry", unit: "ft", core: false },
+  { id: "218", name: "Other Abutment", category: "Substructure", material: "Other", unit: "ft", core: false },
+  { id: "220", name: "RC Pile Cap/Footing", category: "Substructure", material: "Concrete", unit: "ft", core: true },
+  { id: "225", name: "Steel Pile", category: "Substructure", material: "Steel", unit: "ea", core: true },
+  { id: "226", name: "Steel Pipe Pile", category: "Substructure", material: "Steel", unit: "ea", core: true },
+  { id: "227", name: "Reinforced Concrete Pile", category: "Substructure", material: "Concrete", unit: "ea", core: true },
+  { id: "228", name: "Timber Pile", category: "Substructure", material: "Timber", unit: "ea", core: true },
+  { id: "229", name: "Other Pile", category: "Substructure", material: "Other", unit: "ea", core: false },
+  { id: "234", name: "RC Cap", category: "Substructure", material: "Concrete", unit: "ft", core: true },
+  { id: "235", name: "Timber Cap", category: "Substructure", material: "Timber", unit: "ft", core: false },
+  // --- Bearings ---
+  { id: "310", name: "Elastomeric Bearing", category: "Bearing", material: "Other", unit: "ea", core: true },
+  { id: "311", name: "Movable Bearing", category: "Bearing", material: "Steel", unit: "ea", core: true },
+  { id: "312", name: "Enclosed/Concealed Bearing", category: "Bearing", material: "Other", unit: "ea", core: false },
+  { id: "313", name: "Fixed Bearing", category: "Bearing", material: "Steel", unit: "ea", core: true },
+  { id: "314", name: "Pot Bearing", category: "Bearing", material: "Other", unit: "ea", core: false },
+  { id: "315", name: "Disk Bearing", category: "Bearing", material: "Other", unit: "ea", core: false },
+  // --- Joints ---
+  { id: "300", name: "Strip Seal Joint", category: "Joint", material: "Other", unit: "ft", core: true },
+  { id: "301", name: "Pourable Joint Seal", category: "Joint", material: "Other", unit: "ft", core: false },
+  { id: "302", name: "Compression Joint Seal", category: "Joint", material: "Other", unit: "ft", core: false },
+  { id: "303", name: "Modular Joint (Assembly)", category: "Joint", material: "Other", unit: "ft", core: false },
+  { id: "304", name: "Open Joint", category: "Joint", material: "Other", unit: "ft", core: true },
+  { id: "306", name: "Other Joint", category: "Joint", material: "Other", unit: "ft", core: false },
+  // --- Railings ---
+  { id: "330", name: "Metal Bridge Railing", category: "Railing", material: "Steel", unit: "ft", core: true },
+  { id: "331", name: "RC Bridge Railing", category: "Railing", material: "Concrete", unit: "ft", core: true },
+  { id: "332", name: "Timber Bridge Railing", category: "Railing", material: "Timber", unit: "ft", core: false },
+  { id: "333", name: "Other Bridge Railing", category: "Railing", material: "Other", unit: "ft", core: false },
+  { id: "334", name: "Masonry Bridge Railing", category: "Railing", material: "Masonry", unit: "ft", core: false },
+  // --- Other / Protective Systems ---
+  { id: "510", name: "Wearing Surface", category: "Other", material: "Other", unit: "sq ft", core: false },
+  { id: "515", name: "Steel Protective Coating", category: "Other", material: "Steel", unit: "sq ft", core: true },
+  { id: "520", name: "RC Protective System", category: "Other", material: "Concrete", unit: "sq ft", core: false },
 ] as const;
 
-export const DEFECTS_BY_ELEMENT: Record<string, { id: string; name: string; unit: string }[]> = {
+// Material-appropriate default defect lists. Any element without a specific
+// override below inherits the list for its material. Defect ids are kept stable so
+// the SNBI import mapping (SNBI_CODE_TO_DEFECT_ID) continues to resolve correctly.
+const DEFECTS_BY_MATERIAL: Record<string, { id: string; name: string; unit: string }[]> = {
+  Steel: [
+    { id: "corr", name: "Corrosion/Section Loss", unit: "in" },
+    { id: "crack_s", name: "Cracking (Steel/Fatigue)", unit: "in" },
+    { id: "conn", name: "Connection Deterioration", unit: "ea" },
+    { id: "distort", name: "Distortion/Out-of-Plane", unit: "ea" },
+  ],
+  Concrete: [
+    { id: "spall", name: "Spalling/Delamination", unit: "sq ft" },
+    { id: "crack", name: "Cracking", unit: "ft" },
+    { id: "corr_s", name: "Efflorescence/Rust Staining", unit: "sq ft" },
+    { id: "rebar", name: "Exposed/Corroded Reinforcing", unit: "sq ft" },
+  ],
+  Timber: [
+    { id: "decay", name: "Decay/Section Loss", unit: "in" },
+    { id: "check", name: "Checking/Splitting", unit: "ft" },
+    { id: "crush", name: "Crushing/Compression", unit: "ea" },
+  ],
+  Masonry: [
+    { id: "mortar", name: "Mortar Deterioration", unit: "ft" },
+    { id: "crack", name: "Cracking", unit: "ft" },
+    { id: "spall", name: "Spalling/Splitting", unit: "sq ft" },
+    { id: "displace", name: "Masonry Displacement", unit: "ea" },
+  ],
+  Other: [
+    { id: "damage", name: "Damage", unit: "ea" },
+    { id: "deterioration", name: "Deterioration", unit: "ea" },
+  ],
+};
+
+// Element-specific defect lists that differ from the material default (decks,
+// bearings, joints, railings, protective systems, and the custom 226 pile form).
+const DEFECT_OVERRIDES: Record<string, { id: string; name: string; unit: string }[]> = {
+  // Decks / slabs
   "12": [{ id: "spall", name: "Spalling/Delamination", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "wear", name: "Abrasion/Wear", unit: "sq ft" }],
   "38": [{ id: "spall", name: "Spalling/Delamination", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "wear", name: "Abrasion/Wear", unit: "sq ft" }],
-  "107": [{ id: "corr", name: "Corrosion/Section Loss", unit: "in" }, { id: "crack_s", name: "Cracking (Steel)", unit: "in" }],
-  "108": [{ id: "spall", name: "Spalling/Delamination", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "corr_s", name: "Efflorescence/Rust Staining", unit: "sq ft" }],
-  "109": [{ id: "spall", name: "Spalling/Delamination", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "corr_s", name: "Efflorescence/Rust Staining", unit: "sq ft" }],
-  "113": [{ id: "spall", name: "Spalling/Delamination", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "corr_s", name: "Efflorescence/Rust Staining", unit: "sq ft" }],
-  "205": [{ id: "spall", name: "Spalling/Delamination", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }],
-  "215": [{ id: "spall", name: "Spalling/Delamination", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }],
-  "225": [{ id: "spall", name: "Spalling/Delamination", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }],
+  "31": [{ id: "decay", name: "Decay/Section Loss", unit: "in" }, { id: "check", name: "Checking/Splitting", unit: "ft" }, { id: "wear", name: "Abrasion/Wear", unit: "sq ft" }],
+  "321": [{ id: "spall", name: "Spalling/Delamination", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "settle", name: "Settlement/Faulting", unit: "ea" }],
+  // Custom Steel Pipe Pile remaining-section form
   "226": [{ id: "corr_pile", name: "Section Loss (Remaining Section)", unit: "in" }, { id: "pitting", name: "Pitting Corrosion", unit: "in" }, { id: "corr", name: "Corrosion", unit: "sq ft" }],
-  "228": [{ id: "decay", name: "Decay/Section Loss", unit: "in" }, { id: "check", name: "Checking/Splitting", unit: "ft" }],
-  "234": [{ id: "spall", name: "Spalling/Delamination", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }],
-  "310": [{ id: "rotation", name: "Excessive Rotation", unit: "ea" }, { id: "bulging", name: "Excessive Bulging", unit: "ea" }],
-  "311": [{ id: "corr", name: "Corrosion", unit: "sq ft" }, { id: "rotation", name: "Excessive Rotation", unit: "ea" }],
+  // Bearings
+  "310": [{ id: "rotation", name: "Excessive Rotation", unit: "ea" }, { id: "bulging", name: "Excessive Bulging", unit: "ea" }, { id: "shear", name: "Shear/Movement", unit: "ea" }],
+  "311": [{ id: "corr", name: "Corrosion", unit: "sq ft" }, { id: "rotation", name: "Excessive Rotation", unit: "ea" }, { id: "debris", name: "Debris/Loss of Travel", unit: "ea" }],
+  "312": [{ id: "corr", name: "Corrosion", unit: "sq ft" }, { id: "debris", name: "Debris Accumulation", unit: "ea" }],
   "313": [{ id: "corr", name: "Corrosion", unit: "sq ft" }, { id: "rotation", name: "Excessive Rotation", unit: "ea" }],
-  "321": [{ id: "spall", name: "Spalling/Delamination", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }],
-  "330": [{ id: "corr", name: "Corrosion", unit: "sq ft" }, { id: "impact", name: "Impact Damage", unit: "ea" }],
+  "314": [{ id: "rotation", name: "Excessive Rotation", unit: "ea" }, { id: "leak", name: "Seal/Fluid Leakage", unit: "ea" }],
+  "315": [{ id: "rotation", name: "Excessive Rotation", unit: "ea" }, { id: "wear", name: "Wear/Disk Deterioration", unit: "ea" }],
+  // Joints
   "300": [{ id: "seal", name: "Seal Damage", unit: "ft" }, { id: "debris", name: "Debris Accumulation", unit: "sq ft" }],
+  "301": [{ id: "seal", name: "Seal Damage", unit: "ft" }, { id: "debris", name: "Debris Accumulation", unit: "sq ft" }],
+  "302": [{ id: "seal", name: "Seal Damage", unit: "ft" }, { id: "debris", name: "Debris Accumulation", unit: "sq ft" }],
+  "303": [{ id: "seal", name: "Seal Damage", unit: "ft" }, { id: "debris", name: "Debris Accumulation", unit: "sq ft" }, { id: "armour", name: "Armour Damage", unit: "ft" }],
   "304": [{ id: "debris", name: "Debris Accumulation", unit: "sq ft" }, { id: "armour", name: "Armour Damage", unit: "ft" }],
-  "331": [{ id: "impact", name: "Impact Damage", unit: "ea" }, { id: "crack", name: "Cracking", unit: "ft" }],
+  "306": [{ id: "seal", name: "Seal Damage", unit: "ft" }, { id: "debris", name: "Debris Accumulation", unit: "sq ft" }],
+  // Railings
+  "330": [{ id: "corr", name: "Corrosion", unit: "sq ft" }, { id: "impact", name: "Impact Damage", unit: "ea" }],
+  "331": [{ id: "impact", name: "Impact Damage", unit: "ea" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "spall", name: "Spalling/Delamination", unit: "sq ft" }],
+  "332": [{ id: "decay", name: "Decay/Section Loss", unit: "in" }, { id: "impact", name: "Impact Damage", unit: "ea" }],
+  "333": [{ id: "damage", name: "Damage", unit: "ea" }, { id: "impact", name: "Impact Damage", unit: "ea" }],
+  "334": [{ id: "mortar", name: "Mortar Deterioration", unit: "ft" }, { id: "impact", name: "Impact Damage", unit: "ea" }],
+  // Protective systems / wearing surface
+  "510": [{ id: "wear", name: "Abrasion/Wear", unit: "sq ft" }, { id: "deterioration", name: "Deterioration", unit: "sq ft" }],
   "515": [{ id: "coat_fail", name: "Coating Failure", unit: "sq ft" }],
+  "520": [{ id: "coat_fail", name: "Sealer/System Failure", unit: "sq ft" }, { id: "spall", name: "Spalling/Delamination", unit: "sq ft" }],
 };
+
+export const DEFECTS_BY_ELEMENT: Record<string, { id: string; name: string; unit: string }[]> =
+  Object.fromEntries(
+    SNBI_ELEMENTS.map((e) => [
+      e.id,
+      DEFECT_OVERRIDES[e.id] ?? DEFECTS_BY_MATERIAL[e.material] ?? DEFECTS_BY_MATERIAL.Other,
+    ])
+  );
 
 const SNBI_CODE_TO_DEFECT_ID: Record<string, string> = {
   "1000": "corr",
@@ -810,6 +922,12 @@ interface InspectionContextType {
   setSuperstructureType: (v: string) => void;
   substructureType: string;
   setSubstructureType: (v: string) => void;
+  superstructureMaterial: string;
+  setSuperstructureMaterial: (v: string) => void;
+  substructureMaterial: string;
+  setSubstructureMaterial: (v: string) => void;
+  elementSearch: string;
+  setElementSearch: (v: string) => void;
   supportCount: number;
 
   // Form state
@@ -978,26 +1096,55 @@ function buildLocationSequence(
   return sequence;
 }
 
-function getFilteredElements(
+// Material settings double as a filter axis. "" means "Not Set" (no filtering).
+export const MATERIAL_OPTIONS = [
+  { id: "", label: "Not Set" },
+  { id: "Steel", label: "Steel" },
+  { id: "Concrete", label: "Concrete" },
+  { id: "Timber", label: "Timber" },
+  { id: "Masonry", label: "Masonry" },
+  { id: "Other", label: "Other" },
+] as const;
+
+function isSubstructureLocation(location: string): boolean {
+  return (
+    location.includes("Abutment") ||
+    location.includes("Bent") ||
+    location.includes("End Bent")
+  );
+}
+
+// All elements relevant to a location by category alone (ignores the narrow
+// structure-type lists). Used when searching so the user can look up any element.
+function locationCategoryElements(location: string): readonly SnbiElement[] {
+  if (!location) return [];
+  if (location.includes("Joint"))
+    return SNBI_ELEMENTS.filter((e) => e.category === "Joint");
+  if (location.includes("Approach"))
+    return SNBI_ELEMENTS.filter((e) => ["Deck", "Railing"].includes(e.category));
+  if (location.includes("Span"))
+    return SNBI_ELEMENTS.filter((e) =>
+      ["Deck", "Superstructure", "Railing", "Bearing", "Other"].includes(e.category)
+    );
+  if (isSubstructureLocation(location))
+    return SNBI_ELEMENTS.filter((e) => ["Substructure", "Bearing"].includes(e.category));
+  return SNBI_ELEMENTS;
+}
+
+// Location + structure-type narrowed candidate list (the default, pre-material view).
+function locationTypeElements(
   location: string,
   superTypeId: string,
   subTypeId: string
 ): readonly SnbiElement[] {
   if (!location) return [];
 
-  if (location.includes("Joint"))
-    return SNBI_ELEMENTS.filter((e) => e.category === "Joint");
-
-  if (location.includes("Approach"))
-    return SNBI_ELEMENTS.filter((e) => ["Deck", "Railing"].includes(e.category));
+  if (location.includes("Joint") || location.includes("Approach"))
+    return locationCategoryElements(location);
 
   if (location.includes("Span")) {
     const sType = SUPERSTRUCTURE_TYPES.find((t) => t.id === superTypeId);
-    if (!sType || superTypeId === "OTHER") {
-      return SNBI_ELEMENTS.filter((e) =>
-        ["Deck", "Superstructure", "Railing", "Bearing", "Other"].includes(e.category)
-      );
-    }
+    if (!sType || superTypeId === "OTHER") return locationCategoryElements(location);
     const allowedIds = new Set<string>([
       ...(sType.deckId ? [sType.deckId] : []),
       ...sType.elementIds,
@@ -1007,22 +1154,52 @@ function getFilteredElements(
     return SNBI_ELEMENTS.filter((e) => allowedIds.has(e.id));
   }
 
-  if (
-    location.includes("Abutment") ||
-    location.includes("Bent") ||
-    location.includes("End Bent")
-  ) {
+  if (isSubstructureLocation(location)) {
     const sType = SUBSTRUCTURE_TYPES.find((t) => t.id === subTypeId);
-    if (!sType || subTypeId === "OTHER") {
-      return SNBI_ELEMENTS.filter((e) =>
-        ["Substructure", "Bearing"].includes(e.category)
-      );
-    }
+    if (!sType || subTypeId === "OTHER") return locationCategoryElements(location);
     const allowedIds = new Set<string>([...sType.elementIds, "310"]);
     return SNBI_ELEMENTS.filter((e) => allowedIds.has(e.id));
   }
 
   return SNBI_ELEMENTS;
+}
+
+function getFilteredElements(
+  location: string,
+  superTypeId: string,
+  subTypeId: string,
+  superMaterial: string,
+  subMaterial: string,
+  search: string
+): readonly SnbiElement[] {
+  if (!location) return [];
+
+  const query = search.trim().toLowerCase();
+  // Material that applies to this location: substructure → sub material; otherwise super.
+  const material = isSubstructureLocation(location) ? subMaterial : superMaterial;
+  const materialApplies =
+    !!material &&
+    (location.includes("Span") || isSubstructureLocation(location));
+
+  // Searching broadens to the full location catalog (incl. non-core); otherwise
+  // we honor the selected structure type.
+  let list: readonly SnbiElement[] = query
+    ? locationCategoryElements(location)
+    : locationTypeElements(location, superTypeId, subTypeId);
+
+  if (materialApplies) list = list.filter((e) => e.material === material);
+
+  if (query) {
+    list = list.filter((e) =>
+      `${e.id} ${e.name}`.toLowerCase().includes(query)
+    );
+  } else {
+    const coreList = list.filter((e) => e.core);
+    // Fall back to the full narrowed list if a filter leaves no core elements.
+    if (coreList.length > 0) list = coreList;
+  }
+
+  return list;
 }
 
 function applyFilters(
@@ -1078,6 +1255,8 @@ const STORAGE_KEYS = {
   INSPECTION_TYPE: "@bridge_inspection_type",
   SUPERSTRUCTURE_TYPE: "@bridge_superstructure_type",
   SUBSTRUCTURE_TYPE: "@bridge_substructure_type",
+  SUPERSTRUCTURE_MATERIAL: "@bridge_superstructure_material",
+  SUBSTRUCTURE_MATERIAL: "@bridge_substructure_material",
   STRUCTURE_NUMBER: "@bridge_structure_number",
   UNDERCLEARANCE: "@bridge_underclearance",
   CHANNEL: "@bridge_channel",
@@ -1095,6 +1274,9 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const [inspectionType, setInspectionTypeState] = useState(INSPECTION_TYPES.TOPSIDE);
   const [superstructureType, setSuperstructureTypeState] = useState("OTHER");
   const [substructureType, setSubstructureTypeState] = useState("OTHER");
+  const [superstructureMaterial, setSuperstructureMaterialState] = useState("");
+  const [substructureMaterial, setSubstructureMaterialState] = useState("");
+  const [elementSearch, setElementSearch] = useState("");
   const [savedDefects, setSavedDefectsState] = useState<DefectRecord[]>([]);
   const [nbiRatings, setNbiRatingsState] = useState<NbiRating[]>(INITIAL_NBI_RATINGS);
   const [structureNumber, setStructureNumberState] = useState("");
@@ -1154,13 +1336,15 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           ]);
           await AsyncStorage.setItem(STORAGE_KEYS.DEMO_CLEARED, "1");
         }
-        const [defects, nbi, nom, insType, superType, subType, structNum, uc, ch, sb, sn, spp, impSummary] = await Promise.all([
+        const [defects, nbi, nom, insType, superType, subType, superMat, subMat, structNum, uc, ch, sb, sn, spp, impSummary] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.SAVED_DEFECTS),
           AsyncStorage.getItem(STORAGE_KEYS.NBI_RATINGS),
           AsyncStorage.getItem(STORAGE_KEYS.NOMENCLATURE),
           AsyncStorage.getItem(STORAGE_KEYS.INSPECTION_TYPE),
           AsyncStorage.getItem(STORAGE_KEYS.SUPERSTRUCTURE_TYPE),
           AsyncStorage.getItem(STORAGE_KEYS.SUBSTRUCTURE_TYPE),
+          AsyncStorage.getItem(STORAGE_KEYS.SUPERSTRUCTURE_MATERIAL),
+          AsyncStorage.getItem(STORAGE_KEYS.SUBSTRUCTURE_MATERIAL),
           AsyncStorage.getItem(STORAGE_KEYS.STRUCTURE_NUMBER),
           AsyncStorage.getItem(STORAGE_KEYS.UNDERCLEARANCE),
           AsyncStorage.getItem(STORAGE_KEYS.CHANNEL),
@@ -1180,6 +1364,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         if (insType) setInspectionTypeState(insType);
         if (superType) setSuperstructureTypeState(superType);
         if (subType) setSubstructureTypeState(subType);
+        if (superMat !== null) setSuperstructureMaterialState(superMat);
+        if (subMat !== null) setSubstructureMaterialState(subMat);
         if (structNum) {
           setStructureNumberState(structNum);
           setCifData((prev) => ({ ...prev, structureNumber: structNum }));
@@ -1328,6 +1514,16 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     AsyncStorage.setItem(STORAGE_KEYS.SUBSTRUCTURE_TYPE, v).catch(() => {});
   }, []);
 
+  const setSuperstructureMaterial = useCallback((v: string) => {
+    setSuperstructureMaterialState(v);
+    AsyncStorage.setItem(STORAGE_KEYS.SUPERSTRUCTURE_MATERIAL, v).catch(() => {});
+  }, []);
+
+  const setSubstructureMaterial = useCallback((v: string) => {
+    setSubstructureMaterialState(v);
+    AsyncStorage.setItem(STORAGE_KEYS.SUBSTRUCTURE_MATERIAL, v).catch(() => {});
+  }, []);
+
   const setStructureNumber = useCallback((v: string) => {
     setStructureNumberState(v);
     AsyncStorage.setItem(STORAGE_KEYS.STRUCTURE_NUMBER, v).catch(() => {});
@@ -1437,8 +1633,23 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   );
 
   const filteredElements = useMemo(
-    () => getFilteredElements(currentLocation, superstructureType, substructureType),
-    [currentLocation, superstructureType, substructureType]
+    () =>
+      getFilteredElements(
+        currentLocation,
+        superstructureType,
+        substructureType,
+        superstructureMaterial,
+        substructureMaterial,
+        elementSearch
+      ),
+    [
+      currentLocation,
+      superstructureType,
+      substructureType,
+      superstructureMaterial,
+      substructureMaterial,
+      elementSearch,
+    ]
   );
 
   useEffect(() => {
@@ -1985,6 +2196,12 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     setSuperstructureType,
     substructureType,
     setSubstructureType,
+    superstructureMaterial,
+    setSuperstructureMaterial,
+    substructureMaterial,
+    setSubstructureMaterial,
+    elementSearch,
+    setElementSearch,
     supportCount,
     editId,
     setEditId,

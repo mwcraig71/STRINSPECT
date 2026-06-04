@@ -15,6 +15,7 @@ import {
 import { useColors } from "@/hooks/useColors";
 import {
   INSPECTION_TYPES,
+  MATERIAL_OPTIONS,
   NOMENCLATURES,
   SUBSTRUCTURE_TYPES,
   SUPERSTRUCTURE_TYPES,
@@ -37,6 +38,10 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
     setSuperstructureType,
     substructureType,
     setSubstructureType,
+    superstructureMaterial,
+    setSuperstructureMaterial,
+    substructureMaterial,
+    setSubstructureMaterial,
     importFromPdf,
     parsingActive,
   } = useInspection();
@@ -212,7 +217,7 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
               <Text style={[styles.cardTitle, { color: c.foreground }]}>Structural Build</Text>
             </View>
             <Text style={[styles.cardDesc, { color: c.mutedForeground }]}>
-              Define the bridge's structural composition. Combined with the current location, this filters the available elements on the Inspection tab to only those relevant to the structure type.
+              Define the bridge's structural composition and material. Combined with the current location, these filter the elements available on the Inspection tab. Leave material on "Not Set" to show every material.
             </Text>
 
             {/* Superstructure */}
@@ -247,6 +252,29 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
                           <Feather name="check" size={11} color="#38bdf8" />
                         </View>
                       )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <Text style={[styles.matLabel, { color: c.mutedForeground }]}>Material</Text>
+              <View style={styles.matRow}>
+                {MATERIAL_OPTIONS.map((m) => {
+                  const active = superstructureMaterial === m.id;
+                  return (
+                    <TouchableOpacity
+                      key={m.id || "not-set"}
+                      style={[
+                        styles.matChip,
+                        {
+                          backgroundColor: active ? "#0f172a" : c.secondary,
+                          borderColor: active ? "#38bdf8" : c.border,
+                        },
+                      ]}
+                      onPress={() => setSuperstructureMaterial(m.id)}
+                    >
+                      <Text style={[styles.matChipText, { color: active ? "#38bdf8" : c.mutedForeground }]}>
+                        {m.label}
+                      </Text>
                     </TouchableOpacity>
                   );
                 })}
@@ -292,6 +320,29 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
                   );
                 })}
               </View>
+              <Text style={[styles.matLabel, { color: c.mutedForeground }]}>Material</Text>
+              <View style={styles.matRow}>
+                {MATERIAL_OPTIONS.map((m) => {
+                  const active = substructureMaterial === m.id;
+                  return (
+                    <TouchableOpacity
+                      key={m.id || "not-set"}
+                      style={[
+                        styles.matChip,
+                        {
+                          backgroundColor: active ? "#1a0f2e" : c.secondary,
+                          borderColor: active ? "#a78bfa" : c.border,
+                        },
+                      ]}
+                      onPress={() => setSubstructureMaterial(m.id)}
+                    >
+                      <Text style={[styles.matChipText, { color: active ? "#a78bfa" : c.mutedForeground }]}>
+                        {m.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             </View>
 
             {/* Active summary pill */}
@@ -301,12 +352,18 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
                 <Text style={[styles.buildSummaryValue, { color: "#38bdf8" }]}>
                   {SUPERSTRUCTURE_TYPES.find((t) => t.id === superstructureType)?.label ?? "—"}
                 </Text>
+                <Text style={[styles.buildSummaryMat, { color: c.mutedForeground }]}>
+                  {superstructureMaterial || "Any material"}
+                </Text>
               </View>
               <View style={[styles.buildSummaryDivider, { backgroundColor: c.border }]} />
               <View style={styles.buildSummaryItem}>
                 <Text style={[styles.buildSummaryLabel, { color: c.mutedForeground }]}>Sub</Text>
                 <Text style={[styles.buildSummaryValue, { color: "#a78bfa" }]}>
                   {SUBSTRUCTURE_TYPES.find((t) => t.id === substructureType)?.label ?? "—"}
+                </Text>
+                <Text style={[styles.buildSummaryMat, { color: c.mutedForeground }]}>
+                  {substructureMaterial || "Any material"}
                 </Text>
               </View>
             </View>
@@ -396,6 +453,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  matLabel: { fontSize: 10, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.4, marginTop: 4 },
+  matRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  matChip: {
+    borderRadius: 8,
+    borderWidth: 1.5,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+  },
+  matChipText: { fontSize: 12, fontWeight: "700" },
   structDivider: { borderTopWidth: 1, marginVertical: 2 },
   buildSummary: {
     borderRadius: 10,
@@ -407,6 +473,7 @@ const styles = StyleSheet.create({
   buildSummaryItem: { flex: 1, gap: 2 },
   buildSummaryLabel: { fontSize: 9, fontWeight: "700", textTransform: "uppercase" },
   buildSummaryValue: { fontSize: 12, fontWeight: "800" },
+  buildSummaryMat: { fontSize: 10, fontWeight: "600", marginTop: 1 },
   buildSummaryDivider: { width: 1, marginHorizontal: 10 },
   importBtn: {
     flexDirection: "row",
