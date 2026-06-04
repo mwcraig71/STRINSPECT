@@ -2,3 +2,4 @@
 - [Metro react dedup for Expo web](metro-react-dedup-web.md) — react/react-dom must be aliased in metro.config.js for Expo apps in this pnpm monorepo.
 - [Opening bundled PDFs in Expo](expo-bundled-pdf-open.md) — bundle + open a static PDF across web/native; web popup-blocker gotcha.
 - [structure-number sync](structure-number-sync.md) — how the bridge structure number stays consistent across CIF, Underclearance, and the global header.
+- [Bridge element catalog](bridge-element-catalog.md) — AASHTO 226=Prestressed Concrete Pile; custom Steel Pipe Pile is agency id 900 (never reassign 226); non-core elements (incl. culverts) are search-only.

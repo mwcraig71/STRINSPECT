@@ -480,8 +480,8 @@ export default function InspectionScreen() {
             </View>
           )}
 
-          {/* Element 226 — Steel Pipe Pile remaining-section form */}
-          {element?.id === "226" && (
+          {/* Element 900 — custom Steel Pipe Pile remaining-section form */}
+          {element?.id === "900" && (
             <TouchableOpacity
               style={[styles.sppFormBtn, { backgroundColor: "#fff7ed", borderColor: "#fdba74" }]}
               onPress={() => setShowSteelPipePileModal(true)}

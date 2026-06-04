@@ -80,14 +80,14 @@ export const SUBSTRUCTURE_TYPES = [
   {
     id: "CONCRETE_PILE",
     label: "Concrete Pile/Cap",
-    sub: "RC Pile · Pile Cap · Cap",
-    elementIds: ["227", "220", "234"],
+    sub: "PSC Pile · RC Pile · Pile Cap · Cap",
+    elementIds: ["226", "227", "220", "234"],
   },
   {
     id: "STEEL_PILE",
     label: "Steel Pile",
     sub: "H-Pile · Steel Pipe Pile",
-    elementIds: ["225", "226"],
+    elementIds: ["225", "900"],
   },
   {
     id: "TIMBER_PILE",
@@ -99,7 +99,7 @@ export const SUBSTRUCTURE_TYPES = [
     id: "OTHER",
     label: "Other / Not Set",
     sub: "Show all substructure elements",
-    elementIds: ["205", "215", "225", "226", "227", "228", "234"],
+    elementIds: ["205", "215", "225", "226", "227", "228", "234", "900"],
   },
 ];
 
@@ -110,47 +110,69 @@ export const ENVIRONMENTS = [
   { id: "4", name: "4 - Severe" },
 ];
 
-// Element catalog based on the AASHTO Manual for Bridge Element Inspection (MBEI)
-// National Bridge Elements (NBE). `core: true` elements show in the dropdown by
-// default; the rest are reachable via the in-dropdown search. Element 226 is a
-// custom TxDOT-style "Steel Pipe Pile" (overrides the AASHTO 226 = P/S Concrete Pile).
+// Element catalog based on the AASHTO Manual for Bridge Element Inspection (MBEI),
+// Second Edition (2019). Includes National Bridge Elements (NBE), Bridge
+// Management Elements (BME), and one agency-defined element. `core: true`
+// elements show in the dropdown by default; the rest are reachable via the
+// in-dropdown search. Element 226 is the standard AASHTO Prestressed Concrete
+// Pile; the custom TxDOT-style "Steel Pipe Pile" (remaining-section form) is the
+// agency-defined element 900.
 export const SNBI_ELEMENTS = [
-  // --- Deck / Slab ---
+  // --- Decks / Slabs ---
   { id: "12", name: "RC Deck", category: "Deck", material: "Concrete", unit: "sq ft", core: true },
+  { id: "13", name: "PSC Deck", category: "Deck", material: "Concrete", unit: "sq ft", core: false },
+  { id: "15", name: "PSC Top Flange", category: "Deck", material: "Concrete", unit: "sq ft", core: false },
+  { id: "16", name: "RC Top Flange", category: "Deck", material: "Concrete", unit: "sq ft", core: false },
   { id: "28", name: "Steel Deck — Open Grid", category: "Deck", material: "Steel", unit: "sq ft", core: false },
   { id: "29", name: "Steel Deck — Concrete Filled Grid", category: "Deck", material: "Steel", unit: "sq ft", core: false },
+  { id: "30", name: "Steel Deck — Corrugated/Orthotropic", category: "Deck", material: "Steel", unit: "sq ft", core: false },
   { id: "31", name: "Timber Deck", category: "Deck", material: "Timber", unit: "sq ft", core: true },
   { id: "38", name: "RC Slab", category: "Deck", material: "Concrete", unit: "sq ft", core: true },
   { id: "54", name: "Timber Slab", category: "Deck", material: "Timber", unit: "sq ft", core: false },
-  { id: "60", name: "Other Deck/Slab", category: "Deck", material: "Other", unit: "sq ft", core: false },
+  { id: "60", name: "Other Deck", category: "Deck", material: "Other", unit: "sq ft", core: false },
+  { id: "65", name: "Other Slab", category: "Deck", material: "Other", unit: "sq ft", core: false },
+  // --- Approach Slabs ---
+  { id: "320", name: "PSC Approach Slab", category: "Deck", material: "Concrete", unit: "sq ft", core: false },
   { id: "321", name: "RC Approach Slab", category: "Deck", material: "Concrete", unit: "sq ft", core: true },
   // --- Superstructure ---
   { id: "102", name: "Steel Box/Closed Web Girder", category: "Superstructure", material: "Steel", unit: "ft", core: false },
   { id: "104", name: "PSC Box/Closed Web Girder", category: "Superstructure", material: "Concrete", unit: "ft", core: false },
   { id: "105", name: "RC Box/Closed Web Girder", category: "Superstructure", material: "Concrete", unit: "ft", core: false },
+  { id: "106", name: "Other Box/Closed Web Girder", category: "Superstructure", material: "Other", unit: "ft", core: false },
   { id: "107", name: "Steel Girder/Beam", category: "Superstructure", material: "Steel", unit: "ft", core: true },
-  { id: "108", name: "PSC Open Girder/Beam", category: "Superstructure", material: "Concrete", unit: "ft", core: true },
-  { id: "109", name: "PSC Girder", category: "Superstructure", material: "Concrete", unit: "ft", core: true },
-  { id: "110", name: "RC Girder/Beam", category: "Superstructure", material: "Concrete", unit: "ft", core: true },
+  { id: "109", name: "PSC Open Girder/Beam", category: "Superstructure", material: "Concrete", unit: "ft", core: true },
+  { id: "110", name: "RC Open Girder/Beam", category: "Superstructure", material: "Concrete", unit: "ft", core: true },
   { id: "111", name: "Timber Girder/Beam", category: "Superstructure", material: "Timber", unit: "ft", core: true },
-  { id: "113", name: "RC Open Girder/Beam", category: "Superstructure", material: "Concrete", unit: "ft", core: false },
+  { id: "113", name: "Steel Stringer", category: "Superstructure", material: "Steel", unit: "ft", core: false },
   { id: "115", name: "PSC Stringer", category: "Superstructure", material: "Concrete", unit: "ft", core: false },
   { id: "116", name: "RC Stringer", category: "Superstructure", material: "Concrete", unit: "ft", core: false },
   { id: "117", name: "Timber Stringer", category: "Superstructure", material: "Timber", unit: "ft", core: false },
+  { id: "118", name: "Other Stringer", category: "Superstructure", material: "Other", unit: "ft", core: false },
   { id: "120", name: "Steel Truss", category: "Superstructure", material: "Steel", unit: "ft", core: true },
   { id: "135", name: "Timber Truss", category: "Superstructure", material: "Timber", unit: "ft", core: false },
   { id: "141", name: "Steel Arch", category: "Superstructure", material: "Steel", unit: "ft", core: false },
+  { id: "142", name: "Other Arch", category: "Superstructure", material: "Other", unit: "ft", core: false },
+  { id: "143", name: "PSC Arch", category: "Superstructure", material: "Concrete", unit: "ft", core: false },
   { id: "144", name: "RC Arch", category: "Superstructure", material: "Concrete", unit: "ft", core: false },
+  { id: "145", name: "Masonry Arch", category: "Superstructure", material: "Masonry", unit: "ft", core: false },
+  { id: "146", name: "Timber Arch", category: "Superstructure", material: "Timber", unit: "ft", core: false },
+  { id: "147", name: "Steel Main Cables", category: "Superstructure", material: "Steel", unit: "ft", core: false },
+  { id: "148", name: "Secondary Steel Cables", category: "Superstructure", material: "Steel", unit: "ft", core: false },
   { id: "152", name: "Steel Floor Beam", category: "Superstructure", material: "Steel", unit: "ft", core: false },
-  { id: "156", name: "RC Floor Beam", category: "Superstructure", material: "Concrete", unit: "ft", core: false },
+  { id: "154", name: "PSC Floor Beam", category: "Superstructure", material: "Concrete", unit: "ft", core: false },
+  { id: "155", name: "RC Floor Beam", category: "Superstructure", material: "Concrete", unit: "ft", core: false },
+  { id: "156", name: "Timber Floor Beam", category: "Superstructure", material: "Timber", unit: "ft", core: false },
+  { id: "157", name: "Other Floor Beam", category: "Superstructure", material: "Other", unit: "ft", core: false },
   { id: "161", name: "Steel Pin & Hanger Assembly", category: "Superstructure", material: "Steel", unit: "ea", core: false },
   { id: "162", name: "Steel Gusset Plate", category: "Superstructure", material: "Steel", unit: "ea", core: false },
   // --- Substructure ---
   { id: "202", name: "Steel Column", category: "Substructure", material: "Steel", unit: "ea", core: true },
+  { id: "203", name: "Other Column", category: "Substructure", material: "Other", unit: "ea", core: false },
   { id: "204", name: "PSC Column", category: "Substructure", material: "Concrete", unit: "ea", core: false },
   { id: "205", name: "RC Column", category: "Substructure", material: "Concrete", unit: "ea", core: true },
   { id: "206", name: "Timber Column", category: "Substructure", material: "Timber", unit: "ea", core: false },
-  { id: "207", name: "Steel Tower", category: "Substructure", material: "Steel", unit: "ea", core: false },
+  { id: "207", name: "Steel Tower", category: "Substructure", material: "Steel", unit: "ft", core: false },
+  { id: "208", name: "Timber Trestle", category: "Substructure", material: "Timber", unit: "ft", core: false },
   { id: "210", name: "RC Pier Wall", category: "Substructure", material: "Concrete", unit: "ft", core: true },
   { id: "211", name: "Other Pier Wall", category: "Substructure", material: "Other", unit: "ft", core: false },
   { id: "212", name: "Timber Pier Wall", category: "Substructure", material: "Timber", unit: "ft", core: false },
@@ -159,14 +181,25 @@ export const SNBI_ELEMENTS = [
   { id: "216", name: "Timber Abutment", category: "Substructure", material: "Timber", unit: "ft", core: false },
   { id: "217", name: "Masonry Abutment", category: "Substructure", material: "Masonry", unit: "ft", core: false },
   { id: "218", name: "Other Abutment", category: "Substructure", material: "Other", unit: "ft", core: false },
+  { id: "219", name: "Steel Abutment", category: "Substructure", material: "Steel", unit: "ft", core: false },
   { id: "220", name: "RC Pile Cap/Footing", category: "Substructure", material: "Concrete", unit: "ft", core: true },
   { id: "225", name: "Steel Pile", category: "Substructure", material: "Steel", unit: "ea", core: true },
-  { id: "226", name: "Steel Pipe Pile", category: "Substructure", material: "Steel", unit: "ea", core: true },
+  { id: "226", name: "Prestressed Concrete Pile", category: "Substructure", material: "Concrete", unit: "ea", core: true },
   { id: "227", name: "Reinforced Concrete Pile", category: "Substructure", material: "Concrete", unit: "ea", core: true },
   { id: "228", name: "Timber Pile", category: "Substructure", material: "Timber", unit: "ea", core: true },
   { id: "229", name: "Other Pile", category: "Substructure", material: "Other", unit: "ea", core: false },
-  { id: "234", name: "RC Cap", category: "Substructure", material: "Concrete", unit: "ft", core: true },
-  { id: "235", name: "Timber Cap", category: "Substructure", material: "Timber", unit: "ft", core: false },
+  { id: "231", name: "Steel Pier Cap", category: "Substructure", material: "Steel", unit: "ft", core: false },
+  { id: "233", name: "PSC Pier Cap", category: "Substructure", material: "Concrete", unit: "ft", core: false },
+  { id: "234", name: "RC Pier Cap", category: "Substructure", material: "Concrete", unit: "ft", core: true },
+  { id: "235", name: "Timber Pier Cap", category: "Substructure", material: "Timber", unit: "ft", core: false },
+  { id: "236", name: "Other Pier Cap", category: "Substructure", material: "Other", unit: "ft", core: false },
+  // --- Culverts ---
+  { id: "240", name: "Steel Culvert", category: "Culvert", material: "Steel", unit: "ft", core: false },
+  { id: "241", name: "RC Culvert", category: "Culvert", material: "Concrete", unit: "ft", core: false },
+  { id: "242", name: "Timber Culvert", category: "Culvert", material: "Timber", unit: "ft", core: false },
+  { id: "243", name: "Other Culvert", category: "Culvert", material: "Other", unit: "ft", core: false },
+  { id: "244", name: "Masonry Culvert", category: "Culvert", material: "Masonry", unit: "ft", core: false },
+  { id: "245", name: "PSC Culvert", category: "Culvert", material: "Concrete", unit: "ft", core: false },
   // --- Bearings ---
   { id: "310", name: "Elastomeric Bearing", category: "Bearing", material: "Other", unit: "ea", core: true },
   { id: "311", name: "Movable Bearing", category: "Bearing", material: "Steel", unit: "ea", core: true },
@@ -174,12 +207,14 @@ export const SNBI_ELEMENTS = [
   { id: "313", name: "Fixed Bearing", category: "Bearing", material: "Steel", unit: "ea", core: true },
   { id: "314", name: "Pot Bearing", category: "Bearing", material: "Other", unit: "ea", core: false },
   { id: "315", name: "Disk Bearing", category: "Bearing", material: "Other", unit: "ea", core: false },
+  { id: "316", name: "Other Bearing", category: "Bearing", material: "Other", unit: "ea", core: false },
   // --- Joints ---
   { id: "300", name: "Strip Seal Joint", category: "Joint", material: "Other", unit: "ft", core: true },
   { id: "301", name: "Pourable Joint Seal", category: "Joint", material: "Other", unit: "ft", core: false },
   { id: "302", name: "Compression Joint Seal", category: "Joint", material: "Other", unit: "ft", core: false },
-  { id: "303", name: "Modular Joint (Assembly)", category: "Joint", material: "Other", unit: "ft", core: false },
+  { id: "303", name: "Assembly Joint with Seal (Modular)", category: "Joint", material: "Other", unit: "ft", core: false },
   { id: "304", name: "Open Joint", category: "Joint", material: "Other", unit: "ft", core: true },
+  { id: "305", name: "Assembly Joint without Seal", category: "Joint", material: "Other", unit: "ft", core: false },
   { id: "306", name: "Other Joint", category: "Joint", material: "Other", unit: "ft", core: false },
   // --- Railings ---
   { id: "330", name: "Metal Bridge Railing", category: "Railing", material: "Steel", unit: "ft", core: true },
@@ -187,10 +222,12 @@ export const SNBI_ELEMENTS = [
   { id: "332", name: "Timber Bridge Railing", category: "Railing", material: "Timber", unit: "ft", core: false },
   { id: "333", name: "Other Bridge Railing", category: "Railing", material: "Other", unit: "ft", core: false },
   { id: "334", name: "Masonry Bridge Railing", category: "Railing", material: "Masonry", unit: "ft", core: false },
-  // --- Other / Protective Systems ---
+  // --- Wearing Surfaces / Protective Systems ---
   { id: "510", name: "Wearing Surface", category: "Other", material: "Other", unit: "sq ft", core: false },
   { id: "515", name: "Steel Protective Coating", category: "Other", material: "Steel", unit: "sq ft", core: true },
-  { id: "520", name: "RC Protective System", category: "Other", material: "Concrete", unit: "sq ft", core: false },
+  { id: "520", name: "Concrete Reinforcing Steel Protective System", category: "Other", material: "Concrete", unit: "sq ft", core: false },
+  // --- Agency-Defined (custom) ---
+  { id: "900", name: "Steel Pipe Pile", category: "Substructure", material: "Steel", unit: "ea", core: true },
 ] as const;
 
 // Material-appropriate default defect lists. Any element without a specific
@@ -234,7 +271,7 @@ const DEFECTS_BY_MATERIAL: Record<string, { id: string; name: string; unit: stri
 };
 
 // Element-specific defect lists that differ from the material default (decks,
-// bearings, joints, railings, protective systems, and the custom 226 pile form).
+// bearings, joints, railings, protective systems, and the custom 900 pile form).
 const DEFECT_OVERRIDES: Record<string, { id: string; name: string; unit: string }[]> = {
   // Decks / slabs (concrete suite + abrasion/wear from traffic)
   "12": [{ id: "spall", name: "Delamination/Spall/Patched Area", unit: "sq ft" }, { id: "rebar", name: "Exposed/Corroded Reinforcing", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "corr_s", name: "Efflorescence/Rust Staining", unit: "sq ft" }, { id: "wear", name: "Abrasion/Wear", unit: "sq ft" }, { id: "damage", name: "Damage", unit: "ea" }],
@@ -244,8 +281,8 @@ const DEFECT_OVERRIDES: Record<string, { id: string; name: string; unit: string 
   "31": [{ id: "decay", name: "Decay/Section Loss", unit: "in" }, { id: "check", name: "Checks/Shakes", unit: "ft" }, { id: "crack", name: "Splits/Cracks", unit: "ft" }, { id: "wear", name: "Abrasion/Wear", unit: "sq ft" }, { id: "damage", name: "Damage", unit: "ea" }],
   "54": [{ id: "decay", name: "Decay/Section Loss", unit: "in" }, { id: "check", name: "Checks/Shakes", unit: "ft" }, { id: "crack", name: "Splits/Cracks", unit: "ft" }, { id: "wear", name: "Abrasion/Wear", unit: "sq ft" }, { id: "damage", name: "Damage", unit: "ea" }],
   "321": [{ id: "spall", name: "Delamination/Spall/Patched Area", unit: "sq ft" }, { id: "rebar", name: "Exposed/Corroded Reinforcing", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "corr_s", name: "Efflorescence/Rust Staining", unit: "sq ft" }, { id: "settle", name: "Settlement/Faulting", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }],
-  // Custom Steel Pipe Pile remaining-section form
-  "226": [{ id: "corr_pile", name: "Section Loss (Remaining Section)", unit: "in" }, { id: "pitting", name: "Pitting Corrosion", unit: "in" }, { id: "corr", name: "Corrosion", unit: "sq ft" }],
+  // Custom Steel Pipe Pile remaining-section form (agency element 900)
+  "900": [{ id: "corr_pile", name: "Section Loss (Remaining Section)", unit: "in" }, { id: "pitting", name: "Pitting Corrosion", unit: "in" }, { id: "corr", name: "Corrosion", unit: "sq ft" }],
   // Bearings
   "310": [{ id: "rotation", name: "Excessive Rotation", unit: "ea" }, { id: "bulging", name: "Excessive Bulging", unit: "ea" }, { id: "shear", name: "Shear/Movement", unit: "ea" }],
   "311": [{ id: "corr", name: "Corrosion", unit: "sq ft" }, { id: "rotation", name: "Excessive Rotation", unit: "ea" }, { id: "debris", name: "Debris/Loss of Travel", unit: "ea" }],
@@ -876,7 +913,7 @@ const INITIAL_SNBI: SnbiData = {
   roadways: [createSnbiRoadway()],
 };
 
-// ─── Steel Pipe Pile: Remaining Section Measurements (element 226) ────────────
+// ─── Steel Pipe Pile: Remaining Section Measurements (element 900) ────────────
 export interface SteelPipePileRow {
   id: string;
   bent: string; // Bent (per plans / sketch)
@@ -1145,7 +1182,7 @@ function locationCategoryElements(location: string): readonly SnbiElement[] {
       ["Deck", "Superstructure", "Railing", "Bearing", "Other"].includes(e.category)
     );
   if (isSubstructureLocation(location))
-    return SNBI_ELEMENTS.filter((e) => ["Substructure", "Bearing"].includes(e.category));
+    return SNBI_ELEMENTS.filter((e) => ["Substructure", "Culvert", "Bearing"].includes(e.category));
   return SNBI_ELEMENTS;
 }
 
