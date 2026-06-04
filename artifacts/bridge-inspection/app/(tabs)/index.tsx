@@ -509,7 +509,11 @@ export default function InspectionScreen() {
                 <Feather name={defectPickerOpen ? "chevron-up" : "chevron-down"} size={14} color={c.mutedForeground} />
               </TouchableOpacity>
               {defectPickerOpen && (
-                <View style={[styles.dropdownList, { borderColor: c.border }]}>
+                <ScrollView
+                  style={[styles.dropdownList, { borderColor: c.border }]}
+                  nestedScrollEnabled
+                  keyboardShouldPersistTaps="handled"
+                >
                   {availableDefects.map((d) => (
                     <TouchableOpacity
                       key={d.id}
@@ -528,7 +532,7 @@ export default function InspectionScreen() {
                       </Text>
                     </TouchableOpacity>
                   ))}
-                </View>
+                </ScrollView>
               )}
             </View>
             <View style={styles.colRight}>
