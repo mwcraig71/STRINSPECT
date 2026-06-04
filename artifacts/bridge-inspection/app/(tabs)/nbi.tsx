@@ -226,7 +226,7 @@ export default function NBIScreen() {
                             onPress={() => {
                               updateSubComponent(activeIdx, compIdx, "rating", r);
                               if (comp.isImported) {
-                                updateSubComponent(activeIdx, compIdx, "isImported" as any, false);
+                                updateSubComponent(activeIdx, compIdx, "isImported", false);
                               }
                               setRatingPickerOpen(null);
                             }}

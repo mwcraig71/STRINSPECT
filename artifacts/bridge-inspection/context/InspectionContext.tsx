@@ -1052,7 +1052,7 @@ interface InspectionContextType {
     itemIndex: number,
     compIndex: number,
     field: string,
-    value: string
+    value: string | boolean
   ) => void;
   reviewImportedSubComponent: (
     itemIndex: number,
@@ -1725,7 +1725,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
       const qty = parseFloat(d.quantityValue) || 0;
       const mQty = parseFloat(d.maintenanceQuantityValue) || qty;
       const row = summary[elKey];
-      (row as Record<string, number>)[d.cs] += qty;
+      row[d.cs] += qty;
       row.total += qty;
       if (d.isMaintenance) row.maintQty += mQty;
       if (d.isCritical) row.critQty += qty;
@@ -1908,7 +1908,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   }, [fuaData]);
 
   const updateSubComponent = useCallback(
-    (itemIndex: number, compIndex: number, field: string, value: string) => {
+    (itemIndex: number, compIndex: number, field: string, value: string | boolean) => {
       const next = [...nbiRatings];
       const nextItem = { ...next[itemIndex] };
       const nextSub = [...nextItem.subComponents];

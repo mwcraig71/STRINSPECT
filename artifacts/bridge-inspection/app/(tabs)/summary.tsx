@@ -285,7 +285,7 @@ export default function SummaryScreen() {
         <View style={[styles.card, { backgroundColor: c.card, borderColor: "#dc2626", borderWidth: 2 }]}>
           <View style={styles.cardHeader}>
             <View style={styles.cardHeaderLeft}>
-              <Feather name="shield-alert" size={20} color="#dc2626" />
+              <Feather name="alert-octagon" size={20} color="#dc2626" />
               <Text style={[styles.cardTitle, { color: "#dc2626" }]}>Critical Finding Summary</Text>
             </View>
             <View style={[styles.countBadge, { backgroundColor: "#dc2626" }]}>
