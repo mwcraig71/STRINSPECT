@@ -491,6 +491,73 @@ const INITIAL_UNDERCLEARANCE: UnderclearanceData = {
   sketch: [],
 };
 
+// ─── Channel Cross-Section (TxDOT Form 2600) ─────────────────────────────────
+
+export interface ChannelMeasurement {
+  id: string;
+  topRef: string; // Top reference feature
+  botRef: string; // Bottom reference feature
+  totalHoriz: string; // Total Horizontal Distance
+  distFromLastBent: string; // Distance From Last Bent
+  vertDist: string; // Vertical Distance
+  notes: string;
+}
+
+export type ChannelSection = "upstream" | "downstream";
+
+export interface ChannelData {
+  district: string;
+  county: string;
+  controlSection: string;
+  structureNumber: string;
+  route: string;
+  featureCrossed: string;
+  company: string;
+  inspectionDate: string;
+  comments: string;
+  upstream: ChannelMeasurement[];
+  downstream: ChannelMeasurement[];
+}
+
+export const CHANNEL_REFERENCE_FEATURES: { code: string; label: string }[] = [
+  { code: "TR", label: "Top of Railing" },
+  { code: "ED", label: "Edge of Deck" },
+  { code: "TC", label: "Top of Curb" },
+  { code: "TP", label: "Top of Parapet" },
+  { code: "SW", label: "Sidewalk" },
+  { code: "CP", label: "Top of Cap" },
+  { code: "WS", label: "Water Surface" },
+  { code: "CH", label: "Channel" },
+  { code: "RG", label: "Rigid Rip-Rap" },
+  { code: "RB", label: "Rubble Rip-Rap" },
+];
+
+export function createChannelMeasurement(): ChannelMeasurement {
+  return {
+    id: `ch_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    topRef: "",
+    botRef: "",
+    totalHoriz: "",
+    distFromLastBent: "",
+    vertDist: "",
+    notes: "",
+  };
+}
+
+const INITIAL_CHANNEL: ChannelData = {
+  district: "",
+  county: "",
+  controlSection: "",
+  structureNumber: "",
+  route: "",
+  featureCrossed: "",
+  company: "",
+  inspectionDate: new Date().toLocaleDateString("en-US"),
+  comments: "",
+  upstream: [createChannelMeasurement()],
+  downstream: [createChannelMeasurement()],
+};
+
 // ─── Context Types ────────────────────────────────────────────────────────────
 
 interface InspectionContextType {
@@ -556,6 +623,12 @@ interface InspectionContextType {
   setUnderclearanceData: (v: UnderclearanceData) => void;
   addUnderclearanceEntry: () => void;
   removeUnderclearanceEntry: (id: string) => void;
+  showChannelModal: boolean;
+  setShowChannelModal: (v: boolean) => void;
+  channelData: ChannelData;
+  setChannelData: (v: ChannelData) => void;
+  addChannelMeasurement: (section: ChannelSection) => void;
+  removeChannelMeasurement: (section: ChannelSection, id: string) => void;
 
   // Filters
   sortCriteria: string;
@@ -753,6 +826,7 @@ const STORAGE_KEYS = {
   SUBSTRUCTURE_TYPE: "@bridge_substructure_type",
   STRUCTURE_NUMBER: "@bridge_structure_number",
   UNDERCLEARANCE: "@bridge_underclearance",
+  CHANNEL: "@bridge_channel",
   DEMO_CLEARED: "@bridge_demo_cleared_v1",
 };
 
@@ -789,6 +863,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const [showUnderclearanceModal, setShowUnderclearanceModal] = useState(false);
   const [underclearanceData, setUnderclearanceDataState] =
     useState<UnderclearanceData>(INITIAL_UNDERCLEARANCE);
+  const [showChannelModal, setShowChannelModal] = useState(false);
+  const [channelData, setChannelDataState] = useState<ChannelData>(INITIAL_CHANNEL);
 
   const [sortCriteria, setSortCriteria] = useState("location");
   const [filterType, setFilterType] = useState("All");
@@ -810,7 +886,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           ]);
           await AsyncStorage.setItem(STORAGE_KEYS.DEMO_CLEARED, "1");
         }
-        const [defects, nbi, nom, insType, superType, subType, structNum, uc] = await Promise.all([
+        const [defects, nbi, nom, insType, superType, subType, structNum, uc, ch] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.SAVED_DEFECTS),
           AsyncStorage.getItem(STORAGE_KEYS.NBI_RATINGS),
           AsyncStorage.getItem(STORAGE_KEYS.NOMENCLATURE),
@@ -819,6 +895,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           AsyncStorage.getItem(STORAGE_KEYS.SUBSTRUCTURE_TYPE),
           AsyncStorage.getItem(STORAGE_KEYS.STRUCTURE_NUMBER),
           AsyncStorage.getItem(STORAGE_KEYS.UNDERCLEARANCE),
+          AsyncStorage.getItem(STORAGE_KEYS.CHANNEL),
         ]);
         if (defects) setSavedDefectsState(JSON.parse(defects));
         if (nbi) setNbiRatingsState(JSON.parse(nbi));
@@ -843,6 +920,27 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           }
         } else if (structNum) {
           setUnderclearanceDataState((prev) => ({ ...prev, structureNumber: structNum }));
+        }
+        if (ch) {
+          const parsed = JSON.parse(ch) as Partial<ChannelData>;
+          if (parsed && typeof parsed === "object") {
+            const upstream = Array.isArray(parsed.upstream) && parsed.upstream.length
+              ? parsed.upstream
+              : [createChannelMeasurement()];
+            const downstream = Array.isArray(parsed.downstream) && parsed.downstream.length
+              ? parsed.downstream
+              : [createChannelMeasurement()];
+            setChannelDataState({
+              ...INITIAL_CHANNEL,
+              ...parsed,
+              // Global structure number is the source of truth; override any stale persisted value.
+              structureNumber: structNum || parsed.structureNumber || "",
+              upstream,
+              downstream,
+            });
+          }
+        } else if (structNum) {
+          setChannelDataState((prev) => ({ ...prev, structureNumber: structNum }));
         }
       } catch {}
     };
@@ -890,6 +988,11 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
       AsyncStorage.setItem(STORAGE_KEYS.UNDERCLEARANCE, JSON.stringify(next)).catch(() => {});
       return next;
     });
+    setChannelDataState((prev) => {
+      const next = { ...prev, structureNumber: v };
+      AsyncStorage.setItem(STORAGE_KEYS.CHANNEL, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
   }, []);
 
   // ── Persist underclearance ──
@@ -914,6 +1017,35 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         entries: remaining.length ? remaining : [createUnderclearanceEntry()],
       };
       AsyncStorage.setItem(STORAGE_KEYS.UNDERCLEARANCE, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  }, []);
+
+  // ── Persist channel ──
+  const setChannelData = useCallback((v: ChannelData) => {
+    setChannelDataState(v);
+    AsyncStorage.setItem(STORAGE_KEYS.CHANNEL, JSON.stringify(v)).catch(() => {});
+  }, []);
+
+  const addChannelMeasurement = useCallback((section: ChannelSection) => {
+    setChannelDataState((prev) => {
+      const next = {
+        ...prev,
+        [section]: [...prev[section], createChannelMeasurement()],
+      };
+      AsyncStorage.setItem(STORAGE_KEYS.CHANNEL, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  }, []);
+
+  const removeChannelMeasurement = useCallback((section: ChannelSection, id: string) => {
+    setChannelDataState((prev) => {
+      const remaining = prev[section].filter((m) => m.id !== id);
+      const next = {
+        ...prev,
+        [section]: remaining.length ? remaining : [createChannelMeasurement()],
+      };
+      AsyncStorage.setItem(STORAGE_KEYS.CHANNEL, JSON.stringify(next)).catch(() => {});
       return next;
     });
   }, []);
@@ -1482,6 +1614,12 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     setUnderclearanceData,
     addUnderclearanceEntry,
     removeUnderclearanceEntry,
+    showChannelModal,
+    setShowChannelModal,
+    channelData,
+    setChannelData,
+    addChannelMeasurement,
+    removeChannelMeasurement,
     sortCriteria,
     setSortCriteria,
     filterType,

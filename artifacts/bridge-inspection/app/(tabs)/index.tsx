@@ -28,6 +28,7 @@ import { DefectCard } from "@/components/DefectCard";
 import { CIFModal } from "@/components/CIFModal";
 import { FUAModal } from "@/components/FUAModal";
 import { UnderclearanceModal } from "@/components/UnderclearanceModal";
+import { ChannelModal } from "@/components/ChannelModal";
 import { SettingsModal } from "@/components/SettingsModal";
 import colors from "@/constants/colors";
 
@@ -86,9 +87,11 @@ export default function InspectionScreen() {
     setStructureNumber,
     nomenclature,
     setShowUnderclearanceModal,
+    setShowChannelModal,
   } = useInspection();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [moduleMenuOpen, setModuleMenuOpen] = useState(false);
   const isTxDot = nomenclature === NOMENCLATURES.TXDOT;
   const [editingStructureNum, setEditingStructureNum] = useState(false);
   const [structureNumDraft, setStructureNumDraft] = useState("");
@@ -169,6 +172,15 @@ export default function InspectionScreen() {
       <View style={[styles.appHeader, { backgroundColor: c.headerBg }]}>
         <View style={styles.headerRow}>
           <View style={styles.headerTitle}>
+            {isTxDot && (
+              <TouchableOpacity
+                style={styles.menuBtn}
+                onPress={() => setModuleMenuOpen((v) => !v)}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <Feather name="menu" size={18} color="#e2e8f0" />
+              </TouchableOpacity>
+            )}
             <Feather name="activity" size={16} color="#38bdf8" />
             <View>
               <Text style={styles.headerTitleText}>Bridge Inspection</Text>
@@ -230,15 +242,6 @@ export default function InspectionScreen() {
             </View>
           </View>
           <View style={styles.headerActions}>
-            {isTxDot && (
-              <TouchableOpacity
-                style={[styles.moduleToggleHeaderBtn, { backgroundColor: "#0f766e" }]}
-                onPress={() => setShowUnderclearanceModal(true)}
-              >
-                <Feather name="minimize-2" size={12} color="#fff" />
-                <Text style={[styles.moduleToggleHeaderText, { color: "#fff" }]}>UC</Text>
-              </TouchableOpacity>
-            )}
             <TouchableOpacity
               style={[
                 styles.moduleToggleHeaderBtn,
@@ -267,6 +270,52 @@ export default function InspectionScreen() {
         </View>
       </View>
       <SettingsModal visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
+
+      {/* ── TxDOT module menu (hamburger dropdown) ── */}
+      {isTxDot && moduleMenuOpen && (
+        <>
+          <Pressable
+            style={styles.menuBackdrop}
+            onPress={() => setModuleMenuOpen(false)}
+          />
+          <View style={[styles.menuDropdown, { backgroundColor: c.card, borderColor: c.border }]}>
+            <Text style={[styles.menuHeading, { color: c.mutedForeground }]}>TxDOT Forms</Text>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setModuleMenuOpen(false);
+                setShowChannelModal(true);
+              }}
+            >
+              <View style={[styles.menuIcon, { backgroundColor: "#0369a1" }]}>
+                <Feather name="activity" size={15} color="#fff" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.menuItemTitle, { color: c.foreground }]}>Channel Cross-Section</Text>
+                <Text style={[styles.menuItemSub, { color: c.mutedForeground }]}>Form 2600</Text>
+              </View>
+              <Feather name="chevron-right" size={16} color={c.mutedForeground} />
+            </TouchableOpacity>
+            <View style={[styles.menuDivider, { backgroundColor: c.border }]} />
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setModuleMenuOpen(false);
+                setShowUnderclearanceModal(true);
+              }}
+            >
+              <View style={[styles.menuIcon, { backgroundColor: "#0f766e" }]}>
+                <Feather name="minimize-2" size={15} color="#fff" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.menuItemTitle, { color: c.foreground }]}>Underclearance Record</Text>
+                <Text style={[styles.menuItemSub, { color: c.mutedForeground }]}>Form 2601</Text>
+              </View>
+              <Feather name="chevron-right" size={16} color={c.mutedForeground} />
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
 
       <KeyboardAwareScrollViewCompat
         style={styles.scroll}
@@ -685,6 +734,7 @@ export default function InspectionScreen() {
       <CIFModal />
       <FUAModal />
       <UnderclearanceModal />
+      <ChannelModal />
     </View>
   );
 }
@@ -715,6 +765,29 @@ const styles = StyleSheet.create({
   },
   moduleToggleHeaderText: { fontSize: 10, fontWeight: "900", textTransform: "uppercase", letterSpacing: 0.5 },
   gearBtn: { padding: 8, borderRadius: 10 },
+  menuBtn: { padding: 4, borderRadius: 8, backgroundColor: "#1e293b" },
+  menuBackdrop: { ...StyleSheet.absoluteFillObject, zIndex: 20 },
+  menuDropdown: {
+    position: "absolute",
+    top: 92,
+    left: 12,
+    width: 270,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 8,
+    zIndex: 21,
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 12,
+  },
+  menuHeading: { fontSize: 9, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.6, paddingHorizontal: 8, paddingTop: 4, paddingBottom: 6 },
+  menuItem: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 10, paddingHorizontal: 8, borderRadius: 10 },
+  menuIcon: { width: 32, height: 32, borderRadius: 9, alignItems: "center", justifyContent: "center" },
+  menuItemTitle: { fontSize: 13, fontWeight: "800" },
+  menuItemSub: { fontSize: 10, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.4, marginTop: 1 },
+  menuDivider: { height: StyleSheet.hairlineWidth, marginVertical: 2 },
   scroll: { flex: 1 },
   scrollContent: { padding: 12, gap: 12 },
   section: {
