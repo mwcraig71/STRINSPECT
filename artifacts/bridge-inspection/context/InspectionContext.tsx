@@ -228,6 +228,27 @@ export interface NbiRating {
   subComponents: SubComponent[];
 }
 
+export interface ImportSectionAudit {
+  item: string;
+  description: string;
+  filled: number;
+  total: number;
+  hasData: boolean;
+}
+
+export interface ImportSummary {
+  timestamp: number;
+  structureNumber: string;
+  structureNumberFound: boolean;
+  elementsFound: number;
+  elementRecordsCreated: number;
+  nbiFilledCount: number;
+  nbiTotalCount: number;
+  sections: ImportSectionAudit[];
+  emptySections: ImportSectionAudit[];
+  unmatchedComponents: string[];
+}
+
 export interface CifData {
   structureNumber: string;
   inspectionDate: string;
@@ -852,6 +873,8 @@ interface InspectionContextType {
   ) => void;
   importFromPdf: (source: File | { uri: string; name?: string }) => Promise<void>;
   parsingActive: boolean;
+  importSummary: ImportSummary | null;
+  clearImportSummary: () => void;
 }
 
 export interface ElementSummaryRow {
@@ -1006,6 +1029,7 @@ const STORAGE_KEYS = {
   CHANNEL: "@bridge_channel",
   SAFETY_BRIEFING: "@bridge_safety_briefing",
   SNBI: "@bridge_snbi",
+  IMPORT_SUMMARY: "@bridge_import_summary",
   DEMO_CLEARED: "@bridge_demo_cleared_v1",
 };
 
@@ -1056,6 +1080,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const [rangeMax, setRangeMax] = useState("");
   const [syncToCurrentLoc, setSyncToCurrentLoc] = useState(false);
   const [parsingActive, setParsingActive] = useState(false);
+  const [importSummary, setImportSummaryState] = useState<ImportSummary | null>(null);
 
   // ── AsyncStorage load on mount ──
   useEffect(() => {
@@ -1067,10 +1092,11 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
             STORAGE_KEYS.SAVED_DEFECTS,
             STORAGE_KEYS.NBI_RATINGS,
             STORAGE_KEYS.STRUCTURE_NUMBER,
+            STORAGE_KEYS.IMPORT_SUMMARY,
           ]);
           await AsyncStorage.setItem(STORAGE_KEYS.DEMO_CLEARED, "1");
         }
-        const [defects, nbi, nom, insType, superType, subType, structNum, uc, ch, sb, sn] = await Promise.all([
+        const [defects, nbi, nom, insType, superType, subType, structNum, uc, ch, sb, sn, impSummary] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.SAVED_DEFECTS),
           AsyncStorage.getItem(STORAGE_KEYS.NBI_RATINGS),
           AsyncStorage.getItem(STORAGE_KEYS.NOMENCLATURE),
@@ -1082,9 +1108,15 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           AsyncStorage.getItem(STORAGE_KEYS.CHANNEL),
           AsyncStorage.getItem(STORAGE_KEYS.SAFETY_BRIEFING),
           AsyncStorage.getItem(STORAGE_KEYS.SNBI),
+          AsyncStorage.getItem(STORAGE_KEYS.IMPORT_SUMMARY),
         ]);
         if (defects) setSavedDefectsState(JSON.parse(defects));
         if (nbi) setNbiRatingsState(JSON.parse(nbi));
+        if (impSummary) {
+          try {
+            setImportSummaryState(JSON.parse(impSummary) as ImportSummary);
+          } catch {}
+        }
         if (nom) setNomenclatureState(nom);
         if (insType) setInspectionTypeState(insType);
         if (superType) setSuperstructureTypeState(superType);
@@ -1185,6 +1217,20 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     setNbiRatingsState(v);
     AsyncStorage.setItem(STORAGE_KEYS.NBI_RATINGS, JSON.stringify(v)).catch(() => {});
   }, []);
+
+  // ── Persist importSummary ──
+  const setImportSummary = useCallback((v: ImportSummary | null) => {
+    setImportSummaryState(v);
+    if (v) {
+      AsyncStorage.setItem(STORAGE_KEYS.IMPORT_SUMMARY, JSON.stringify(v)).catch(() => {});
+    } else {
+      AsyncStorage.removeItem(STORAGE_KEYS.IMPORT_SUMMARY).catch(() => {});
+    }
+  }, []);
+
+  const clearImportSummary = useCallback(() => {
+    setImportSummary(null);
+  }, [setImportSummary]);
 
   const setNomenclature = useCallback((v: string) => {
     setNomenclatureState(v);
@@ -1739,18 +1785,36 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           return null;
         }
 
-        const usedIndicesForAlert = new Set<number>();
-        let nbiMatchedCount = 0;
+        // ── Build per-section import audit (mirrors the actual fill below) ──
+        const usedIndicesForAudit = new Set<number>();
+        let nbiFilledCount = 0;
+        let nbiTotalCount = 0;
+        const sectionAudits: ImportSectionAudit[] = [];
         for (const item of nbiRatings) {
+          let filled = 0;
           for (const sub of item.subComponents) {
-            const result = findFuzzyNbiEntry(nbi, item.item, sub.name, usedIndicesForAlert);
+            nbiTotalCount++;
+            const result = findFuzzyNbiEntry(nbi, item.item, sub.name, usedIndicesForAudit);
             if (result) {
-              usedIndicesForAlert.add(result.index);
-              nbiMatchedCount++;
+              usedIndicesForAudit.add(result.index);
+              const match = result.entry;
+              const hasAny = !!(match.rating || match.comment || match.desc || match.min);
+              if (hasAny) {
+                filled++;
+                nbiFilledCount++;
+              }
             }
           }
+          sectionAudits.push({
+            item: item.item,
+            description: item.description,
+            filled,
+            total: item.subComponents.length,
+            hasData: filled > 0,
+          });
         }
-        const unmatchedNbi = nbi.filter((_, i) => !usedIndicesForAlert.has(i));
+        const emptySections = sectionAudits.filter((s) => !s.hasData);
+        const unmatchedNbi = nbi.filter((_, i) => !usedIndicesForAudit.has(i));
         if (unmatchedNbi.length > 0) {
           console.warn(
             "[NBI Import] Unmatched components (not imported):",
@@ -1786,6 +1850,28 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         }
 
         const unmatchedNames = unmatchedNbi.map((r) => `Item ${r.item}: ${r.componentName}`);
+        const elementsFound = elements.filter((e) => !e.isDefect).length;
+
+        const summary: ImportSummary = {
+          timestamp: ts,
+          structureNumber: parsedNum || "",
+          structureNumberFound: !!parsedNum,
+          elementsFound,
+          elementRecordsCreated: newDefects.length,
+          nbiFilledCount,
+          nbiTotalCount,
+          sections: sectionAudits,
+          emptySections,
+          unmatchedComponents: unmatchedNames,
+        };
+        setImportSummary(summary);
+
+        const emptySummary =
+          emptySections.length > 0
+            ? `\n\n${emptySections.length} NBI section(s) with no data extracted — review manually:\n${emptySections
+                .map((s) => `Item ${s.item}: ${s.description}`)
+                .join("\n")}`
+            : "";
         const unmatchedSummary =
           unmatchedNames.length > 0
             ? `\n\n${unmatchedNames.length} NBI component(s) not matched:\n${unmatchedNames.join("\n")}`
@@ -1794,11 +1880,9 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         const { Alert } = require("react-native");
         Alert.alert(
           "Import Complete",
-          `Imported ${newDefects.length} element record(s) across ${
-            elements.filter((e) => !e.isDefect).length
-          } elements.\n${nbiMatchedCount} NBI rating(s) pre-filled.${unmatchedSummary}\n${
+          `Imported ${newDefects.length} element record(s) across ${elementsFound} elements.\n${nbiFilledCount} of ${nbiTotalCount} NBI field(s) pre-filled.${emptySummary}${unmatchedSummary}\n\n${
             parsedNum ? `Structure: ${parsedNum}` : "Structure number not found."
-          }\n\nAssign locations and verify records before submitting.`
+          }\n\nSee the import audit on the Summary tab. Assign locations and verify records before submitting.`
         );
       } catch (err: unknown) {
         const { Alert } = require("react-native");
@@ -1808,7 +1892,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         setParsingActive(false);
       }
     },
-    [setSavedDefectsState, setNbiRatingsState, setStructureNumber, nbiRatings]
+    [setSavedDefectsState, setNbiRatingsState, setStructureNumber, nbiRatings, setImportSummary]
   );
 
   const value: InspectionContextType = {
@@ -1910,6 +1994,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     setStructureNumber,
     importFromPdf,
     parsingActive,
+    importSummary,
+    clearImportSummary,
   };
 
   return (

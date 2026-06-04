@@ -35,7 +35,13 @@ export default function NBIScreen() {
     inspectionType,
     environment,
     setEnvironment,
+    importSummary,
   } = useInspection();
+
+  const blankSectionItems = React.useMemo(
+    () => new Set((importSummary?.emptySections ?? []).map((s) => s.item)),
+    [importSummary]
+  );
   const [activeItem, setActiveItem] = useState("58");
   const [expandedComp, setExpandedComp] = useState<number | null>(null);
   const [ratingPickerOpen, setRatingPickerOpen] = useState<number | null>(null);
@@ -70,29 +76,38 @@ export default function NBIScreen() {
       {/* Tab strip */}
       <View style={[styles.tabStrip, { backgroundColor: c.card, borderBottomColor: c.border }]}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabStripContent}>
-          {nbiRatings.map((item) => (
-            <TouchableOpacity
-              key={item.item}
-              style={[
-                styles.tab,
-                activeItem === item.item
-                  ? { backgroundColor: c.primary, borderColor: c.primary }
-                  : { backgroundColor: c.background, borderColor: c.border },
-              ]}
-              onPress={() => {
-                setActiveItem(item.item);
-                setExpandedComp(null);
-                setRatingPickerOpen(null);
-              }}
-            >
-              <Text style={[styles.tabText, { color: activeItem === item.item ? "#fff" : c.mutedForeground }]}>
-                Item {item.item}
-              </Text>
-              <Text style={[styles.tabSub, { color: activeItem === item.item ? "rgba(255,255,255,0.8)" : c.mutedForeground }]}>
-                {item.description}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {nbiRatings.map((item) => {
+            const isBlankImport = blankSectionItems.has(item.item);
+            return (
+              <TouchableOpacity
+                key={item.item}
+                style={[
+                  styles.tab,
+                  activeItem === item.item
+                    ? { backgroundColor: c.primary, borderColor: c.primary }
+                    : { backgroundColor: c.background, borderColor: c.border },
+                  isBlankImport && activeItem !== item.item && { borderColor: "#f59e0b" },
+                ]}
+                onPress={() => {
+                  setActiveItem(item.item);
+                  setExpandedComp(null);
+                  setRatingPickerOpen(null);
+                }}
+              >
+                {isBlankImport && (
+                  <View style={styles.blankDot}>
+                    <Feather name="alert-triangle" size={9} color="#fff" />
+                  </View>
+                )}
+                <Text style={[styles.tabText, { color: activeItem === item.item ? "#fff" : c.mutedForeground }]}>
+                  Item {item.item}
+                </Text>
+                <Text style={[styles.tabSub, { color: activeItem === item.item ? "rgba(255,255,255,0.8)" : c.mutedForeground }]}>
+                  {item.description}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
       </View>
 
@@ -422,6 +437,19 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     alignItems: "center",
+    position: "relative",
+  },
+  blankDot: {
+    position: "absolute",
+    top: -5,
+    right: -5,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: "#f59e0b",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1,
   },
   tabText: { fontSize: 11, fontWeight: "900", textTransform: "uppercase" },
   tabSub: { fontSize: 9, fontWeight: "600", marginTop: 2 },

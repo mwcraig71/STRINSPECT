@@ -28,8 +28,14 @@ export default function SummaryScreen() {
     maintenanceSummary,
     criticalFindingsSummary,
     inspectionType,
+    importSummary,
+    clearImportSummary,
   } = useInspection();
   const [settingsOpen, setSettingsOpen] = React.useState(false);
+
+  const importedAt = importSummary
+    ? new Date(importSummary.timestamp).toLocaleString("en-US")
+    : "";
 
   return (
     <View style={[styles.container, { backgroundColor: c.background }]}>
@@ -48,6 +54,125 @@ export default function SummaryScreen() {
       <SettingsModal visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
+
+        {/* ── Import Audit ── */}
+        {importSummary && (
+          <View style={[styles.card, { backgroundColor: c.card, borderColor: "#f97316", borderWidth: 2 }]}>
+            <View style={[styles.cardHeader, { borderBottomColor: "#fed7aa" }]}>
+              <View style={styles.cardHeaderLeft}>
+                <Feather name="file-text" size={20} color="#f97316" />
+                <Text style={[styles.cardTitle, { color: "#c2410c" }]}>Import Audit</Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.dismissBtn, { backgroundColor: "#fff7ed", borderColor: "#fdba74" }]}
+                onPress={clearImportSummary}
+              >
+                <Feather name="x" size={14} color="#c2410c" />
+                <Text style={styles.dismissBtnText}>Dismiss</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.auditBody}>
+              <Text style={[styles.auditMeta, { color: c.mutedForeground }]}>
+                Imported {importedAt}
+              </Text>
+
+              {/* Stat tiles */}
+              <View style={styles.statRow}>
+                <View style={[styles.statTile, { backgroundColor: c.background, borderColor: c.border }]}>
+                  <Text style={[styles.statNum, { color: c.foreground }]}>{importSummary.elementsFound}</Text>
+                  <Text style={[styles.statLabel, { color: c.mutedForeground }]}>Elements Found</Text>
+                </View>
+                <View style={[styles.statTile, { backgroundColor: c.background, borderColor: c.border }]}>
+                  <Text style={[styles.statNum, { color: c.foreground }]}>{importSummary.elementRecordsCreated}</Text>
+                  <Text style={[styles.statLabel, { color: c.mutedForeground }]}>Records Created</Text>
+                </View>
+                <View style={[styles.statTile, { backgroundColor: c.background, borderColor: c.border }]}>
+                  <Text style={[styles.statNum, { color: c.foreground }]}>
+                    {importSummary.nbiFilledCount}/{importSummary.nbiTotalCount}
+                  </Text>
+                  <Text style={[styles.statLabel, { color: c.mutedForeground }]}>NBI Fields Filled</Text>
+                </View>
+              </View>
+
+              {/* Structure number */}
+              <View style={[styles.auditLine, { borderColor: c.border }]}>
+                <Feather
+                  name={importSummary.structureNumberFound ? "check-circle" : "alert-triangle"}
+                  size={14}
+                  color={importSummary.structureNumberFound ? "#059669" : "#dc2626"}
+                />
+                <Text style={[styles.auditLineText, { color: c.foreground }]}>
+                  {importSummary.structureNumberFound
+                    ? `Structure ${importSummary.structureNumber}`
+                    : "Structure number not found — enter manually"}
+                </Text>
+              </View>
+
+              {/* NBI section breakdown */}
+              <Text style={[styles.auditSectionTitle, { color: c.mutedForeground }]}>NBI Sections</Text>
+              <View style={styles.chipWrap}>
+                {importSummary.sections.map((s) => {
+                  const blank = !s.hasData;
+                  return (
+                    <View
+                      key={s.item}
+                      style={[
+                        styles.chip,
+                        blank
+                          ? { backgroundColor: "#fef2f2", borderColor: "#fca5a5" }
+                          : { backgroundColor: "#f0fdf4", borderColor: "#86efac" },
+                      ]}
+                    >
+                      <Feather
+                        name={blank ? "alert-triangle" : "check"}
+                        size={11}
+                        color={blank ? "#dc2626" : "#059669"}
+                      />
+                      <Text style={[styles.chipText, { color: blank ? "#b91c1c" : "#15803d" }]}>
+                        {s.item} · {blank ? "blank" : `${s.filled}/${s.total}`}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+
+              {/* Blank sections callout */}
+              {importSummary.emptySections.length > 0 && (
+                <View style={styles.calloutWarn}>
+                  <View style={styles.calloutHeader}>
+                    <Feather name="alert-triangle" size={13} color="#b91c1c" />
+                    <Text style={styles.calloutTitle}>
+                      {importSummary.emptySections.length} section(s) need manual review
+                    </Text>
+                  </View>
+                  {importSummary.emptySections.map((s) => (
+                    <Text key={s.item} style={styles.calloutItem}>
+                      Item {s.item} — {s.description}: no data extracted
+                    </Text>
+                  ))}
+                </View>
+              )}
+
+              {/* Unmatched components */}
+              {importSummary.unmatchedComponents.length > 0 && (
+                <View style={styles.calloutNeutral}>
+                  <View style={styles.calloutHeader}>
+                    <Feather name="help-circle" size={13} color="#92400e" />
+                    <Text style={[styles.calloutTitle, { color: "#92400e" }]}>
+                      {importSummary.unmatchedComponents.length} parsed component(s) not matched
+                    </Text>
+                  </View>
+                  {importSummary.unmatchedComponents.map((name, idx) => (
+                    <Text key={idx} style={[styles.calloutItem, { color: "#92400e" }]}>
+                      {name}
+                    </Text>
+                  ))}
+                </View>
+              )}
+            </View>
+          </View>
+        )}
 
         {/* ── Element Data ── */}
         <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
@@ -285,4 +410,23 @@ const styles = StyleSheet.create({
   qtyText: { fontSize: 13, fontWeight: "900", textAlign: "right" },
   emptyRow: { padding: 28, alignItems: "center" },
   emptyText: { fontSize: 12, fontWeight: "600", textTransform: "uppercase" },
+  dismissBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, borderWidth: 1 },
+  dismissBtnText: { fontSize: 10, fontWeight: "900", color: "#c2410c", textTransform: "uppercase" },
+  auditBody: { padding: 14, gap: 12 },
+  auditMeta: { fontSize: 10, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.3 },
+  statRow: { flexDirection: "row", gap: 8 },
+  statTile: { flex: 1, borderWidth: 1, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 8, alignItems: "center", gap: 4 },
+  statNum: { fontSize: 20, fontWeight: "900" },
+  statLabel: { fontSize: 8.5, fontWeight: "800", textTransform: "uppercase", textAlign: "center", letterSpacing: 0.2 },
+  auditLine: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 8, paddingHorizontal: 10, borderWidth: 1, borderRadius: 10 },
+  auditLineText: { fontSize: 12, fontWeight: "700", flex: 1 },
+  auditSectionTitle: { fontSize: 10, fontWeight: "900", textTransform: "uppercase", letterSpacing: 0.5, marginTop: 2 },
+  chipWrap: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  chip: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, borderWidth: 1 },
+  chipText: { fontSize: 10, fontWeight: "800", textTransform: "uppercase" },
+  calloutWarn: { backgroundColor: "#fef2f2", borderWidth: 1, borderColor: "#fca5a5", borderRadius: 10, padding: 10, gap: 4 },
+  calloutNeutral: { backgroundColor: "#fffbeb", borderWidth: 1, borderColor: "#fcd34d", borderRadius: 10, padding: 10, gap: 4 },
+  calloutHeader: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 },
+  calloutTitle: { fontSize: 11, fontWeight: "900", color: "#b91c1c", textTransform: "uppercase" },
+  calloutItem: { fontSize: 11, fontWeight: "600", color: "#b91c1c" },
 });
