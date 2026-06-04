@@ -1225,7 +1225,8 @@ function getFilteredElements(
   subTypeId: string,
   superMaterial: string,
   subMaterial: string,
-  search: string
+  search: string,
+  inspectionType: string
 ): readonly SnbiElement[] {
   if (!location) return [];
 
@@ -1248,6 +1249,12 @@ function getFilteredElements(
 
   // No search: honor the selected structure type for this location.
   let list: readonly SnbiElement[] = locationTypeElements(location, superTypeId, subTypeId);
+
+  // Topside inspection: only the riding surface and railings are visible from the
+  // deck for a span — girders/beams, bearings and protective coatings are not.
+  if (inspectionType === INSPECTION_TYPES.TOPSIDE && location.includes("Span")) {
+    list = SNBI_ELEMENTS.filter((e) => ["Deck", "Railing"].includes(e.category));
+  }
 
   if (materialApplies) list = list.filter((e) => e.material === material);
 
@@ -1707,7 +1714,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         substructureType,
         superstructureMaterial,
         substructureMaterial,
-        elementSearch
+        elementSearch,
+        inspectionType
       ),
     [
       currentLocation,
@@ -1716,6 +1724,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
       superstructureMaterial,
       substructureMaterial,
       elementSearch,
+      inspectionType,
     ]
   );
 
