@@ -595,6 +595,7 @@ export interface SafetyBriefingData {
   ppeHarness: boolean; // Harness & Lanyard
   ppeOther: boolean;
   ppeOtherText: string;
+  selectedRisks: string[]; // identified risks present at this site (by risk title)
   crew: SafetyCrewSignoff[];
 }
 
@@ -662,6 +663,7 @@ const INITIAL_SAFETY_BRIEFING: SafetyBriefingData = {
   ppeHarness: false,
   ppeOther: false,
   ppeOtherText: "",
+  selectedRisks: [],
   crew: [createSafetyCrewSignoff()],
 };
 
@@ -1069,6 +1071,9 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
             setSafetyBriefingDataState({
               ...INITIAL_SAFETY_BRIEFING,
               ...parsed,
+              selectedRisks: Array.isArray(parsed.selectedRisks)
+                ? parsed.selectedRisks
+                : [],
               crew:
                 Array.isArray(parsed.crew) && parsed.crew.length
                   ? parsed.crew

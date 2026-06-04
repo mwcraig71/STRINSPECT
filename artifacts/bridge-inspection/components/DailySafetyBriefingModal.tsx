@@ -43,6 +43,16 @@ export function DailySafetyBriefingModal() {
     setSafetyBriefingData({ ...d, [field]: value });
   };
 
+  const toggleRisk = (risk: string) => {
+    const selected = d.selectedRisks.includes(risk);
+    setSafetyBriefingData({
+      ...d,
+      selectedRisks: selected
+        ? d.selectedRisks.filter((r) => r !== risk)
+        : [...d.selectedRisks, risk],
+    });
+  };
+
   const updateCrew = (id: string, patch: Partial<SafetyCrewSignoff>) => {
     setSafetyBriefingData({
       ...d,
@@ -202,31 +212,56 @@ export function DailySafetyBriefingModal() {
             </View>
           </View>
 
-          {/* Identified risks reference */}
+          {/* Identified risks — select all that apply to this site */}
           <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
             <Text style={[styles.cardTitle, { color: c.foreground }]}>
               Identified Risks & Mitigations
             </Text>
-            {SAFETY_BRIEFING_RISKS.map((r, i) => (
-              <View
-                key={r.risk}
-                style={[
-                  styles.riskRow,
-                  { borderColor: c.border },
-                  i === SAFETY_BRIEFING_RISKS.length - 1 && { borderBottomWidth: 0 },
-                ]}
-              >
-                <View style={[styles.riskBadge, { backgroundColor: ACCENT }]}>
-                  <Feather name="alert-triangle" size={12} color="#fff" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.riskTitle, { color: c.foreground }]}>{r.risk}</Text>
-                  <Text style={[styles.riskMitigation, { color: c.mutedForeground }]}>
-                    {r.mitigation}
-                  </Text>
-                </View>
-              </View>
-            ))}
+            <Text style={[styles.cardHint, { color: c.mutedForeground }]}>
+              Tap each risk present at this site
+            </Text>
+            {SAFETY_BRIEFING_RISKS.map((r, i) => {
+              const selected = d.selectedRisks.includes(r.risk);
+              return (
+                <Pressable
+                  key={r.risk}
+                  onPress={() => toggleRisk(r.risk)}
+                  style={[
+                    styles.riskRow,
+                    { borderColor: c.border },
+                    i === SAFETY_BRIEFING_RISKS.length - 1 && { borderBottomWidth: 0 },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.riskCheck,
+                      { borderColor: c.border },
+                      selected && { backgroundColor: ACCENT, borderColor: ACCENT },
+                    ]}
+                  >
+                    {selected ? (
+                      <Feather name="check" size={13} color="#fff" />
+                    ) : (
+                      <Feather name="alert-triangle" size={11} color={c.mutedForeground} />
+                    )}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={[
+                        styles.riskTitle,
+                        { color: c.foreground },
+                        selected && { color: ACCENT },
+                      ]}
+                    >
+                      {r.risk}
+                    </Text>
+                    <Text style={[styles.riskMitigation, { color: c.mutedForeground }]}>
+                      {r.mitigation}
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            })}
             <Text style={[styles.disclaimer, { color: c.mutedForeground }]}>
               This is not an exhaustive list of hazards. If new hazards are
               identified, STOP work and re-evaluate this site-specific safety plan.
@@ -410,8 +445,9 @@ const styles = StyleSheet.create({
   fieldLabel: { fontSize: 9, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.5 },
   input: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 12, fontWeight: "600" },
   textArea: { borderWidth: 1, borderRadius: 8, padding: 10, fontSize: 12, fontWeight: "600", minHeight: 56, textAlignVertical: "top" },
+  cardHint: { fontSize: 10, fontWeight: "700", marginTop: -6 },
   riskRow: { flexDirection: "row", gap: 10, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
-  riskBadge: { width: 22, height: 22, borderRadius: 6, alignItems: "center", justifyContent: "center", marginTop: 1 },
+  riskCheck: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, alignItems: "center", justifyContent: "center", marginTop: 1 },
   riskTitle: { fontSize: 12, fontWeight: "800" },
   riskMitigation: { fontSize: 11, fontWeight: "500", marginTop: 2, lineHeight: 15 },
   disclaimer: { fontSize: 10, fontWeight: "700", fontStyle: "italic", marginTop: 4 },
