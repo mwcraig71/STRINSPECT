@@ -44,7 +44,32 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
     setSubstructureMaterial,
     importFromPdf,
     parsingActive,
+    clearInspection,
+    savedDefects,
+    structureNumber,
+    importSummary,
   } = useInspection();
+
+  const hasInspectionData =
+    savedDefects.length > 0 || !!structureNumber || !!importSummary;
+
+  const handleClearInspection = () => {
+    Alert.alert(
+      "Clear Inspection",
+      "This permanently discards all imported and recorded inspection data — element records, NBI ratings, and the structure number. This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Clear Inspection",
+          style: "destructive",
+          onPress: () => {
+            clearInspection();
+            onClose();
+          },
+        },
+      ]
+    );
+  };
 
   const handleImport = async () => {
     try {
@@ -388,6 +413,37 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
                 {parsingActive ? "Parsing PDF..." : "Import Previous Report (PDF)"}
               </Text>
             </TouchableOpacity>
+
+            <View style={[styles.clearDivider, { borderTopColor: c.border }]} />
+
+            <Text style={[styles.cardDesc, { color: c.mutedForeground }]}>
+              Discard all imported and recorded inspection data to start a fresh session. This cannot be undone.
+            </Text>
+            <TouchableOpacity
+              style={[
+                styles.clearBtn,
+                {
+                  borderColor: hasInspectionData ? "#7f1d1d" : c.border,
+                  backgroundColor: hasInspectionData ? "#1f0a0a" : c.muted,
+                },
+              ]}
+              onPress={handleClearInspection}
+              disabled={!hasInspectionData}
+            >
+              <Feather
+                name="trash-2"
+                size={16}
+                color={hasInspectionData ? "#f87171" : c.mutedForeground}
+              />
+              <Text
+                style={[
+                  styles.clearBtnText,
+                  { color: hasInspectionData ? "#fca5a5" : c.mutedForeground },
+                ]}
+              >
+                {hasInspectionData ? "Clear Inspection" : "No Inspection Data"}
+              </Text>
+            </TouchableOpacity>
           </View>
         </ScrollView>
       </View>
@@ -485,4 +541,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   importBtnText: { fontSize: 13, fontWeight: "800", textTransform: "uppercase" },
+  clearDivider: { borderTopWidth: 1, marginVertical: 2 },
+  clearBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  clearBtnText: { fontSize: 13, fontWeight: "800", textTransform: "uppercase" },
 });

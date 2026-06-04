@@ -1064,6 +1064,7 @@ interface InspectionContextType {
   parsingActive: boolean;
   importSummary: ImportSummary | null;
   clearImportSummary: () => void;
+  clearInspection: () => void;
 }
 
 export interface ElementSummaryRow {
@@ -1557,6 +1558,14 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
       return next;
     });
   }, []);
+
+  // ── Discard the entire imported/working inspection session ──
+  const clearInspection = useCallback(() => {
+    setSavedDefects([]);
+    setNbiRatings(INITIAL_NBI_RATINGS);
+    setStructureNumber("");
+    setImportSummary(null);
+  }, [setSavedDefects, setNbiRatings, setStructureNumber, setImportSummary]);
 
   // ── Persist underclearance ──
   const setUnderclearanceData = useCallback((v: UnderclearanceData) => {
@@ -2333,6 +2342,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     parsingActive,
     importSummary,
     clearImportSummary,
+    clearInspection,
   };
 
   return (
