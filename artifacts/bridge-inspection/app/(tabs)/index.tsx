@@ -6,6 +6,7 @@ import React, { useState } from "react";
 import {
   Alert,
   Image,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -15,6 +16,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { lookupCS } from "@/data/csDescriptions";
 
 import { useColors } from "@/hooks/useColors";
 import {
@@ -100,6 +102,8 @@ export default function InspectionScreen() {
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [moduleMenuOpen, setModuleMenuOpen] = useState(false);
+  const [csHelpVisible, setCsHelpVisible] = useState(false);
+  const [csHelpHighlight, setCsHelpHighlight] = useState<string>("");
   const isTxDot = nomenclature === NOMENCLATURES.TXDOT;
   const [editingStructureNum, setEditingStructureNum] = useState(false);
   const [structureNumDraft, setStructureNumDraft] = useState("");
@@ -278,6 +282,70 @@ export default function InspectionScreen() {
         </View>
       </View>
       <SettingsModal visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
+
+      {/* ── CS Condition State Help Modal (long-press on CS button) ── */}
+      <Modal
+        visible={csHelpVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setCsHelpVisible(false)}
+      >
+        <Pressable style={styles.csHelpBackdrop} onPress={() => setCsHelpVisible(false)}>
+          <Pressable
+            style={[styles.csHelpCard, { backgroundColor: c.card, borderColor: c.border }]}
+            onPress={() => {}}
+          >
+            {/* Header */}
+            <View style={styles.csHelpHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.csHelpTitle, { color: c.foreground }]}>Condition State Guide</Text>
+                {element && defect ? (
+                  <Text style={[styles.csHelpSubtitle, { color: c.mutedForeground }]} numberOfLines={1}>
+                    {element.name} · {defect.name}
+                  </Text>
+                ) : (
+                  <Text style={[styles.csHelpSubtitle, { color: c.mutedForeground }]}>
+                    Select an element and defect to see AASHTO descriptions.
+                  </Text>
+                )}
+              </View>
+              <TouchableOpacity onPress={() => setCsHelpVisible(false)} style={{ padding: 4 }}>
+                <Feather name="x" size={18} color={c.mutedForeground} />
+              </TouchableOpacity>
+            </View>
+
+            {/* CS rows */}
+            {CS_OPTIONS.map((cs) => {
+              const csDesc = element && defect
+                ? lookupCS(defect.id, element.material, element.id)
+                : null;
+              const csKey = cs.toLowerCase() as "cs1" | "cs2" | "cs3" | "cs4";
+              const descText = csDesc ? csDesc[csKey] : "No AASHTO description available for this defect.";
+              const isHighlighted = cs === csHelpHighlight;
+              return (
+                <View
+                  key={cs}
+                  style={[
+                    styles.csHelpRow,
+                    isHighlighted && { backgroundColor: CS_COLORS[cs] + "18", borderColor: CS_COLORS[cs], borderWidth: 1.5, borderRadius: 10 },
+                  ]}
+                >
+                  <View style={[styles.csHelpBadge, { backgroundColor: CS_COLORS[cs] }]}>
+                    <Text style={styles.csHelpBadgeText}>{cs}</Text>
+                  </View>
+                  <Text style={[styles.csHelpDesc, { color: isHighlighted ? c.foreground : c.mutedForeground }]}>
+                    {descText}
+                  </Text>
+                </View>
+              );
+            })}
+
+            <Text style={[styles.csHelpHint, { color: c.mutedForeground }]}>
+              Long-press any CS button to see these definitions · Source: AASHTO MBEI 2019
+            </Text>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* ── TxDOT module menu (hamburger dropdown) ── */}
       {isTxDot && moduleMenuOpen && (
@@ -548,6 +616,12 @@ export default function InspectionScreen() {
                         : { backgroundColor: c.secondary, borderColor: c.border },
                     ]}
                     onPress={() => setConditionState(cs)}
+                    onLongPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                      setCsHelpHighlight(cs);
+                      setCsHelpVisible(true);
+                    }}
+                    delayLongPress={400}
                   >
                     <Text style={[styles.csBtnText, { color: conditionState === cs ? "#fff" : c.mutedForeground }]}>
                       {cs}
@@ -1059,4 +1133,47 @@ const styles = StyleSheet.create({
     borderStyle: "dashed",
   },
   emptyText: { fontSize: 13, fontWeight: "600" },
+  // ── CS Help Modal ──────────────────────────────────────────────────────────
+  csHelpBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  csHelpCard: {
+    width: "100%",
+    maxWidth: 420,
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 18,
+    gap: 10,
+  },
+  csHelpHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    marginBottom: 4,
+  },
+  csHelpTitle: { fontSize: 15, fontWeight: "900" },
+  csHelpSubtitle: { fontSize: 11, fontWeight: "600", marginTop: 1 },
+  csHelpRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+  },
+  csHelpBadge: {
+    minWidth: 34,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: 7,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 1,
+  },
+  csHelpBadgeText: { fontSize: 9, fontWeight: "900", color: "#fff" },
+  csHelpDesc: { flex: 1, fontSize: 12, fontWeight: "600", lineHeight: 17 },
+  csHelpHint: { fontSize: 9, fontWeight: "600", textAlign: "center", marginTop: 4 },
 });

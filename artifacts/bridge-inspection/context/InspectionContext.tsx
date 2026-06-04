@@ -239,6 +239,8 @@ const DEFECTS_BY_MATERIAL: Record<string, { id: string; name: string; unit: stri
     { id: "crack_s", name: "Cracking/Fatigue", unit: "in" },
     { id: "conn", name: "Connection Deterioration", unit: "ea" },
     { id: "distort", name: "Distortion/Out-of-Plane", unit: "ea" },
+    { id: "settle", name: "Settlement", unit: "ea" },
+    { id: "scour", name: "Scour", unit: "ea" },
     { id: "damage", name: "Damage", unit: "ea" },
   ],
   Concrete: [
@@ -246,27 +248,41 @@ const DEFECTS_BY_MATERIAL: Record<string, { id: string; name: string; unit: stri
     { id: "rebar", name: "Exposed/Corroded Reinforcing", unit: "sq ft" },
     { id: "crack", name: "Cracking", unit: "ft" },
     { id: "corr_s", name: "Efflorescence/Rust Staining", unit: "sq ft" },
+    { id: "wear", name: "Abrasion/Wear", unit: "sq ft" },
+    { id: "distort", name: "Distortion", unit: "ea" },
+    { id: "settle", name: "Settlement", unit: "ea" },
+    { id: "scour", name: "Scour", unit: "ea" },
     { id: "damage", name: "Damage", unit: "ea" },
   ],
   Timber: [
+    { id: "conn", name: "Connection Deterioration", unit: "ea" },
     { id: "decay", name: "Decay/Section Loss", unit: "in" },
     { id: "check", name: "Checks/Shakes", unit: "ft" },
-    { id: "crack", name: "Splits/Cracks", unit: "ft" },
+    { id: "crack", name: "Cracks", unit: "ft" },
+    { id: "split", name: "Split/Delamination", unit: "ft" },
+    { id: "wear", name: "Abrasion/Wear", unit: "sq ft" },
     { id: "crush", name: "Crushing/Compression", unit: "ea" },
-    { id: "conn", name: "Connection Deterioration", unit: "ea" },
+    { id: "settle", name: "Settlement", unit: "ea" },
+    { id: "scour", name: "Scour", unit: "ea" },
     { id: "damage", name: "Damage", unit: "ea" },
   ],
   Masonry: [
-    { id: "mortar", name: "Mortar Deterioration", unit: "ft" },
-    { id: "crack", name: "Cracking", unit: "ft" },
-    { id: "spall", name: "Spalling/Splitting", unit: "sq ft" },
+    { id: "spall", name: "Delamination/Spalling/Split", unit: "sq ft" },
+    { id: "corr_s", name: "Efflorescence/Rust Staining", unit: "sq ft" },
+    { id: "mortar", name: "Mortar Breakdown", unit: "ft" },
     { id: "displace", name: "Masonry Displacement", unit: "ea" },
+    { id: "distort", name: "Distortion", unit: "ea" },
+    { id: "settle", name: "Settlement", unit: "ea" },
+    { id: "scour", name: "Scour", unit: "ea" },
     { id: "damage", name: "Damage", unit: "ea" },
   ],
   Other: [
-    { id: "damage", name: "Damage", unit: "ea" },
     { id: "deterioration", name: "Deterioration", unit: "ea" },
+    { id: "distort", name: "Distortion", unit: "ea" },
     { id: "wear", name: "Abrasion/Wear", unit: "sq ft" },
+    { id: "settle", name: "Settlement", unit: "ea" },
+    { id: "scour", name: "Scour", unit: "ea" },
+    { id: "damage", name: "Damage", unit: "ea" },
   ],
 };
 
@@ -283,20 +299,21 @@ const DEFECT_OVERRIDES: Record<string, { id: string; name: string; unit: string 
   "321": [{ id: "spall", name: "Delamination/Spall/Patched Area", unit: "sq ft" }, { id: "rebar", name: "Exposed/Corroded Reinforcing", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "corr_s", name: "Efflorescence/Rust Staining", unit: "sq ft" }, { id: "settle", name: "Settlement/Faulting", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }],
   // Custom Steel Pipe Pile remaining-section form (agency element 900)
   "900": [{ id: "corr_pile", name: "Section Loss (Remaining Section)", unit: "in" }, { id: "pitting", name: "Pitting Corrosion", unit: "in" }, { id: "corr", name: "Corrosion", unit: "sq ft" }],
-  // Bearings
-  "310": [{ id: "rotation", name: "Excessive Rotation", unit: "ea" }, { id: "bulging", name: "Excessive Bulging", unit: "ea" }, { id: "shear", name: "Shear/Movement", unit: "ea" }],
-  "311": [{ id: "corr", name: "Corrosion", unit: "sq ft" }, { id: "rotation", name: "Excessive Rotation", unit: "ea" }, { id: "debris", name: "Debris/Loss of Travel", unit: "ea" }],
-  "312": [{ id: "corr", name: "Corrosion", unit: "sq ft" }, { id: "debris", name: "Debris Accumulation", unit: "ea" }],
-  "313": [{ id: "corr", name: "Corrosion", unit: "sq ft" }, { id: "rotation", name: "Excessive Rotation", unit: "ea" }],
-  "314": [{ id: "rotation", name: "Excessive Rotation", unit: "ea" }, { id: "leak", name: "Seal/Fluid Leakage", unit: "ea" }],
-  "315": [{ id: "rotation", name: "Excessive Rotation", unit: "ea" }, { id: "wear", name: "Wear/Disk Deterioration", unit: "ea" }],
-  // Joints
-  "300": [{ id: "seal", name: "Seal Damage", unit: "ft" }, { id: "debris", name: "Debris Accumulation", unit: "sq ft" }],
-  "301": [{ id: "seal", name: "Seal Damage", unit: "ft" }, { id: "debris", name: "Debris Accumulation", unit: "sq ft" }],
-  "302": [{ id: "seal", name: "Seal Damage", unit: "ft" }, { id: "debris", name: "Debris Accumulation", unit: "sq ft" }],
-  "303": [{ id: "seal", name: "Seal Damage", unit: "ft" }, { id: "debris", name: "Debris Accumulation", unit: "sq ft" }, { id: "armour", name: "Armour Damage", unit: "ft" }],
-  "304": [{ id: "debris", name: "Debris Accumulation", unit: "sq ft" }, { id: "armour", name: "Armour Damage", unit: "ft" }],
-  "306": [{ id: "seal", name: "Seal Damage", unit: "ft" }, { id: "debris", name: "Debris Accumulation", unit: "sq ft" }],
+  // Bearings — AASHTO defect codes 1000, 1020, 2210–2240, 7000
+  "310": [{ id: "conn", name: "Connection", unit: "ea" }, { id: "movement", name: "Movement/Expansion", unit: "ea" }, { id: "alignment", name: "Alignment", unit: "ea" }, { id: "bulging", name: "Bulging/Splitting/Tearing", unit: "ea" }, { id: "bearing_loss", name: "Loss of Bearing Area", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }],
+  "311": [{ id: "corr", name: "Corrosion/Section Loss", unit: "sq ft" }, { id: "conn", name: "Connection", unit: "ea" }, { id: "alignment", name: "Alignment", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }],
+  "312": [{ id: "corr", name: "Corrosion/Section Loss", unit: "sq ft" }, { id: "conn", name: "Connection", unit: "ea" }, { id: "movement", name: "Movement/Expansion", unit: "ea" }, { id: "alignment", name: "Alignment", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }],
+  "313": [{ id: "corr", name: "Corrosion/Section Loss", unit: "sq ft" }, { id: "conn", name: "Connection", unit: "ea" }, { id: "movement", name: "Movement/Expansion", unit: "ea" }, { id: "alignment", name: "Alignment", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }],
+  "314": [{ id: "conn", name: "Connection", unit: "ea" }, { id: "movement", name: "Movement/Expansion", unit: "ea" }, { id: "alignment", name: "Alignment", unit: "ea" }, { id: "leak", name: "Seal/Fluid Leakage", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }],
+  "315": [{ id: "conn", name: "Connection", unit: "ea" }, { id: "movement", name: "Movement/Expansion", unit: "ea" }, { id: "alignment", name: "Alignment", unit: "ea" }, { id: "wear", name: "Wear/PTFE Deterioration", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }],
+  // Joints — AASHTO defect codes 2310–2370, 7000
+  "300": [{ id: "leak", name: "Leakage", unit: "ft" }, { id: "adhesion", name: "Seal Adhesion", unit: "ft" }, { id: "seal", name: "Seal Damage", unit: "ft" }, { id: "seal_crack", name: "Seal Cracking", unit: "ft" }, { id: "debris", name: "Debris Impaction", unit: "ft" }, { id: "adj_deck", name: "Adjacent Deck/Header", unit: "sq ft" }, { id: "metal_det", name: "Metal Deterioration/Damage", unit: "ft" }, { id: "damage", name: "Damage", unit: "ea" }],
+  "301": [{ id: "leak", name: "Leakage", unit: "ft" }, { id: "adhesion", name: "Seal Adhesion", unit: "ft" }, { id: "seal", name: "Seal Damage", unit: "ft" }, { id: "seal_crack", name: "Seal Cracking", unit: "ft" }, { id: "debris", name: "Debris Impaction", unit: "ft" }, { id: "adj_deck", name: "Adjacent Deck/Header", unit: "sq ft" }, { id: "damage", name: "Damage", unit: "ea" }],
+  "302": [{ id: "leak", name: "Leakage", unit: "ft" }, { id: "adhesion", name: "Seal Adhesion", unit: "ft" }, { id: "seal", name: "Seal Damage", unit: "ft" }, { id: "seal_crack", name: "Seal Cracking", unit: "ft" }, { id: "debris", name: "Debris Impaction", unit: "ft" }, { id: "adj_deck", name: "Adjacent Deck/Header", unit: "sq ft" }, { id: "damage", name: "Damage", unit: "ea" }],
+  "303": [{ id: "leak", name: "Leakage", unit: "ft" }, { id: "adhesion", name: "Seal Adhesion", unit: "ft" }, { id: "seal", name: "Seal Damage", unit: "ft" }, { id: "seal_crack", name: "Seal Cracking", unit: "ft" }, { id: "debris", name: "Debris Impaction", unit: "ft" }, { id: "adj_deck", name: "Adjacent Deck/Header", unit: "sq ft" }, { id: "metal_det", name: "Metal Deterioration/Damage", unit: "ft" }, { id: "damage", name: "Damage", unit: "ea" }],
+  "304": [{ id: "debris", name: "Debris Impaction", unit: "ft" }, { id: "adj_deck", name: "Adjacent Deck/Header", unit: "sq ft" }, { id: "metal_det", name: "Metal Deterioration/Damage", unit: "ft" }, { id: "damage", name: "Damage", unit: "ea" }],
+  "305": [{ id: "debris", name: "Debris Impaction", unit: "ft" }, { id: "adj_deck", name: "Adjacent Deck/Header", unit: "sq ft" }, { id: "damage", name: "Damage", unit: "ea" }],
+  "306": [{ id: "leak", name: "Leakage", unit: "ft" }, { id: "seal", name: "Seal Damage", unit: "ft" }, { id: "debris", name: "Debris Impaction", unit: "ft" }, { id: "adj_deck", name: "Adjacent Deck/Header", unit: "sq ft" }, { id: "metal_det", name: "Metal Deterioration/Damage", unit: "ft" }, { id: "damage", name: "Damage", unit: "ea" }],
   // Railings (material suite + vehicular impact damage)
   "330": [{ id: "corr", name: "Corrosion/Section Loss", unit: "sq ft" }, { id: "crack_s", name: "Cracking/Fatigue", unit: "in" }, { id: "conn", name: "Connection Deterioration", unit: "ea" }, { id: "impact", name: "Impact Damage", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }],
   "331": [{ id: "spall", name: "Delamination/Spall/Patched Area", unit: "sq ft" }, { id: "rebar", name: "Exposed/Corroded Reinforcing", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "corr_s", name: "Efflorescence/Rust Staining", unit: "sq ft" }, { id: "impact", name: "Impact Damage", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }],
@@ -310,9 +327,13 @@ const DEFECT_OVERRIDES: Record<string, { id: string; name: string; unit: string 
   "218": [{ id: "deterioration", name: "Deterioration", unit: "ea" }, { id: "settle", name: "Settlement/Movement", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }],
   "220": [{ id: "spall", name: "Delamination/Spall/Patched Area", unit: "sq ft" }, { id: "rebar", name: "Exposed/Corroded Reinforcing", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "corr_s", name: "Efflorescence/Rust Staining", unit: "sq ft" }, { id: "settle", name: "Settlement/Movement", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }],
   // Protective systems / wearing surface
-  "510": [{ id: "wear", name: "Abrasion/Wear", unit: "sq ft" }, { id: "spall", name: "Delamination/Spall/Patched Area", unit: "sq ft" }, { id: "deterioration", name: "Effectiveness/Deterioration", unit: "sq ft" }],
-  "515": [{ id: "coat_fail", name: "Peeling/Bubbling/Cracking", unit: "sq ft" }, { id: "deterioration", name: "Chalking/Oxide Film/Effectiveness", unit: "sq ft" }, { id: "corr", name: "Underlying Steel Corrosion", unit: "sq ft" }],
-  "520": [{ id: "coat_fail", name: "Sealer/System Failure", unit: "sq ft" }, { id: "spall", name: "Delamination/Spall/Patched Area", unit: "sq ft" }, { id: "deterioration", name: "Effectiveness/Deterioration", unit: "sq ft" }],
+  "510": [{ id: "spall", name: "Delamination/Spall/Pothole", unit: "sq ft" }, { id: "crack_ws", name: "Cracking (Wearing Surface)", unit: "ft" }, { id: "deterioration", name: "Effectiveness/Deterioration", unit: "sq ft" }, { id: "damage", name: "Damage", unit: "ea" }],
+  "515": [{ id: "coat_fail", name: "Peeling/Bubbling/Cracking", unit: "sq ft" }, { id: "deterioration", name: "Chalking/Oxide Film/Effectiveness", unit: "sq ft" }, { id: "corr", name: "Underlying Steel Corrosion", unit: "sq ft" }, { id: "damage", name: "Damage", unit: "ea" }],
+  "520": [{ id: "coat_fail", name: "Sealer/System Failure", unit: "sq ft" }, { id: "spall", name: "Delamination/Spall/Patched Area", unit: "sq ft" }, { id: "deterioration", name: "Effectiveness/Deterioration", unit: "sq ft" }, { id: "damage", name: "Damage", unit: "ea" }],
+  // PSC elements — add Exposed Prestressing (1100) on top of the concrete suite
+  "104": [{ id: "spall", name: "Delamination/Spall/Patched Area", unit: "sq ft" }, { id: "rebar", name: "Exposed/Corroded Reinforcing", unit: "sq ft" }, { id: "psc_rebar", name: "Exposed Prestressing", unit: "ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "corr_s", name: "Efflorescence/Rust Staining", unit: "sq ft" }, { id: "wear", name: "Abrasion/Wear", unit: "sq ft" }, { id: "distort", name: "Distortion", unit: "ea" }, { id: "settle", name: "Settlement", unit: "ea" }, { id: "scour", name: "Scour", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }],
+  "109": [{ id: "spall", name: "Delamination/Spall/Patched Area", unit: "sq ft" }, { id: "rebar", name: "Exposed/Corroded Reinforcing", unit: "sq ft" }, { id: "psc_rebar", name: "Exposed Prestressing", unit: "ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "corr_s", name: "Efflorescence/Rust Staining", unit: "sq ft" }, { id: "wear", name: "Abrasion/Wear", unit: "sq ft" }, { id: "distort", name: "Distortion", unit: "ea" }, { id: "settle", name: "Settlement", unit: "ea" }, { id: "scour", name: "Scour", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }],
+  "115": [{ id: "spall", name: "Delamination/Spall/Patched Area", unit: "sq ft" }, { id: "rebar", name: "Exposed/Corroded Reinforcing", unit: "sq ft" }, { id: "psc_rebar", name: "Exposed Prestressing", unit: "ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "corr_s", name: "Efflorescence/Rust Staining", unit: "sq ft" }, { id: "wear", name: "Abrasion/Wear", unit: "sq ft" }, { id: "distort", name: "Distortion", unit: "ea" }, { id: "settle", name: "Settlement", unit: "ea" }, { id: "scour", name: "Scour", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }],
 };
 
 export const DEFECTS_BY_ELEMENT: Record<string, { id: string; name: string; unit: string }[]> =
@@ -324,21 +345,60 @@ export const DEFECTS_BY_ELEMENT: Record<string, { id: string; name: string; unit
   );
 
 const SNBI_CODE_TO_DEFECT_ID: Record<string, string> = {
+  // Steel
   "1000": "corr",
   "1010": "crack_s",
-  "1020": "crack_s",
+  "1020": "conn",
+  // Concrete / PSC
   "1060": "spall",
   "1080": "spall",
-  "1090": "spall",
-  "1100": "corr_s",
+  "1090": "rebar",
+  "1100": "psc_rebar",
+  "1110": "crack",
   "1120": "corr_s",
   "1130": "crack",
   "1190": "wear",
+  // Timber
+  "1140": "decay",
+  "1150": "check",
+  "1160": "crack",
+  "1170": "split",
+  "1180": "wear",
+  // Masonry
+  "1610": "mortar",
+  "1620": "spall",
+  "1630": "spall",
+  "1640": "displace",
+  // Other / generic
+  "1220": "deterioration",
+  "1900": "distort",
+  // Bearings
+  "2210": "movement",
+  "2220": "alignment",
+  "2230": "bulging",
+  "2240": "bearing_loss",
+  // Joints
+  "2310": "leak",
+  "2320": "adhesion",
+  "2330": "seal",
+  "2340": "seal_crack",
+  "2350": "debris",
+  "2360": "adj_deck",
+  "2370": "metal_det",
+  // Wearing surfaces / coatings
+  "3210": "spall",
+  "3220": "crack_ws",
+  "3230": "deterioration",
+  "3420": "coat_fail",
+  // Historical codes
   "2000": "corr",
   "2010": "crack_s",
   "3000": "decay",
   "3010": "check",
-  "4000": "spall",
+  // Universal
+  "4000": "settle",
+  "6000": "scour",
+  "7000": "damage",
 };
 
 export type SnbiElement = (typeof SNBI_ELEMENTS)[number];

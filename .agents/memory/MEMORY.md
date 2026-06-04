@@ -3,3 +3,5 @@
 - [Opening bundled PDFs in Expo](expo-bundled-pdf-open.md) — bundle + open a static PDF across web/native; web popup-blocker gotcha.
 - [structure-number sync](structure-number-sync.md) — how the bridge structure number stays consistent across CIF, Underclearance, and the global header.
 - [Bridge element catalog](bridge-element-catalog.md) — AASHTO 226=Prestressed Concrete Pile; custom Steel Pipe Pile is agency id 900 (never reassign 226); non-core elements (incl. culverts) are search-only.
+- [CS descriptions data](cs-descriptions.md) — long-press help lives in data/csDescriptions.ts; keyed "Material:defectId" beats plain "defectId"; lookupCS takes optional elementId for wearing-surface (510) spall edge case.
+- [SNBI code mapping fixes](snbi-code-corrections.md) — original had 3 wrong mappings (1020→crack_s, 1090→spall, 4000→spall); now corrected + 30 new codes for bearings/joints/scour/settlement.
