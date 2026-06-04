@@ -464,15 +464,25 @@ const INITIAL_FUA: FuaData = {
   photos: [],
 };
 
-export function createUnderclearanceEntry(): UnderclearanceEntry {
+export type UcMeasureKey =
+  | "rightLateral"
+  | "leftLateral"
+  | "totalHorizontal"
+  | "maxPracticalVert"
+  | "minMeasuredVert";
+
+export function createUnderclearanceEntry(
+  // Reference features persist until changed: seed each row's refer code from the previous entry.
+  seedRefer?: Partial<Record<UcMeasureKey, string>>
+): UnderclearanceEntry {
   return {
     id: `uc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
     psn: "",
-    rightLateral: { data: "", refer: "" },
-    leftLateral: { data: "", refer: "" },
-    totalHorizontal: { data: "", refer: "" },
-    maxPracticalVert: { data: "", refer: "" },
-    minMeasuredVert: { data: "", refer: "" },
+    rightLateral: { data: "", refer: seedRefer?.rightLateral ?? "" },
+    leftLateral: { data: "", refer: seedRefer?.leftLateral ?? "" },
+    totalHorizontal: { data: "", refer: seedRefer?.totalHorizontal ?? "" },
+    maxPracticalVert: { data: "", refer: seedRefer?.maxPracticalVert ?? "" },
+    minMeasuredVert: { data: "", refer: seedRefer?.minMeasuredVert ?? "" },
     signedVertData: "",
     signedVertTolerance: "",
   };
@@ -1015,7 +1025,17 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
 
   const addUnderclearanceEntry = useCallback(() => {
     setUnderclearanceDataState((prev) => {
-      const next = { ...prev, entries: [...prev.entries, createUnderclearanceEntry()] };
+      const last = prev.entries[prev.entries.length - 1];
+      const seedRefer = last
+        ? {
+            rightLateral: last.rightLateral.refer,
+            leftLateral: last.leftLateral.refer,
+            totalHorizontal: last.totalHorizontal.refer,
+            maxPracticalVert: last.maxPracticalVert.refer,
+            minMeasuredVert: last.minMeasuredVert.refer,
+          }
+        : undefined;
+      const next = { ...prev, entries: [...prev.entries, createUnderclearanceEntry(seedRefer)] };
       AsyncStorage.setItem(STORAGE_KEYS.UNDERCLEARANCE, JSON.stringify(next)).catch(() => {});
       return next;
     });

@@ -17,6 +17,7 @@ import {
   UC_MEASURE_ROWS,
   UC_REFERENCE_FEATURES,
   UcMeasure,
+  UcMeasureKey,
   UnderclearanceEntry,
   useInspection,
 } from "@/context/InspectionContext";
@@ -35,6 +36,10 @@ export function UnderclearanceModal() {
 
   const d = underclearanceData;
   const [scrollEnabled, setScrollEnabled] = useState(true);
+  const [refPicker, setRefPicker] = useState<{
+    entryId: string;
+    key: UcMeasureKey;
+  } | null>(null);
 
   const setHeader = (field: keyof typeof d, value: string) => {
     // Structure # is globally synced (CIF + header); route through the source of truth.
@@ -58,12 +63,31 @@ export function UnderclearanceModal() {
 
   const updateMeasure = (
     id: string,
-    key: "rightLateral" | "leftLateral" | "totalHorizontal" | "maxPracticalVert" | "minMeasuredVert",
+    key: UcMeasureKey,
     patch: Partial<UcMeasure>
   ) => {
     const entry = d.entries.find((e) => e.id === id);
     if (!entry) return;
     updateEntry(id, { [key]: { ...entry[key], ...patch } });
+  };
+
+  const renderReferCell = (entryId: string, key: UcMeasureKey, m: UcMeasure) => {
+    const open = refPicker?.entryId === entryId && refPicker?.key === key;
+    return (
+      <TouchableOpacity
+        style={[
+          styles.measureRefer,
+          styles.referCell,
+          { backgroundColor: c.secondary, borderColor: open ? "#0f766e" : c.border },
+        ]}
+        onPress={() => setRefPicker(open ? null : { entryId, key })}
+      >
+        <Text style={[styles.referCellText, { color: m.refer ? c.foreground : c.mutedForeground }]}>
+          {m.refer || "—"}
+        </Text>
+        <Feather name="chevron-down" size={10} color={c.mutedForeground} />
+      </TouchableOpacity>
+    );
   };
 
   const headerFields: { key: keyof typeof d; label: string; placeholder: string }[] = [
@@ -180,27 +204,56 @@ export function UnderclearanceModal() {
 
               {UC_MEASURE_ROWS.map((row) => {
                 const m = entry[row.key];
+                const pickerOpen = refPicker?.entryId === entry.id && refPicker?.key === row.key;
                 return (
-                  <View key={row.key} style={[styles.measureRow, { borderColor: c.border }]}>
-                    <Text style={[styles.measureLabel, { color: c.foreground }]} numberOfLines={2}>
-                      {row.label}
-                    </Text>
-                    <TextInput
-                      style={[styles.measureData, { backgroundColor: c.secondary, borderColor: c.border, color: c.foreground }]}
-                      value={m.data}
-                      onChangeText={(t) => updateMeasure(entry.id, row.key, { data: t })}
-                      placeholder="—"
-                      placeholderTextColor={c.mutedForeground}
-                    />
-                    <TextInput
-                      style={[styles.measureRefer, { backgroundColor: c.secondary, borderColor: c.border, color: c.foreground }]}
-                      value={m.refer}
-                      onChangeText={(t) => updateMeasure(entry.id, row.key, { refer: t })}
-                      placeholder="A-N"
-                      placeholderTextColor={c.mutedForeground}
-                      autoCapitalize="characters"
-                    />
-                    <Text style={[styles.measureItem, { color: c.mutedForeground }]}>{row.itemNo}</Text>
+                  <View key={row.key}>
+                    <View style={[styles.measureRow, { borderColor: c.border }]}>
+                      <Text style={[styles.measureLabel, { color: c.foreground }]} numberOfLines={2}>
+                        {row.label}
+                      </Text>
+                      <TextInput
+                        style={[styles.measureData, { backgroundColor: c.secondary, borderColor: c.border, color: c.foreground }]}
+                        value={m.data}
+                        onChangeText={(t) => updateMeasure(entry.id, row.key, { data: t })}
+                        placeholder="—"
+                        placeholderTextColor={c.mutedForeground}
+                      />
+                      {renderReferCell(entry.id, row.key, m)}
+                      <Text style={[styles.measureItem, { color: c.mutedForeground }]}>{row.itemNo}</Text>
+                    </View>
+                    {pickerOpen && (
+                      <View style={[styles.refDropdown, { backgroundColor: c.card, borderColor: c.border }]}>
+                        <Text style={[styles.refDropdownTitle, { color: c.mutedForeground }]}>
+                          {row.label} — Reference Feature
+                        </Text>
+                        <View style={styles.refOptions}>
+                          {UC_REFERENCE_FEATURES.map((r) => {
+                            const selected = m.refer === r.code;
+                            return (
+                              <TouchableOpacity
+                                key={r.code}
+                                style={[
+                                  styles.refOption,
+                                  {
+                                    backgroundColor: selected ? "#0f766e" : c.secondary,
+                                    borderColor: selected ? "#0f766e" : c.border,
+                                  },
+                                ]}
+                                onPress={() => {
+                                  updateMeasure(entry.id, row.key, { refer: r.code });
+                                  setRefPicker(null);
+                                }}
+                              >
+                                <Text style={[styles.refOptionCode, { color: selected ? "#fff" : "#0f766e" }]}>{r.code}</Text>
+                                <Text style={[styles.refOptionLabel, { color: selected ? "#fff" : c.foreground }]} numberOfLines={1}>
+                                  {r.label}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      </View>
+                    )}
                   </View>
                 );
               })}
@@ -311,6 +364,14 @@ const styles = StyleSheet.create({
   measureLabel: { flex: 1, fontSize: 11, fontWeight: "700" },
   measureData: { width: 72, borderWidth: 1, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 6, fontSize: 11, fontWeight: "700", textAlign: "center" },
   measureRefer: { width: 48, borderWidth: 1, borderRadius: 6, paddingHorizontal: 4, paddingVertical: 6, fontSize: 11, fontWeight: "700", textAlign: "center" },
+  referCell: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 1, paddingHorizontal: 1 },
+  referCellText: { fontSize: 11, fontWeight: "800" },
+  refDropdown: { borderWidth: 1, borderRadius: 8, padding: 8, gap: 6, marginTop: 2, marginBottom: 4 },
+  refDropdownTitle: { fontSize: 9, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.5 },
+  refOptions: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  refOption: { flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 6, width: "47%" },
+  refOptionCode: { fontSize: 10, fontWeight: "900", minWidth: 20 },
+  refOptionLabel: { fontSize: 10, fontWeight: "600", flex: 1 },
   measureItem: { width: 34, fontSize: 10, fontWeight: "800", textAlign: "center" },
   signedBox: { borderWidth: 2, borderRadius: 10, padding: 12, gap: 8, marginTop: 4 },
   signedRow: { flexDirection: "row", gap: 12 },
