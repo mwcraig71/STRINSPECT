@@ -96,14 +96,14 @@ export function parseStructureNumber(pages: string[][]): string {
 }
 
 const NBI_SECTION_PATTERNS: { pattern: RegExp; item: string }[] = [
-  { pattern: /\b(?:item\s*(?:no\.?\s*)?)?58\b[^\n]{0,40}\bdeck\b|\bdeck\b[^\n]{0,40}\b(?:item\s*(?:no\.?\s*)?)?58\b/i, item: "58" },
-  { pattern: /\b(?:item\s*(?:no\.?\s*)?)?59\b[^\n]{0,40}\bsuper(?:structure)?\b|\bsuper(?:structure)?\b[^\n]{0,40}\b(?:item\s*(?:no\.?\s*)?)?59\b/i, item: "59" },
-  { pattern: /\b(?:item\s*(?:no\.?\s*)?)?60\b[^\n]{0,40}\bsub(?:structure)?\b|\bsub(?:structure)?\b[^\n]{0,40}\b(?:item\s*(?:no\.?\s*)?)?60\b/i, item: "60" },
-  { pattern: /\b(?:item\s*(?:no\.?\s*)?)?61\b[^\n]{0,40}\bchannel\b|\bchannel\b[^\n]{0,40}\b(?:item\s*(?:no\.?\s*)?)?61\b/i, item: "61" },
-  { pattern: /\b(?:item\s*(?:no\.?\s*)?)?65\b|\bapproach(?:es)?\b/i, item: "65" },
-  { pattern: /\b(?:item\s*(?:no\.?\s*)?)?36\b[^\n]{0,40}\btraffic\b|\btraffic\s+safety\b/i, item: "36" },
-  { pattern: /\b(?:item\s*(?:no\.?\s*)?)?71\b|\bwaterway\b/i, item: "71" },
-  { pattern: /\b(?:item\s*(?:no\.?\s*)?)?72\b|\bapproach\s+road(?:way)?\s+align/i, item: "72" },
+  { pattern: /\bDECK\b.*ITEM\s*58|\bITEM\s*58\b/i, item: "58" },
+  { pattern: /\bSUPERSTRUCTURE\b.*ITEM\s*59|\bITEM\s*59\b/i, item: "59" },
+  { pattern: /\bSUBSTRUCTURE\b.*ITEM\s*60|\bITEM\s*60\b/i, item: "60" },
+  { pattern: /\bCHANNEL\b.*ITEM\s*61|\bITEM\s*61\b/i, item: "61" },
+  { pattern: /\bAPPROACH(ES)?\b.*ITEM\s*65|\bITEM\s*65\b/i, item: "65" },
+  { pattern: /\bTRAFFIC\b.*ITEM\s*36|\bITEM\s*36\b/i, item: "36" },
+  { pattern: /\bWATERWAY\b.*ITEM\s*71|\bITEM\s*71\b/i, item: "71" },
+  { pattern: /\bAPPROACH\s+ROAD(?:WAY)?\s+ALIGN|\bITEM\s*72\b/i, item: "72" },
 ];
 
 const COMPONENT_TO_ITEMS: Record<string, string[]> = {
@@ -159,7 +159,6 @@ const COMPONENT_TO_ITEMS: Record<string, string[]> = {
   "Approach Rail Ends": ["36"],
   "Waterway Adequacy": ["71"],
   "Approach Roadway Alignment": ["72"],
-  // Ambiguous (appear in multiple items) — order = preference
   "Steel Protective Coating": ["59", "60"],
   "Delineation": ["58", "65"],
   "Other": ["58"],
@@ -260,14 +259,17 @@ export function nbiSubNameMatchScore(parsedName: string, subName: string): numbe
 
 function normalizeComponentName(raw: string): string {
   const norm = normalizeForMatching(raw);
+
   for (const [key, canonical] of Object.entries(NBI_COMPONENT_ALIASES)) {
+    if (norm === normalizeForMatching(key)) return canonical;
+  }
+
+  const sortedKeys = Object.keys(NBI_COMPONENT_ALIASES).sort((a, b) => b.length - a.length);
+  for (const key of sortedKeys) {
     const normKey = normalizeForMatching(key);
-    if (norm === normKey || norm.startsWith(normKey)) return canonical;
+    if (norm.startsWith(normKey)) return NBI_COMPONENT_ALIASES[key];
   }
-  const lower = raw.toLowerCase().trim();
-  for (const [key, canonical] of Object.entries(NBI_COMPONENT_ALIASES)) {
-    if (lower === key || lower.startsWith(key)) return canonical;
-  }
+
   return raw.trim();
 }
 
@@ -291,6 +293,18 @@ const RATING_LINE_PATTERNS: RegExp[] = [
 
 const STRUCTURAL_LINE_RE = /^\s*(?:\d{1,3}\s*-|page\s*\d|sheet\s*\d|date\s*[:\/]|time\s*[:\/]|inspector|firm|structure\s+id|inspection\s+date|do\s+not\s+disclose|item\s*(?:no\.?\s*)?\d|appendix)/i;
 
+function isElementTableHeader(lines: string[], i: number): boolean {
+  const block = [
+    lines[i] || "",
+    lines[i + 1] || "",
+    lines[i + 2] || "",
+  ].join(" ").toUpperCase();
+  return (
+    block.includes("ENVIRONMENT") &&
+    (block.includes("STATE 1") || block.includes("CONDITION STATE") || block.includes("QUANTITY"))
+  );
+}
+
 export function parseNbiRatings(pages: string[][]): ParsedNbiEntry[] {
   const results: ParsedNbiEntry[] = [];
   const allLines = pages.flat();
@@ -301,14 +315,23 @@ export function parseNbiRatings(pages: string[][]): ParsedNbiEntry[] {
 
   for (let i = 0; i < allLines.length; i++) {
     const line = allLines[i];
+
+    if (isElementTableHeader(allLines, i)) {
+      break;
+    }
+
     const next = allLines[i + 1] || "";
+    const next2 = allLines[i + 2] || "";
+    const block3 = line + " " + next + " " + next2;
 
     for (const { pattern, item } of NBI_SECTION_PATTERNS) {
-      if (pattern.test(line) || pattern.test(line + " " + next)) {
+      if (pattern.test(line) || pattern.test(block3)) {
         currentItem = item;
         break;
       }
     }
+
+    if (!currentItem) continue;
 
     let matched: { rawName: string; desc: string; min: string; rating: string; comment: string } | null = null;
 
@@ -351,7 +374,9 @@ export function parseNbiRatings(pages: string[][]): ParsedNbiEntry[] {
     const componentName = normalizeComponentName(rawName);
 
     if (componentName.length <= 3) continue;
+    if (rawName.match(/^\d{1,3}-/)) continue;
     if (rawName.match(/^\d{4,}/)) continue;
+    if (rawName.match(/^\d[\d,]*\s+(?:sq|ft|each|ea)/i)) continue;
     if (rawName.match(/Structure ID|Inspection Date|DO NOT DISCLOSE|ITEM\s*\d|Page\s*\d|^Date\b|^Time\b/i)) continue;
     if (componentName.toLowerCase().match(/^(yes|no|n\/a|na|none|date|page|sheet)\b/)) continue;
 
@@ -394,182 +419,167 @@ export function parseNbiRatings(pages: string[][]): ParsedNbiEntry[] {
   return results;
 }
 
-function parseEnvCode(raw: string): string {
-  const m = raw.match(/(\d+)\s*[-–]\s*\w+/);
-  if (m) return m[1];
-  if (/^\d+$/.test(raw.trim())) return raw.trim();
-  return "2";
+interface ParsedNumbers {
+  env: string;
+  qty: number;
+  unit: string;
+  cs: [number, number, number, number];
 }
 
-function extractTrailingNumbers(parts: string[]): number[] {
+function extractTrailingFourNumbers(line: string): [number, number, number, number] | null {
+  const parts = line.trim().split(/\s+/);
   const nums: number[] = [];
-  for (let i = parts.length - 1; i >= 0; i--) {
-    const n = Number(parts[i]);
-    if (!isNaN(n) && /^\d+$/.test(parts[i])) {
-      nums.unshift(n);
+  for (let j = parts.length - 1; j >= 0 && nums.length < 4; j--) {
+    if (/^\d+$/.test(parts[j])) {
+      nums.unshift(parseInt(parts[j]));
     } else {
       break;
     }
   }
-  return nums;
+  if (nums.length < 4) return null;
+  return [nums[0], nums[1], nums[2], nums[3]];
 }
 
-const UNIT_KEYWORDS = ["sq", "ft", "each", "ea", "ln", "in", "m", "m2", "m3"];
+function parseDataLine(line: string): ParsedNumbers | null {
+  const cs = extractTrailingFourNumbers(line);
+  if (!cs) return null;
+
+  const envM = line.match(/(\d+)\s*[-–]\s*(?:Mod|Ben|Low|Sev|Ext)\w*/i);
+  const env = envM ? envM[1] : "2";
+
+  const unitM = line.match(/\b(sq\.?\s*ft\.?|ft\.?|each|ea\.?|ln\.?\s*ft\.?)\b/i);
+  const unit = unitM ? unitM[1].replace(/\.$/, "").toLowerCase() : "";
+
+  const qtyM = line.match(/(\d[\d,]*)\s+(?:sq|ft|each|ea)/i);
+  const qty = qtyM ? parseInt(qtyM[1].replace(/,/g, "")) : cs.reduce((a, b) => a + b, 0);
+
+  return { env, qty, unit, cs };
+}
+
+function isNumbersOrDataLine(line: string): boolean {
+  if (/^\d{1,3}-/.test(line.trim()) || /^\d{4,}-/.test(line.trim())) return false;
+  return extractTrailingFourNumbers(line) !== null;
+}
+
+function isIdLine(line: string): boolean {
+  return /^\d{1,3}-/.test(line.trim()) || /^\d{4,}-/.test(line.trim());
+}
+
+function stripDataFromName(name: string): string {
+  return name
+    .replace(/\s+\d+\s*[-–]\s*\w+\.?\s*\d[\d,]*\s*[\w./]+.*$/, "")
+    .replace(/\s+\d[\d,]*\s*[\w./]+\s*\d+\s+\d+\s+\d+\s+\d+.*$/, "")
+    .replace(/\s+\d+\s+\d+\s+\d+\s+\d+\s*$/, "")
+    .trim();
+}
+
+const SECTION_END_PATTERN = /^\s*(PICTURES|PHOTOS|APPENDIX|BRIDGE INSPECTION RECORD|Bridge Inspection Report|Inspector:|Inspection Date:)\s*/i;
 
 export function parseElementsTable(pages: string[][]): ParsedElementRow[] {
   const results: ParsedElementRow[] = [];
   const allLines = pages.flat();
 
-  let inElementsSection = false;
-  let headerFound = false;
-  let currentElement: ParsedElementRow | null = null;
-
+  let startIdx = -1;
   for (let i = 0; i < allLines.length; i++) {
-    const line = allLines[i];
-    const upper = line.toUpperCase();
-
-    if (!inElementsSection) {
-      if (upper.match(/^\s*ELEMENTS\s*$/) || upper.includes("ELEMENTS\n") || upper === "ELEMENTS") {
-        inElementsSection = true;
-      }
-      continue;
-    }
-
-    if (!headerFound) {
-      if (upper.includes("ENVIRONMENT") && upper.includes("CONDITION")) {
-        headerFound = true;
-      }
-      continue;
-    }
-
-    if (upper.match(/^\s*(PICTURES|PHOTOS|APPENDIX|BRIDGE INSPECTION RECORD)\s*$/)) {
+    if (isElementTableHeader(allLines, i)) {
+      startIdx = i + 3;
       break;
     }
+  }
 
-    const elementMatch = line.match(/^(\d{1,3})-(.+?)(?:\s{2,}(.+?))?(?:\s+(\d[\d.,]*)\s+([\w.\s/]+?))?\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*$/);
-    const defectMatch = line.match(/^(\d{4,})-(.+?)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*$/);
+  if (startIdx < 0) return [];
 
-    if (elementMatch) {
-      const parts = line.split(/\s+/);
-      const nums = extractTrailingNumbers(parts);
-      if (nums.length < 4) { i++; continue; }
+  let currentElement: ParsedElementRow | null = null;
+  let pendingData: ParsedNumbers | null = null;
 
-      const [cs4, cs3, cs2, cs1] = nums.reverse();
-      const idMatch = line.match(/^(\d{1,3})-/);
-      if (!idMatch) { i++; continue; }
+  for (let i = startIdx; i < allLines.length; i++) {
+    const line = allLines[i];
 
-      const elementId = idMatch[1];
-      const rest = line.slice(idMatch[0].length);
+    if (SECTION_END_PATTERN.test(line)) break;
 
-      let environment = "2";
-      const envM = rest.match(/(\d+)\s*[-–]\s*(?:Mod|Ben|Low|Sev|Ext)\w*/i);
-      if (envM) environment = envM[1];
+    if (isNumbersOrDataLine(line)) {
+      pendingData = parseDataLine(line);
+      continue;
+    }
 
-      let unit = "";
-      const unitM = rest.match(/\b(sq\.?\s*ft\.?|ft\.?|each|ea\.?|ln\.?\s*ft\.?|in\.?)\b/i);
-      if (unitM) unit = unitM[1].replace(/\.$/, "").toLowerCase();
+    const idMatch = line.match(/^(\d{1,4})-(.+)/);
+    if (!idMatch) {
+      pendingData = null;
+      continue;
+    }
 
-      const totalM = rest.match(/(\d[\d,]*)\s+(?:sq|ft|ea)/i);
-      const totalQty = totalM ? parseInt(totalM[1].replace(/,/g, "")) : nums.reduce((a, b) => a + b, 0);
+    const id = idMatch[1];
+    const isDefect = id.length >= 4;
+    const restOfLine = idMatch[2];
 
-      let elementName = rest.replace(/\s+\d+\s*-\s*\w+\.?\s*\d[\d,]*\s*[\w.]+.*$/, "")
-        .replace(/\s+\d[\d,]*\s*[\w.]+\s*\d+\s+\d+\s+\d+\s+\d+.*$/, "")
-        .trim();
-      if (!elementName) elementName = `Element ${elementId}`;
+    let data = parseDataLine(line);
+    let nameText = restOfLine;
 
+    if (data) {
+      nameText = stripDataFromName(restOfLine);
+      pendingData = null;
+    } else if (pendingData) {
+      data = pendingData;
+      nameText = restOfLine.trim();
+      pendingData = null;
+    } else {
+      const nextLine = allLines[i + 1] || "";
+      const nextData = parseDataLine(nextLine);
+      if (nextData) {
+        data = nextData;
+        const lineAfter = allLines[i + 2] || "";
+        if (
+          lineAfter.trim() &&
+          !isIdLine(lineAfter) &&
+          !isNumbersOrDataLine(lineAfter) &&
+          !SECTION_END_PATTERN.test(lineAfter) &&
+          !/^\d/.test(lineAfter.trim())
+        ) {
+          nameText = (restOfLine + " " + lineAfter).trim();
+          i += 2;
+        } else {
+          nameText = restOfLine.trim();
+          i += 1;
+        }
+        pendingData = null;
+      }
+    }
+
+    if (!data) continue;
+
+    const [cs1, cs2, cs3, cs4] = data.cs;
+
+    if (isDefect) {
+      if (!currentElement) continue;
+      const defectName = nameText.replace(/(\s+\d+)+\s*$/, "").trim();
+      results.push({
+        elementId: currentElement.elementId,
+        elementName: defectName,
+        isDefect: true,
+        defectCode: id,
+        environment: currentElement.environment,
+        totalQty: cs1 + cs2 + cs3 + cs4,
+        unit: currentElement.unit,
+        cs1,
+        cs2,
+        cs3,
+        cs4,
+      });
+    } else {
+      const elementName = nameText || `Element ${id}`;
       currentElement = {
-        elementId,
+        elementId: id,
         elementName,
         isDefect: false,
-        environment,
-        totalQty,
-        unit,
-        cs1: cs1 ?? 0,
-        cs2: cs2 ?? 0,
-        cs3: cs3 ?? 0,
-        cs4: cs4 ?? 0,
+        environment: data.env,
+        totalQty: data.qty || cs1 + cs2 + cs3 + cs4,
+        unit: data.unit,
+        cs1,
+        cs2,
+        cs3,
+        cs4,
       };
       results.push(currentElement);
-      continue;
-    }
-
-    if (defectMatch) {
-      const defectCode = defectMatch[1];
-      const defectNameRaw = defectMatch[2].trim();
-      const cs1 = parseInt(defectMatch[3]) || 0;
-      const cs2 = parseInt(defectMatch[4]) || 0;
-      const cs3 = parseInt(defectMatch[5]) || 0;
-      const cs4 = parseInt(defectMatch[6]) || 0;
-
-      if (currentElement) {
-        results.push({
-          elementId: currentElement.elementId,
-          elementName: defectNameRaw,
-          isDefect: true,
-          defectCode,
-          environment: currentElement.environment,
-          totalQty: cs1 + cs2 + cs3 + cs4,
-          unit: currentElement.unit,
-          cs1,
-          cs2,
-          cs3,
-          cs4,
-        });
-      }
-      continue;
-    }
-
-    const simpleIdMatch = line.match(/^(\d{1,3})-(.+)/) || line.match(/^(\d{4,})-(.+)/);
-    if (simpleIdMatch) {
-      const combined = line + " " + (allLines[i + 1] || "");
-      const allNums = combined.match(/\b\d[\d,]*\b/g);
-      if (allNums && allNums.length >= 4) {
-        const last4 = allNums.slice(-4).map((n) => parseInt(n.replace(/,/g, "")));
-        const id = simpleIdMatch[1];
-        const isDefect = id.length >= 4;
-        const rawName = simpleIdMatch[2].trim();
-
-        let environment = "2";
-        const envM = combined.match(/(\d+)\s*[-–]\s*(?:Mod|Ben|Low|Sev)\w*/i);
-        if (envM) environment = envM[1];
-
-        let unit = "";
-        const unitM = combined.match(/\b(sq\.?\s*ft\.?|ft\.?|each|ea\.?)\b/i);
-        if (unitM) unit = unitM[1].replace(/\.$/, "").toLowerCase();
-
-        if (isDefect && currentElement) {
-          results.push({
-            elementId: currentElement.elementId,
-            elementName: rawName,
-            isDefect: true,
-            defectCode: id,
-            environment: currentElement.environment,
-            totalQty: last4.reduce((a, b) => a + b, 0),
-            unit: currentElement.unit,
-            cs1: last4[0],
-            cs2: last4[1],
-            cs3: last4[2],
-            cs4: last4[3],
-          });
-        } else {
-          currentElement = {
-            elementId: id,
-            elementName: rawName,
-            isDefect: false,
-            environment,
-            totalQty: last4.reduce((a, b) => a + b, 0),
-            unit,
-            cs1: last4[0],
-            cs2: last4[1],
-            cs3: last4[2],
-            cs4: last4[3],
-          };
-          results.push(currentElement);
-        }
-        if (allNums.length > 4 && allLines[i + 1]?.match(/^\d+\s+\d+\s+\d+\s+\d+/)) {
-          i++;
-        }
-      }
     }
   }
 
