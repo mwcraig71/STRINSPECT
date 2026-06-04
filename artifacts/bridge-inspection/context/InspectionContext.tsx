@@ -693,7 +693,7 @@ export interface SnbiData {
   fatigueDetailsPresent: "" | "Yes" | "No"; // Steel superstructure E/E' details
   scourRating: string; // condition rating
   railingTransitionsRating: string; // condition rating
-  equipmentRequired: SnbiEquipment; // only one selectable
+  equipmentRequired: Exclude<SnbiEquipment, "">[]; // multiple selectable
   equipmentOtherText: string;
   roadways: SnbiRoadway[];
 }
@@ -722,7 +722,7 @@ const INITIAL_SNBI: SnbiData = {
   fatigueDetailsPresent: "",
   scourRating: "",
   railingTransitionsRating: "",
-  equipmentRequired: "",
+  equipmentRequired: [],
   equipmentOtherText: "",
   roadways: [createSnbiRoadway()],
 };
@@ -1152,9 +1152,16 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         if (sn) {
           const parsed = JSON.parse(sn) as Partial<SnbiData>;
           if (parsed && typeof parsed === "object") {
+            const eq = (parsed as { equipmentRequired?: unknown }).equipmentRequired;
+            const equipmentRequired = Array.isArray(eq)
+              ? (eq as Exclude<SnbiEquipment, "">[])
+              : typeof eq === "string" && eq
+                ? [eq as Exclude<SnbiEquipment, "">]
+                : [];
             setSnbiDataState({
               ...INITIAL_SNBI,
               ...parsed,
+              equipmentRequired,
               roadways:
                 Array.isArray(parsed.roadways) && parsed.roadways.length
                   ? parsed.roadways

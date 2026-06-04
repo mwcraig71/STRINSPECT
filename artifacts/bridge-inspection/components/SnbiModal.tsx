@@ -27,6 +27,23 @@ const EQUIPMENT_OPTIONS: Exclude<SnbiEquipment, "">[] = [
   "Other",
 ];
 
+// Restrict free-text numeric entry to a fixed number of decimal places.
+// decimals = 0 => integers only; decimals = N => at most N digits after the dot.
+function sanitizeNumeric(text: string, decimals: number): string {
+  let cleaned = text.replace(/[^0-9.]/g, "");
+  // Collapse to a single decimal point (keep the first).
+  const firstDot = cleaned.indexOf(".");
+  if (firstDot !== -1) {
+    cleaned =
+      cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, "");
+  }
+  if (decimals === 0) {
+    return cleaned.replace(/\./g, "");
+  }
+  const [intPart, decPart] = cleaned.split(".");
+  return decPart !== undefined ? `${intPart}.${decPart.slice(0, decimals)}` : intPart;
+}
+
 export function SnbiModal() {
   const c = useColors();
   const { showSnbiModal, setShowSnbiModal, snbiData, setSnbiData } = useInspection();
@@ -56,7 +73,7 @@ export function SnbiModal() {
     label: string,
     field: keyof SnbiData,
     unit: string,
-    keyboardType: "numeric" | "default" = "numeric"
+    decimals: number = 1
   ) => (
     <View style={styles.measureRow}>
       <Text style={[styles.measureLabel, { color: c.foreground }]}>{label}</Text>
@@ -64,10 +81,12 @@ export function SnbiModal() {
         <TextInput
           style={[styles.measureInput, { backgroundColor: c.secondary, borderColor: c.border, color: c.foreground }]}
           value={d[field] as string}
-          onChangeText={(t) => setField(field, t as SnbiData[typeof field])}
-          placeholder="—"
+          onChangeText={(t) =>
+            setField(field, sanitizeNumeric(t, decimals) as SnbiData[typeof field])
+          }
+          placeholder={decimals === 0 ? "0" : "0.0"}
           placeholderTextColor={c.mutedForeground}
-          keyboardType={keyboardType}
+          keyboardType="decimal-pad"
         />
         <Text style={[styles.measureUnit, { color: c.mutedForeground }]}>{unit}</Text>
       </View>
@@ -136,10 +155,10 @@ export function SnbiModal() {
                 <TextInput
                   style={[styles.input, { backgroundColor: c.secondary, borderColor: c.border, color: c.foreground }]}
                   value={d.sidewalkLeft}
-                  onChangeText={(t) => setField("sidewalkLeft", t)}
+                  onChangeText={(t) => setField("sidewalkLeft", sanitizeNumeric(t, 1))}
                   placeholder="0.0"
                   placeholderTextColor={c.mutedForeground}
-                  keyboardType="numeric"
+                  keyboardType="decimal-pad"
                 />
               </View>
               <View style={[styles.fieldGroup, { flex: 1 }]}>
@@ -147,10 +166,10 @@ export function SnbiModal() {
                 <TextInput
                   style={[styles.input, { backgroundColor: c.secondary, borderColor: c.border, color: c.foreground }]}
                   value={d.sidewalkRight}
-                  onChangeText={(t) => setField("sidewalkRight", t)}
+                  onChangeText={(t) => setField("sidewalkRight", sanitizeNumeric(t, 1))}
                   placeholder="0.0"
                   placeholderTextColor={c.mutedForeground}
-                  keyboardType="numeric"
+                  keyboardType="decimal-pad"
                 />
               </View>
             </View>
@@ -176,7 +195,7 @@ export function SnbiModal() {
           {/* Culvert */}
           <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
             <Text style={[styles.cardTitle, { color: c.foreground }]}>Culvert</Text>
-            {measure("Bridge Height — Top of Headwall to Water/Bottom Slab (no decimal)", "culvertBridgeHeight", "ft")}
+            {measure("Bridge Height — Top of Headwall to Water/Bottom Slab (no decimal)", "culvertBridgeHeight", "ft", 0)}
             {measure("Interior Wall Thickness (for NBIS Bridge Length)", "culvertWallThickness", "in")}
           </View>
 
@@ -221,10 +240,10 @@ export function SnbiModal() {
           {/* Equipment required */}
           <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
             <Text style={[styles.cardTitle, { color: c.foreground }]}>Equipment Required</Text>
-            <Text style={[styles.cardHint, { color: c.mutedForeground }]}>Select one</Text>
+            <Text style={[styles.cardHint, { color: c.mutedForeground }]}>Select all that apply</Text>
             <View style={styles.equipWrap}>
               {EQUIPMENT_OPTIONS.map((opt) => {
-                const sel = d.equipmentRequired === opt;
+                const sel = d.equipmentRequired.includes(opt);
                 return (
                   <TouchableOpacity
                     key={opt}
@@ -235,11 +254,13 @@ export function SnbiModal() {
                         : { backgroundColor: c.secondary, borderColor: c.border },
                     ]}
                     onPress={() => {
-                      const next: SnbiEquipment = sel ? "" : opt;
+                      const next = sel
+                        ? d.equipmentRequired.filter((e) => e !== opt)
+                        : [...d.equipmentRequired, opt];
                       setSnbiData({
                         ...d,
                         equipmentRequired: next,
-                        equipmentOtherText: next === "Other" ? d.equipmentOtherText : "",
+                        equipmentOtherText: next.includes("Other") ? d.equipmentOtherText : "",
                       });
                     }}
                   >
@@ -250,7 +271,7 @@ export function SnbiModal() {
                 );
               })}
             </View>
-            {d.equipmentRequired === "Other" && (
+            {d.equipmentRequired.includes("Other") && (
               <TextInput
                 style={[styles.input, { backgroundColor: c.secondary, borderColor: c.border, color: c.foreground }]}
                 value={d.equipmentOtherText}
@@ -284,18 +305,18 @@ export function SnbiModal() {
                 <TextInput
                   style={[styles.roadWidth, { backgroundColor: c.secondary, borderColor: c.border, color: c.foreground }]}
                   value={r.width}
-                  onChangeText={(t) => updateRoadway(r.id, { width: t })}
+                  onChangeText={(t) => updateRoadway(r.id, { width: sanitizeNumeric(t, 1) })}
                   placeholder="ft"
                   placeholderTextColor={c.mutedForeground}
-                  keyboardType="numeric"
+                  keyboardType="decimal-pad"
                 />
                 <TextInput
                   style={[styles.roadLanes, { backgroundColor: c.secondary, borderColor: c.border, color: c.foreground }]}
                   value={r.lanes}
-                  onChangeText={(t) => updateRoadway(r.id, { lanes: t })}
+                  onChangeText={(t) => updateRoadway(r.id, { lanes: sanitizeNumeric(t, 0) })}
                   placeholder="#"
                   placeholderTextColor={c.mutedForeground}
-                  keyboardType="numeric"
+                  keyboardType="number-pad"
                 />
                 <TouchableOpacity
                   onPress={() => removeRoadway(r.id)}
