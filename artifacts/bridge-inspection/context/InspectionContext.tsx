@@ -1247,14 +1247,23 @@ function getFilteredElements(
     !!material &&
     (location.includes("Span") || isSubstructureLocation(location));
 
+  // Topside inspection: only the riding surface, railings and wearing surface are
+  // visible from the deck for a span — girders/beams, bearings and protective
+  // coatings are not. The wearing surface (510) is always included regardless of
+  // structural material; decks/railings still honor the selected material.
+  if (inspectionType === INSPECTION_TYPES.TOPSIDE && location.includes("Span")) {
+    let topList = SNBI_ELEMENTS.filter((e) => ["Deck", "Railing"].includes(e.category));
+    if (material) topList = topList.filter((e) => e.material === material);
+    const base = topList.filter((e) => e.core);
+    const wearing = SNBI_ELEMENTS.filter((e) => e.id === "510");
+    const seen = new Set<string>();
+    return [...base, ...wearing].filter((e) =>
+      seen.has(e.id) ? false : (seen.add(e.id), true)
+    );
+  }
+
   // No search: honor the selected structure type for this location.
   let list: readonly SnbiElement[] = locationTypeElements(location, superTypeId, subTypeId);
-
-  // Topside inspection: only the riding surface and railings are visible from the
-  // deck for a span — girders/beams, bearings and protective coatings are not.
-  if (inspectionType === INSPECTION_TYPES.TOPSIDE && location.includes("Span")) {
-    list = SNBI_ELEMENTS.filter((e) => ["Deck", "Railing"].includes(e.category));
-  }
 
   if (materialApplies) list = list.filter((e) => e.material === material);
 
