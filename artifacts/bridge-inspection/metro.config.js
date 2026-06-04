@@ -16,4 +16,7 @@ config.resolver.extraNodeModules = {
   "react-dom": reactDomPath,
 };
 
+// Allow bundling PDF documents (e.g. the safety plan) as static assets.
+config.resolver.assetExts = [...config.resolver.assetExts, "pdf"];
+
 module.exports = config;

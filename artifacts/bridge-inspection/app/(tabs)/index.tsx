@@ -29,6 +29,7 @@ import { CIFModal } from "@/components/CIFModal";
 import { FUAModal } from "@/components/FUAModal";
 import { UnderclearanceModal } from "@/components/UnderclearanceModal";
 import { ChannelModal } from "@/components/ChannelModal";
+import { DailySafetyBriefingModal } from "@/components/DailySafetyBriefingModal";
 import { SettingsModal } from "@/components/SettingsModal";
 import colors from "@/constants/colors";
 
@@ -88,6 +89,7 @@ export default function InspectionScreen() {
     nomenclature,
     setShowUnderclearanceModal,
     setShowChannelModal,
+    setShowDailySafetyModal,
   } = useInspection();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -280,6 +282,23 @@ export default function InspectionScreen() {
           />
           <View style={[styles.menuDropdown, { backgroundColor: c.card, borderColor: c.border }]}>
             <Text style={[styles.menuHeading, { color: c.mutedForeground }]}>TxDOT Forms</Text>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setModuleMenuOpen(false);
+                setShowDailySafetyModal(true);
+              }}
+            >
+              <View style={[styles.menuIcon, { backgroundColor: "#b91c1c" }]}>
+                <Feather name="shield" size={15} color="#fff" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.menuItemTitle, { color: c.foreground }]}>Daily Safety Briefing</Text>
+                <Text style={[styles.menuItemSub, { color: c.mutedForeground }]}>Risk Assessment & Sign-Off</Text>
+              </View>
+              <Feather name="chevron-right" size={16} color={c.mutedForeground} />
+            </TouchableOpacity>
+            <View style={[styles.menuDivider, { backgroundColor: c.border }]} />
             <TouchableOpacity
               style={styles.menuItem}
               onPress={() => {
@@ -735,6 +754,7 @@ export default function InspectionScreen() {
       <FUAModal />
       <UnderclearanceModal />
       <ChannelModal />
+      <DailySafetyBriefingModal />
     </View>
   );
 }

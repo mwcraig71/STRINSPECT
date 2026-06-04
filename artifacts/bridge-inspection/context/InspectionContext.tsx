@@ -575,6 +575,96 @@ const INITIAL_CHANNEL: ChannelData = {
   bentStations: { upstream: "", downstream: "" },
 };
 
+// ─── Daily Safety Briefing / Risk Assessment (Strinteg) ───────────────────────
+
+export interface SafetyCrewSignoff {
+  id: string;
+  name: string; // Printed name / signature
+  date: string;
+  initials: string;
+}
+
+export interface SafetyBriefingData {
+  workLocation: string;
+  employeeInCharge: string;
+  employeeInChargePhone: string;
+  briefingDate: string;
+  nearestHospitals: string;
+  safetyPlanOnSite: "" | "Yes" | "No";
+  ppeStandard: boolean; // Hard Hat / Vest+Pants / Glasses / Boots / Gloves / First Aid Kit
+  ppeHarness: boolean; // Harness & Lanyard
+  ppeOther: boolean;
+  ppeOtherText: string;
+  crew: SafetyCrewSignoff[];
+}
+
+// Static reference content from the Strinteg Risk Assessment & Safety Briefing form.
+export const SAFETY_BRIEFING_RISKS: { risk: string; mitigation: string }[] = [
+  {
+    risk: "Elevated Height / Fall Hazard",
+    mitigation:
+      "100% tie-off within 6' of unprotected edge; access opening awareness; trauma straps on harnesses; ladder safety training; proper fall arrest usage",
+  },
+  {
+    risk: "Vehicular Traffic / Impact Hazard",
+    mitigation:
+      "Situational awareness; identify and stay within safe work zones; never turn back to flow of traffic; inspect traffic control setup prior to entering",
+  },
+  {
+    risk: "Work over Water / Drowning Hazard",
+    mitigation:
+      "Employ safety boat when necessary; personal flotation devices; wader belts",
+  },
+  {
+    risk: "Aerial Lift & UBIU / Pinch, Crush, & Hydraulic Hazard",
+    mitigation:
+      "Competent and qualified through appropriate training in aerial lift equipment; awareness of exposure to hydraulic fluid and pinch-points; 100% tie-off",
+  },
+  {
+    risk: "Falling Objects",
+    mitigation:
+      "Awareness of hazard zone; properly fitted impact-rated hard hats; tie-off loose equipment whenever possible",
+  },
+  {
+    risk: "Hot Environment / Fatigue Risk",
+    mitigation:
+      "Stay hydrated; take adequate breaks; cool down when necessary; look for signs of heat stroke among coworkers",
+  },
+  {
+    risk: "Extreme Weather Events",
+    mitigation:
+      "Halt work if weather becomes unsafe for the task being performed; track weather forecast prior to beginning work",
+  },
+  {
+    risk: "Allergic Reactions / Wildlife Hazard",
+    mitigation:
+      "Awareness of inspector allergies; ensure corrective options are available on-site (i.e. EpiPen); use snake guards",
+  },
+];
+
+export function createSafetyCrewSignoff(): SafetyCrewSignoff {
+  return {
+    id: `sb_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    name: "",
+    date: new Date().toLocaleDateString("en-US"),
+    initials: "",
+  };
+}
+
+const INITIAL_SAFETY_BRIEFING: SafetyBriefingData = {
+  workLocation: "",
+  employeeInCharge: "",
+  employeeInChargePhone: "",
+  briefingDate: new Date().toLocaleDateString("en-US"),
+  nearestHospitals: "",
+  safetyPlanOnSite: "",
+  ppeStandard: false,
+  ppeHarness: false,
+  ppeOther: false,
+  ppeOtherText: "",
+  crew: [createSafetyCrewSignoff()],
+};
+
 // ─── Context Types ────────────────────────────────────────────────────────────
 
 interface InspectionContextType {
@@ -646,6 +736,10 @@ interface InspectionContextType {
   setChannelData: (v: ChannelData) => void;
   addChannelMeasurement: (section: ChannelSection) => void;
   removeChannelMeasurement: (section: ChannelSection, id: string) => void;
+  showDailySafetyModal: boolean;
+  setShowDailySafetyModal: (v: boolean) => void;
+  safetyBriefingData: SafetyBriefingData;
+  setSafetyBriefingData: (v: SafetyBriefingData) => void;
 
   // Filters
   sortCriteria: string;
@@ -844,6 +938,7 @@ const STORAGE_KEYS = {
   STRUCTURE_NUMBER: "@bridge_structure_number",
   UNDERCLEARANCE: "@bridge_underclearance",
   CHANNEL: "@bridge_channel",
+  SAFETY_BRIEFING: "@bridge_safety_briefing",
   DEMO_CLEARED: "@bridge_demo_cleared_v1",
 };
 
@@ -882,6 +977,9 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     useState<UnderclearanceData>(INITIAL_UNDERCLEARANCE);
   const [showChannelModal, setShowChannelModal] = useState(false);
   const [channelData, setChannelDataState] = useState<ChannelData>(INITIAL_CHANNEL);
+  const [showDailySafetyModal, setShowDailySafetyModal] = useState(false);
+  const [safetyBriefingData, setSafetyBriefingDataState] =
+    useState<SafetyBriefingData>(INITIAL_SAFETY_BRIEFING);
 
   const [sortCriteria, setSortCriteria] = useState("location");
   const [filterType, setFilterType] = useState("All");
@@ -903,7 +1001,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           ]);
           await AsyncStorage.setItem(STORAGE_KEYS.DEMO_CLEARED, "1");
         }
-        const [defects, nbi, nom, insType, superType, subType, structNum, uc, ch] = await Promise.all([
+        const [defects, nbi, nom, insType, superType, subType, structNum, uc, ch, sb] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.SAVED_DEFECTS),
           AsyncStorage.getItem(STORAGE_KEYS.NBI_RATINGS),
           AsyncStorage.getItem(STORAGE_KEYS.NOMENCLATURE),
@@ -913,6 +1011,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           AsyncStorage.getItem(STORAGE_KEYS.STRUCTURE_NUMBER),
           AsyncStorage.getItem(STORAGE_KEYS.UNDERCLEARANCE),
           AsyncStorage.getItem(STORAGE_KEYS.CHANNEL),
+          AsyncStorage.getItem(STORAGE_KEYS.SAFETY_BRIEFING),
         ]);
         if (defects) setSavedDefectsState(JSON.parse(defects));
         if (nbi) setNbiRatingsState(JSON.parse(nbi));
@@ -963,6 +1062,19 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           }
         } else if (structNum) {
           setChannelDataState((prev) => ({ ...prev, structureNumber: structNum }));
+        }
+        if (sb) {
+          const parsed = JSON.parse(sb) as Partial<SafetyBriefingData>;
+          if (parsed && typeof parsed === "object") {
+            setSafetyBriefingDataState({
+              ...INITIAL_SAFETY_BRIEFING,
+              ...parsed,
+              crew:
+                Array.isArray(parsed.crew) && parsed.crew.length
+                  ? parsed.crew
+                  : [createSafetyCrewSignoff()],
+            });
+          }
         }
       } catch {}
     };
@@ -1057,6 +1169,11 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const setChannelData = useCallback((v: ChannelData) => {
     setChannelDataState(v);
     AsyncStorage.setItem(STORAGE_KEYS.CHANNEL, JSON.stringify(v)).catch(() => {});
+  }, []);
+
+  const setSafetyBriefingData = useCallback((v: SafetyBriefingData) => {
+    setSafetyBriefingDataState(v);
+    AsyncStorage.setItem(STORAGE_KEYS.SAFETY_BRIEFING, JSON.stringify(v)).catch(() => {});
   }, []);
 
   const addChannelMeasurement = useCallback((section: ChannelSection) => {
@@ -1658,6 +1775,10 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     setChannelData,
     addChannelMeasurement,
     removeChannelMeasurement,
+    showDailySafetyModal,
+    setShowDailySafetyModal,
+    safetyBriefingData,
+    setSafetyBriefingData,
     sortCriteria,
     setSortCriteria,
     filterType,
