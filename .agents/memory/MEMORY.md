@@ -1,3 +1,1 @@
-- [structure-number sync](structure-number-sync.md) — global structureNumber is source of truth; CIF/Underclearance mirror it via setStructureNumber, never write their own copy.
-- [Metro react dedup for Expo web](metro-react-dedup-web.md) — pnpm symlinks cause "Invalid hook call" on web; alias react/react-dom in metro.config.js to one resolved path.
-- [Open bundled PDF in Expo](expo-bundled-pdf-open.md) — add "pdf" to assetExts, resolve via expo-asset; on web pre-open blank tab in the click gesture before await or popup blocker kills it.
+- [RN Web TextInput overflow](rn-web-textinput-overflow.md) — TextInputs overflow narrow flex rows on RN Web; add `minWidth: 0` to the `flex:1` input.
