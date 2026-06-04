@@ -198,42 +198,52 @@ export const SNBI_ELEMENTS = [
 // the SNBI import mapping (SNBI_CODE_TO_DEFECT_ID) continues to resolve correctly.
 const DEFECTS_BY_MATERIAL: Record<string, { id: string; name: string; unit: string }[]> = {
   Steel: [
-    { id: "corr", name: "Corrosion/Section Loss", unit: "in" },
-    { id: "crack_s", name: "Cracking (Steel/Fatigue)", unit: "in" },
+    { id: "corr", name: "Corrosion/Section Loss", unit: "sq ft" },
+    { id: "crack_s", name: "Cracking/Fatigue", unit: "in" },
     { id: "conn", name: "Connection Deterioration", unit: "ea" },
     { id: "distort", name: "Distortion/Out-of-Plane", unit: "ea" },
+    { id: "damage", name: "Damage", unit: "ea" },
   ],
   Concrete: [
-    { id: "spall", name: "Spalling/Delamination", unit: "sq ft" },
+    { id: "spall", name: "Delamination/Spall/Patched Area", unit: "sq ft" },
+    { id: "rebar", name: "Exposed/Corroded Reinforcing", unit: "sq ft" },
     { id: "crack", name: "Cracking", unit: "ft" },
     { id: "corr_s", name: "Efflorescence/Rust Staining", unit: "sq ft" },
-    { id: "rebar", name: "Exposed/Corroded Reinforcing", unit: "sq ft" },
+    { id: "damage", name: "Damage", unit: "ea" },
   ],
   Timber: [
     { id: "decay", name: "Decay/Section Loss", unit: "in" },
-    { id: "check", name: "Checking/Splitting", unit: "ft" },
+    { id: "check", name: "Checks/Shakes", unit: "ft" },
+    { id: "crack", name: "Splits/Cracks", unit: "ft" },
     { id: "crush", name: "Crushing/Compression", unit: "ea" },
+    { id: "conn", name: "Connection Deterioration", unit: "ea" },
+    { id: "damage", name: "Damage", unit: "ea" },
   ],
   Masonry: [
     { id: "mortar", name: "Mortar Deterioration", unit: "ft" },
     { id: "crack", name: "Cracking", unit: "ft" },
     { id: "spall", name: "Spalling/Splitting", unit: "sq ft" },
     { id: "displace", name: "Masonry Displacement", unit: "ea" },
+    { id: "damage", name: "Damage", unit: "ea" },
   ],
   Other: [
     { id: "damage", name: "Damage", unit: "ea" },
     { id: "deterioration", name: "Deterioration", unit: "ea" },
+    { id: "wear", name: "Abrasion/Wear", unit: "sq ft" },
   ],
 };
 
 // Element-specific defect lists that differ from the material default (decks,
 // bearings, joints, railings, protective systems, and the custom 226 pile form).
 const DEFECT_OVERRIDES: Record<string, { id: string; name: string; unit: string }[]> = {
-  // Decks / slabs
-  "12": [{ id: "spall", name: "Spalling/Delamination", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "wear", name: "Abrasion/Wear", unit: "sq ft" }],
-  "38": [{ id: "spall", name: "Spalling/Delamination", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "wear", name: "Abrasion/Wear", unit: "sq ft" }],
-  "31": [{ id: "decay", name: "Decay/Section Loss", unit: "in" }, { id: "check", name: "Checking/Splitting", unit: "ft" }, { id: "wear", name: "Abrasion/Wear", unit: "sq ft" }],
-  "321": [{ id: "spall", name: "Spalling/Delamination", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "settle", name: "Settlement/Faulting", unit: "ea" }],
+  // Decks / slabs (concrete suite + abrasion/wear from traffic)
+  "12": [{ id: "spall", name: "Delamination/Spall/Patched Area", unit: "sq ft" }, { id: "rebar", name: "Exposed/Corroded Reinforcing", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "corr_s", name: "Efflorescence/Rust Staining", unit: "sq ft" }, { id: "wear", name: "Abrasion/Wear", unit: "sq ft" }, { id: "damage", name: "Damage", unit: "ea" }],
+  "38": [{ id: "spall", name: "Delamination/Spall/Patched Area", unit: "sq ft" }, { id: "rebar", name: "Exposed/Corroded Reinforcing", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "corr_s", name: "Efflorescence/Rust Staining", unit: "sq ft" }, { id: "wear", name: "Abrasion/Wear", unit: "sq ft" }, { id: "damage", name: "Damage", unit: "ea" }],
+  "28": [{ id: "corr", name: "Corrosion/Section Loss", unit: "sq ft" }, { id: "crack_s", name: "Cracking/Fatigue", unit: "in" }, { id: "conn", name: "Connection Deterioration", unit: "ea" }, { id: "wear", name: "Abrasion/Wear", unit: "sq ft" }, { id: "damage", name: "Damage", unit: "ea" }],
+  "29": [{ id: "corr", name: "Corrosion/Section Loss", unit: "sq ft" }, { id: "crack_s", name: "Cracking/Fatigue", unit: "in" }, { id: "conn", name: "Connection Deterioration", unit: "ea" }, { id: "wear", name: "Abrasion/Wear", unit: "sq ft" }, { id: "damage", name: "Damage", unit: "ea" }],
+  "31": [{ id: "decay", name: "Decay/Section Loss", unit: "in" }, { id: "check", name: "Checks/Shakes", unit: "ft" }, { id: "crack", name: "Splits/Cracks", unit: "ft" }, { id: "wear", name: "Abrasion/Wear", unit: "sq ft" }, { id: "damage", name: "Damage", unit: "ea" }],
+  "54": [{ id: "decay", name: "Decay/Section Loss", unit: "in" }, { id: "check", name: "Checks/Shakes", unit: "ft" }, { id: "crack", name: "Splits/Cracks", unit: "ft" }, { id: "wear", name: "Abrasion/Wear", unit: "sq ft" }, { id: "damage", name: "Damage", unit: "ea" }],
+  "321": [{ id: "spall", name: "Delamination/Spall/Patched Area", unit: "sq ft" }, { id: "rebar", name: "Exposed/Corroded Reinforcing", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "corr_s", name: "Efflorescence/Rust Staining", unit: "sq ft" }, { id: "settle", name: "Settlement/Faulting", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }],
   // Custom Steel Pipe Pile remaining-section form
   "226": [{ id: "corr_pile", name: "Section Loss (Remaining Section)", unit: "in" }, { id: "pitting", name: "Pitting Corrosion", unit: "in" }, { id: "corr", name: "Corrosion", unit: "sq ft" }],
   // Bearings
@@ -250,16 +260,22 @@ const DEFECT_OVERRIDES: Record<string, { id: string; name: string; unit: string 
   "303": [{ id: "seal", name: "Seal Damage", unit: "ft" }, { id: "debris", name: "Debris Accumulation", unit: "sq ft" }, { id: "armour", name: "Armour Damage", unit: "ft" }],
   "304": [{ id: "debris", name: "Debris Accumulation", unit: "sq ft" }, { id: "armour", name: "Armour Damage", unit: "ft" }],
   "306": [{ id: "seal", name: "Seal Damage", unit: "ft" }, { id: "debris", name: "Debris Accumulation", unit: "sq ft" }],
-  // Railings
-  "330": [{ id: "corr", name: "Corrosion", unit: "sq ft" }, { id: "impact", name: "Impact Damage", unit: "ea" }],
-  "331": [{ id: "impact", name: "Impact Damage", unit: "ea" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "spall", name: "Spalling/Delamination", unit: "sq ft" }],
-  "332": [{ id: "decay", name: "Decay/Section Loss", unit: "in" }, { id: "impact", name: "Impact Damage", unit: "ea" }],
-  "333": [{ id: "damage", name: "Damage", unit: "ea" }, { id: "impact", name: "Impact Damage", unit: "ea" }],
-  "334": [{ id: "mortar", name: "Mortar Deterioration", unit: "ft" }, { id: "impact", name: "Impact Damage", unit: "ea" }],
+  // Railings (material suite + vehicular impact damage)
+  "330": [{ id: "corr", name: "Corrosion/Section Loss", unit: "sq ft" }, { id: "crack_s", name: "Cracking/Fatigue", unit: "in" }, { id: "conn", name: "Connection Deterioration", unit: "ea" }, { id: "impact", name: "Impact Damage", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }],
+  "331": [{ id: "spall", name: "Delamination/Spall/Patched Area", unit: "sq ft" }, { id: "rebar", name: "Exposed/Corroded Reinforcing", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "corr_s", name: "Efflorescence/Rust Staining", unit: "sq ft" }, { id: "impact", name: "Impact Damage", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }],
+  "332": [{ id: "decay", name: "Decay/Section Loss", unit: "in" }, { id: "check", name: "Checks/Shakes", unit: "ft" }, { id: "crack", name: "Splits/Cracks", unit: "ft" }, { id: "impact", name: "Impact Damage", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }],
+  "333": [{ id: "deterioration", name: "Deterioration", unit: "ea" }, { id: "impact", name: "Impact Damage", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }],
+  "334": [{ id: "mortar", name: "Mortar Deterioration", unit: "ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "spall", name: "Spalling/Splitting", unit: "sq ft" }, { id: "impact", name: "Impact Damage", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }],
+  // Substructure (material suite + settlement / movement)
+  "215": [{ id: "spall", name: "Delamination/Spall/Patched Area", unit: "sq ft" }, { id: "rebar", name: "Exposed/Corroded Reinforcing", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "corr_s", name: "Efflorescence/Rust Staining", unit: "sq ft" }, { id: "settle", name: "Settlement/Movement", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }],
+  "216": [{ id: "decay", name: "Decay/Section Loss", unit: "in" }, { id: "check", name: "Checks/Shakes", unit: "ft" }, { id: "crack", name: "Splits/Cracks", unit: "ft" }, { id: "settle", name: "Settlement/Movement", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }],
+  "217": [{ id: "mortar", name: "Mortar Deterioration", unit: "ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "spall", name: "Spalling/Splitting", unit: "sq ft" }, { id: "displace", name: "Masonry Displacement", unit: "ea" }, { id: "settle", name: "Settlement/Movement", unit: "ea" }],
+  "218": [{ id: "deterioration", name: "Deterioration", unit: "ea" }, { id: "settle", name: "Settlement/Movement", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }],
+  "220": [{ id: "spall", name: "Delamination/Spall/Patched Area", unit: "sq ft" }, { id: "rebar", name: "Exposed/Corroded Reinforcing", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "corr_s", name: "Efflorescence/Rust Staining", unit: "sq ft" }, { id: "settle", name: "Settlement/Movement", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }],
   // Protective systems / wearing surface
-  "510": [{ id: "wear", name: "Abrasion/Wear", unit: "sq ft" }, { id: "deterioration", name: "Deterioration", unit: "sq ft" }],
-  "515": [{ id: "coat_fail", name: "Coating Failure", unit: "sq ft" }],
-  "520": [{ id: "coat_fail", name: "Sealer/System Failure", unit: "sq ft" }, { id: "spall", name: "Spalling/Delamination", unit: "sq ft" }],
+  "510": [{ id: "wear", name: "Abrasion/Wear", unit: "sq ft" }, { id: "spall", name: "Delamination/Spall/Patched Area", unit: "sq ft" }, { id: "deterioration", name: "Effectiveness/Deterioration", unit: "sq ft" }],
+  "515": [{ id: "coat_fail", name: "Peeling/Bubbling/Cracking", unit: "sq ft" }, { id: "deterioration", name: "Chalking/Oxide Film/Effectiveness", unit: "sq ft" }, { id: "corr", name: "Underlying Steel Corrosion", unit: "sq ft" }],
+  "520": [{ id: "coat_fail", name: "Sealer/System Failure", unit: "sq ft" }, { id: "spall", name: "Delamination/Spall/Patched Area", unit: "sq ft" }, { id: "deterioration", name: "Effectiveness/Deterioration", unit: "sq ft" }],
 };
 
 export const DEFECTS_BY_ELEMENT: Record<string, { id: string; name: string; unit: string }[]> =
@@ -1175,29 +1191,30 @@ function getFilteredElements(
   if (!location) return [];
 
   const query = search.trim().toLowerCase();
+
+  // When the inspector is searching, scan the ENTIRE catalog (every element,
+  // every material, regardless of location) so any element can be found —
+  // including ones not normally listed for the current location/structure type.
+  if (query) {
+    return SNBI_ELEMENTS.filter((e) =>
+      `${e.id} ${e.name} ${e.category} ${e.material}`.toLowerCase().includes(query)
+    );
+  }
+
   // Material that applies to this location: substructure → sub material; otherwise super.
   const material = isSubstructureLocation(location) ? subMaterial : superMaterial;
   const materialApplies =
     !!material &&
     (location.includes("Span") || isSubstructureLocation(location));
 
-  // Searching broadens to the full location catalog (incl. non-core); otherwise
-  // we honor the selected structure type.
-  let list: readonly SnbiElement[] = query
-    ? locationCategoryElements(location)
-    : locationTypeElements(location, superTypeId, subTypeId);
+  // No search: honor the selected structure type for this location.
+  let list: readonly SnbiElement[] = locationTypeElements(location, superTypeId, subTypeId);
 
   if (materialApplies) list = list.filter((e) => e.material === material);
 
-  if (query) {
-    list = list.filter((e) =>
-      `${e.id} ${e.name}`.toLowerCase().includes(query)
-    );
-  } else {
-    const coreList = list.filter((e) => e.core);
-    // Fall back to the full narrowed list if a filter leaves no core elements.
-    if (coreList.length > 0) list = coreList;
-  }
+  const coreList = list.filter((e) => e.core);
+  // Fall back to the full narrowed list if a filter leaves no core elements.
+  if (coreList.length > 0) list = coreList;
 
   return list;
 }
