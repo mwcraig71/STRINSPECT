@@ -19,9 +19,12 @@ export const HealthCheckResponse = zod.object({
  * Returns metadata for all synced sessions (no defect/NBI payload)
  * @summary List all inspection sessions
  */
+export const SessionSource = zod.enum(["mobile_sync", "pdf_import"]);
+
 export const ListSessionsResponseItem = zod.object({
   id: zod.string(),
   structureNumber: zod.string(),
+  source: SessionSource.default("mobile_sync"),
   defectCount: zod.number(),
   cs4Count: zod.number(),
   syncedAt: zod.coerce.date(),
@@ -34,6 +37,7 @@ export const ListSessionsResponse = zod.array(ListSessionsResponseItem);
  */
 export const UpsertSessionBody = zod.object({
   structureNumber: zod.string(),
+  source: SessionSource.optional(),
   defects: zod.array(zod.unknown()).optional(),
   nbiRatings: zod.array(zod.unknown()).optional(),
   importSummary: zod.unknown().optional(),
@@ -42,6 +46,7 @@ export const UpsertSessionBody = zod.object({
 export const UpsertSessionResponse = zod.object({
   id: zod.string(),
   structureNumber: zod.string(),
+  source: SessionSource.default("mobile_sync"),
   defectCount: zod.number(),
   cs4Count: zod.number(),
   syncedAt: zod.coerce.date(),
@@ -57,6 +62,7 @@ export const GetSessionParams = zod.object({
 export const GetSessionResponse = zod.object({
   id: zod.string(),
   structureNumber: zod.string(),
+  source: SessionSource.default("mobile_sync"),
   defectCount: zod.number(),
   cs4Count: zod.number(),
   syncedAt: zod.coerce.date(),

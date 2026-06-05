@@ -2,11 +2,15 @@ import { pgTable, text, integer, timestamp, jsonb, uuid, uniqueIndex } from "dri
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
+export const SESSION_SOURCES = ["mobile_sync", "pdf_import"] as const;
+export type SessionSource = typeof SESSION_SOURCES[number];
+
 export const inspectionSessionsTable = pgTable(
   "inspection_sessions",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     structureNumber: text("structure_number").notNull(),
+    source: text("source").$type<SessionSource>().notNull().default("mobile_sync"),
     defectCount: integer("defect_count").notNull().default(0),
     cs4Count: integer("cs4_count").notNull().default(0),
     syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),

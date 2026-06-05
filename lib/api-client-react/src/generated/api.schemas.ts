@@ -9,9 +9,12 @@ export interface HealthStatus {
   status: string;
 }
 
+export type SessionSource = "mobile_sync" | "pdf_import";
+
 export interface SessionSummary {
   id: string;
   structureNumber: string;
+  source: SessionSource;
   defectCount: number;
   cs4Count: number;
   syncedAt: string;
@@ -20,6 +23,7 @@ export interface SessionSummary {
 export interface SessionDetail {
   id: string;
   structureNumber: string;
+  source: SessionSource;
   defectCount: number;
   cs4Count: number;
   syncedAt: string;
@@ -30,6 +34,7 @@ export interface SessionDetail {
 
 export interface UpsertSessionBody {
   structureNumber: string;
+  source?: SessionSource;
   defects?: unknown[];
   nbiRatings?: unknown[];
   importSummary?: unknown;

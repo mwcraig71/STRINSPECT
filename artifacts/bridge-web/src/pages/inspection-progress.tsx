@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { Upload, AlertTriangle, Wrench, HelpCircle, RefreshCw, Cloud, ChevronDown, ChevronUp } from "lucide-react";
+import { Upload, AlertTriangle, Wrench, HelpCircle, RefreshCw, Cloud, ChevronDown, ChevronUp, Smartphone, FileText } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -162,6 +162,16 @@ export default function InspectionProgress({ sessionData, setSessionData }: Prop
                 {sessions.length}
               </span>
             )}
+            {sessions && (() => {
+              const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+              const recentCount = sessions.filter((s) => new Date(s.syncedAt).getTime() > cutoff).length;
+              return recentCount > 0 ? (
+                <span className="text-xs bg-green-500/15 text-green-400 rounded-full px-2 py-0.5 font-semibold flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" />
+                  {recentCount} updated today
+                </span>
+              ) : null;
+            })()}
           </div>
           <div className="flex items-center gap-3">
             {dataUpdatedAt > 0 && (
@@ -212,11 +222,24 @@ export default function InspectionProgress({ sessionData, setSessionData }: Prop
                   className="w-full px-4 py-3 text-left hover:bg-secondary/40 transition-colors flex items-center justify-between gap-4 group disabled:opacity-60"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors truncate">
-                      {s.structureNumber}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors truncate">
+                        {s.structureNumber}
+                      </p>
+                      {s.source === "mobile_sync" ? (
+                        <span className="flex items-center gap-1 text-xs bg-blue-500/10 text-blue-400 rounded-full px-2 py-0.5 font-medium flex-shrink-0">
+                          <Smartphone className="h-3 w-3" />
+                          Device
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-xs bg-amber-500/10 text-amber-400 rounded-full px-2 py-0.5 font-medium flex-shrink-0">
+                          <FileText className="h-3 w-3" />
+                          PDF Import
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Synced {formatRelativeTime(s.syncedAt)}
+                      Last synced {formatRelativeTime(s.syncedAt)}
                     </p>
                   </div>
                   <div className="flex items-center gap-4 flex-shrink-0">

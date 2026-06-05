@@ -17,6 +17,7 @@ router.get("/sessions", async (_req, res) => {
     .select({
       id: inspectionSessionsTable.id,
       structureNumber: inspectionSessionsTable.structureNumber,
+      source: inspectionSessionsTable.source,
       defectCount: inspectionSessionsTable.defectCount,
       cs4Count: inspectionSessionsTable.cs4Count,
       syncedAt: inspectionSessionsTable.syncedAt,
@@ -35,6 +36,7 @@ router.post("/sessions", async (req, res) => {
   }
 
   const { structureNumber } = bodyParsed.data;
+  const source = bodyParsed.data.source ?? "mobile_sync";
   const defects = bodyParsed.data.defects ?? [];
   const nbiRatings = bodyParsed.data.nbiRatings ?? [];
   const importSummary = bodyParsed.data.importSummary ?? null;
@@ -48,14 +50,15 @@ router.post("/sessions", async (req, res) => {
 
   const [row] = await db
     .insert(inspectionSessionsTable)
-    .values({ structureNumber, defects, nbiRatings, importSummary, defectCount, cs4Count })
+    .values({ structureNumber, source, defects, nbiRatings, importSummary, defectCount, cs4Count })
     .onConflictDoUpdate({
       target: inspectionSessionsTable.structureNumber,
-      set: { defects, nbiRatings, importSummary, defectCount, cs4Count, syncedAt: new Date() },
+      set: { source, defects, nbiRatings, importSummary, defectCount, cs4Count, syncedAt: new Date() },
     })
     .returning({
       id: inspectionSessionsTable.id,
       structureNumber: inspectionSessionsTable.structureNumber,
+      source: inspectionSessionsTable.source,
       defectCount: inspectionSessionsTable.defectCount,
       cs4Count: inspectionSessionsTable.cs4Count,
       syncedAt: inspectionSessionsTable.syncedAt,
