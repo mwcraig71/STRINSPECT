@@ -70,6 +70,9 @@ export default defineConfig({
       "/api": {
         target: `http://localhost:${process.env.API_SERVER_PORT ?? "8080"}`,
         changeOrigin: true,
+        ...(process.env.API_KEY
+          ? { headers: { authorization: `Bearer ${process.env.API_KEY}` } }
+          : {}),
       },
     },
   },

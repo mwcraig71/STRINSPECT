@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import { eq } from "drizzle-orm";
 import { db, inspectionSessionsTable } from "@workspace/db";
 import {
@@ -11,6 +11,31 @@ import {
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
+
+function requireApiKey(req: Request, res: Response, next: NextFunction): void {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    next();
+    return;
+  }
+
+  const authHeader = req.headers["authorization"];
+  const xApiKey = req.headers["x-api-key"];
+
+  let provided: string | undefined;
+  if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
+    provided = authHeader.slice(7);
+  } else if (typeof xApiKey === "string") {
+    provided = xApiKey;
+  }
+
+  if (!provided || provided !== apiKey) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  next();
+}
 
 router.get("/sessions", async (_req, res) => {
   const rows = await db
@@ -28,7 +53,7 @@ router.get("/sessions", async (_req, res) => {
   res.json(ListSessionsResponse.parse(rows));
 });
 
-router.post("/sessions", async (req, res) => {
+router.post("/sessions", requireApiKey, async (req, res) => {
   const bodyParsed = UpsertSessionBody.safeParse(req.body);
   if (!bodyParsed.success) {
     res.status(400).json({ error: bodyParsed.error.message });

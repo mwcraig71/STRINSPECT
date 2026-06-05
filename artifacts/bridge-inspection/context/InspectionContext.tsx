@@ -8,7 +8,9 @@ import React, {
   useState,
 } from "react";
 import { nbiSubNameMatchScore, parseReport } from "../utils/pdfParser";
-import { setBaseUrl, upsertSession } from "@workspace/api-client-react";
+import { setBaseUrl, setAuthTokenGetter, upsertSession } from "@workspace/api-client-react";
+
+setAuthTokenGetter(() => process.env.EXPO_PUBLIC_API_KEY ?? null);
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
