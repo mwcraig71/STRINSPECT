@@ -1164,6 +1164,8 @@ interface InspectionContextType {
   clearImportSummary: () => void;
   clearInspection: () => void;
   lastSynced: string | null;
+  lastModified: string | null;
+  hasUnsyncedChanges: boolean;
   syncSession: () => Promise<void>;
 }
 
@@ -1405,6 +1407,7 @@ const STORAGE_KEYS = {
   LAST_JOINT_ELEMENT: "@bridge_last_joint_element",
   DEMO_CLEARED: "@bridge_demo_cleared_v1",
   LAST_SYNCED: "@bridge_last_synced",
+  LAST_MODIFIED: "@bridge_last_modified",
 };
 
 export function InspectionProvider({ children }: { children: React.ReactNode }) {
@@ -1418,6 +1421,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const [substructureMaterial, setSubstructureMaterialState] = useState("");
   const [elementSearch, setElementSearch] = useState("");
   const [lastSynced, setLastSynced] = useState<string | null>(null);
+  const [lastModified, setLastModifiedState] = useState<string | null>(null);
   const [savedDefects, setSavedDefectsState] = useState<DefectRecord[]>([]);
   const [nbiRatings, setNbiRatingsState] = useState<NbiRating[]>(INITIAL_NBI_RATINGS);
   const [structureNumber, setStructureNumberState] = useState("");
@@ -1480,7 +1484,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           ]);
           await AsyncStorage.setItem(STORAGE_KEYS.DEMO_CLEARED, "1");
         }
-        const [defects, nbi, nom, insType, superType, subType, superMat, subMat, structNum, uc, ch, sb, sn, spp, impSummary, lastJoint, lastSync] = await Promise.all([
+        const [defects, nbi, nom, insType, superType, subType, superMat, subMat, structNum, uc, ch, sb, sn, spp, impSummary, lastJoint, lastSync, lastMod] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.SAVED_DEFECTS),
           AsyncStorage.getItem(STORAGE_KEYS.NBI_RATINGS),
           AsyncStorage.getItem(STORAGE_KEYS.NOMENCLATURE),
@@ -1498,9 +1502,11 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           AsyncStorage.getItem(STORAGE_KEYS.IMPORT_SUMMARY),
           AsyncStorage.getItem(STORAGE_KEYS.LAST_JOINT_ELEMENT),
           AsyncStorage.getItem(STORAGE_KEYS.LAST_SYNCED),
+          AsyncStorage.getItem(STORAGE_KEYS.LAST_MODIFIED),
         ]);
         if (lastJoint) setLastJointElementIdState(lastJoint);
         if (lastSync) setLastSynced(lastSync);
+        if (lastMod) setLastModifiedState(lastMod);
         if (defects) setSavedDefectsState(JSON.parse(defects));
         if (nbi) setNbiRatingsState(JSON.parse(nbi));
         if (impSummary) {
@@ -1617,16 +1623,24 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   }, []);
 
   // ── Persist savedDefects ──
+  const bumpLastModified = useCallback(() => {
+    const ts = new Date().toISOString();
+    setLastModifiedState(ts);
+    AsyncStorage.setItem(STORAGE_KEYS.LAST_MODIFIED, ts).catch(() => {});
+  }, []);
+
   const setSavedDefects = useCallback((v: DefectRecord[]) => {
     setSavedDefectsState(v);
     AsyncStorage.setItem(STORAGE_KEYS.SAVED_DEFECTS, JSON.stringify(v)).catch(() => {});
-  }, []);
+    bumpLastModified();
+  }, [bumpLastModified]);
 
   // ── Persist nbiRatings ──
   const setNbiRatings = useCallback((v: NbiRating[]) => {
     setNbiRatingsState(v);
     AsyncStorage.setItem(STORAGE_KEYS.NBI_RATINGS, JSON.stringify(v)).catch(() => {});
-  }, []);
+    bumpLastModified();
+  }, [bumpLastModified]);
 
   // ── Persist importSummary ──
   const setImportSummary = useCallback((v: ImportSummary | null) => {
@@ -1692,6 +1706,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const setStructureNumber = useCallback((v: string) => {
     setStructureNumberState(v);
     AsyncStorage.setItem(STORAGE_KEYS.STRUCTURE_NUMBER, v).catch(() => {});
+    bumpLastModified();
     setCifData((prev) => ({ ...prev, structureNumber: v }));
     setUnderclearanceDataState((prev) => {
       const next = { ...prev, structureNumber: v };
@@ -1703,15 +1718,19 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
       AsyncStorage.setItem(STORAGE_KEYS.CHANNEL, JSON.stringify(next)).catch(() => {});
       return next;
     });
-  }, []);
+  }, [bumpLastModified]);
 
   // ── Discard the entire imported/working inspection session ──
   const clearInspection = useCallback(() => {
-    setSavedDefects([]);
-    setNbiRatings(INITIAL_NBI_RATINGS);
+    setSavedDefectsState([]);
+    AsyncStorage.setItem(STORAGE_KEYS.SAVED_DEFECTS, JSON.stringify([])).catch(() => {});
+    setNbiRatingsState(INITIAL_NBI_RATINGS);
+    AsyncStorage.setItem(STORAGE_KEYS.NBI_RATINGS, JSON.stringify(INITIAL_NBI_RATINGS)).catch(() => {});
     setStructureNumber("");
     setImportSummary(null);
-  }, [setSavedDefects, setNbiRatings, setStructureNumber, setImportSummary]);
+    setLastModifiedState(null);
+    AsyncStorage.removeItem(STORAGE_KEYS.LAST_MODIFIED).catch(() => {});
+  }, [setStructureNumber, setImportSummary]);
 
   // ── Persist underclearance ──
   const setUnderclearanceData = useCallback((v: UnderclearanceData) => {
@@ -2340,6 +2359,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           });
         }
 
+        bumpLastModified();
+
         const unmatchedNames = unmatchedNbi.map((r) => `Item ${r.item}: ${r.componentName}`);
         const elementsFound = elements.filter((e) => !e.isDefect).length;
 
@@ -2383,7 +2404,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         setParsingActive(false);
       }
     },
-    [setSavedDefectsState, setNbiRatingsState, setStructureNumber, nbiRatings, setImportSummary]
+    [setSavedDefectsState, setNbiRatingsState, setStructureNumber, nbiRatings, setImportSummary, bumpLastModified]
   );
 
   // Retained fallback hook. The UI always triggers a real PDF import via
@@ -2511,6 +2532,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     clearImportSummary,
     clearInspection,
     lastSynced,
+    lastModified,
+    hasUnsyncedChanges: lastModified !== null && (lastSynced === null || lastModified > lastSynced),
     syncSession,
   };
 

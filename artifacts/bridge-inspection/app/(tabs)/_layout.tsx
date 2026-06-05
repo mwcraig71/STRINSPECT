@@ -9,6 +9,8 @@ import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
 import { InspectionProvider } from "@/context/InspectionContext";
+import { SyncToast } from "@/components/SyncToast";
+import { useAutoSync } from "@/hooks/useAutoSync";
 
 function NativeTabLayout() {
   return (
@@ -100,14 +102,20 @@ function ClassicTabLayout() {
   );
 }
 
+function TabContent() {
+  const { toastVisible, toastKey } = useAutoSync();
+  return (
+    <View style={{ flex: 1 }}>
+      {isLiquidGlassAvailable() ? <NativeTabLayout /> : <ClassicTabLayout />}
+      <SyncToast key={toastKey} visible={toastVisible} message="Auto-synced to cloud" />
+    </View>
+  );
+}
+
 export default function TabLayout() {
   return (
     <InspectionProvider>
-      {isLiquidGlassAvailable() ? (
-        <NativeTabLayout />
-      ) : (
-        <ClassicTabLayout />
-      )}
+      <TabContent />
     </InspectionProvider>
   );
 }
