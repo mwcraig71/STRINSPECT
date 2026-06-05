@@ -8,6 +8,7 @@ import React, {
   useState,
 } from "react";
 import { nbiSubNameMatchScore, parseReport } from "../utils/pdfParser";
+import { setBaseUrl, upsertSession } from "@workspace/api-client-react";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -1161,6 +1162,8 @@ interface InspectionContextType {
   importSummary: ImportSummary | null;
   clearImportSummary: () => void;
   clearInspection: () => void;
+  lastSynced: string | null;
+  syncSession: () => Promise<void>;
 }
 
 export interface ElementSummaryRow {
@@ -1400,6 +1403,7 @@ const STORAGE_KEYS = {
   IMPORT_SUMMARY: "@bridge_import_summary",
   LAST_JOINT_ELEMENT: "@bridge_last_joint_element",
   DEMO_CLEARED: "@bridge_demo_cleared_v1",
+  LAST_SYNCED: "@bridge_last_synced",
 };
 
 export function InspectionProvider({ children }: { children: React.ReactNode }) {
@@ -1412,6 +1416,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const [superstructureMaterial, setSuperstructureMaterialState] = useState("");
   const [substructureMaterial, setSubstructureMaterialState] = useState("");
   const [elementSearch, setElementSearch] = useState("");
+  const [lastSynced, setLastSynced] = useState<string | null>(null);
   const [savedDefects, setSavedDefectsState] = useState<DefectRecord[]>([]);
   const [nbiRatings, setNbiRatingsState] = useState<NbiRating[]>(INITIAL_NBI_RATINGS);
   const [structureNumber, setStructureNumberState] = useState("");
@@ -1474,7 +1479,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           ]);
           await AsyncStorage.setItem(STORAGE_KEYS.DEMO_CLEARED, "1");
         }
-        const [defects, nbi, nom, insType, superType, subType, superMat, subMat, structNum, uc, ch, sb, sn, spp, impSummary, lastJoint] = await Promise.all([
+        const [defects, nbi, nom, insType, superType, subType, superMat, subMat, structNum, uc, ch, sb, sn, spp, impSummary, lastJoint, lastSync] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.SAVED_DEFECTS),
           AsyncStorage.getItem(STORAGE_KEYS.NBI_RATINGS),
           AsyncStorage.getItem(STORAGE_KEYS.NOMENCLATURE),
@@ -1491,8 +1496,10 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           AsyncStorage.getItem(STORAGE_KEYS.STEEL_PIPE_PILE),
           AsyncStorage.getItem(STORAGE_KEYS.IMPORT_SUMMARY),
           AsyncStorage.getItem(STORAGE_KEYS.LAST_JOINT_ELEMENT),
+          AsyncStorage.getItem(STORAGE_KEYS.LAST_SYNCED),
         ]);
         if (lastJoint) setLastJointElementIdState(lastJoint);
+        if (lastSync) setLastSynced(lastSync);
         if (defects) setSavedDefectsState(JSON.parse(defects));
         if (nbi) setNbiRatingsState(JSON.parse(nbi));
         if (impSummary) {
@@ -1663,6 +1670,22 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     setSubstructureMaterialState(v);
     AsyncStorage.setItem(STORAGE_KEYS.SUBSTRUCTURE_MATERIAL, v).catch(() => {});
   }, []);
+
+  const syncSession = useCallback(async (): Promise<void> => {
+    const apiUrl = process.env.EXPO_PUBLIC_API_URL ??
+      (process.env.EXPO_PUBLIC_DOMAIN
+        ? `https://${process.env.EXPO_PUBLIC_DOMAIN}:8080`
+        : null);
+    setBaseUrl(apiUrl ?? null);
+    await upsertSession({
+      structureNumber: structureNumber.trim() || "UNKNOWN",
+      defects: savedDefects,
+      nbiRatings,
+    });
+    const ts = new Date().toISOString();
+    setLastSynced(ts);
+    AsyncStorage.setItem(STORAGE_KEYS.LAST_SYNCED, ts).catch(() => {});
+  }, [structureNumber, savedDefects, nbiRatings]);
 
   const setStructureNumber = useCallback((v: string) => {
     setStructureNumberState(v);
@@ -2485,6 +2508,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     importSummary,
     clearImportSummary,
     clearInspection,
+    lastSynced,
+    syncSession,
   };
 
   return (

@@ -2,6 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import React from "react";
 import {
+  ActivityIndicator,
   Alert,
   Modal,
   Pressable,
@@ -48,10 +49,44 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
     savedDefects,
     structureNumber,
     importSummary,
+    lastSynced,
+    syncSession,
   } = useInspection();
 
   const hasInspectionData =
     savedDefects.length > 0 || !!structureNumber || !!importSummary;
+
+  type SyncStatus = "idle" | "syncing" | "success" | "error";
+  const [syncStatus, setSyncStatus] = React.useState<SyncStatus>("idle");
+  const [syncError, setSyncError] = React.useState("");
+
+  const formatRelativeTime = (iso: string): string => {
+    const diff = Date.now() - new Date(iso).getTime();
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return "just now";
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    return `${Math.floor(h / 24)}d ago`;
+  };
+
+  const handleSync = async () => {
+    if (syncStatus === "syncing") return;
+    setSyncStatus("syncing");
+    setSyncError("");
+    try {
+      await syncSession();
+      setSyncStatus("success");
+    } catch (err: unknown) {
+      const raw = err instanceof Error ? err.message : "Sync failed.";
+      const isOffline =
+        err instanceof TypeError ||
+        raw.toLowerCase().includes("network") ||
+        raw.toLowerCase().includes("failed to fetch");
+      setSyncError(isOffline ? "No internet connection. Check your network and try again." : raw);
+      setSyncStatus("error");
+    }
+  };
 
   const handleClearInspection = () => {
     Alert.alert(
@@ -445,6 +480,65 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
               </Text>
             </TouchableOpacity>
           </View>
+
+          {/* Cloud Sync */}
+          <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
+            <View style={styles.cardHeader}>
+              <Feather name="cloud" size={15} color={c.mutedForeground} />
+              <Text style={[styles.cardTitle, { color: c.foreground }]}>Cloud Sync</Text>
+              {syncStatus === "success" && (
+                <View style={styles.syncBadge}>
+                  <Feather name="check" size={10} color="#34d399" />
+                  <Text style={styles.syncBadgeText}>Synced</Text>
+                </View>
+              )}
+            </View>
+            <Text style={[styles.cardDesc, { color: c.mutedForeground }]}>
+              Upload structure number, defect records, and NBI ratings to the server. Photos stay on this device.
+            </Text>
+            {lastSynced && syncStatus !== "error" && (
+              <View style={styles.syncMeta}>
+                <Feather name="clock" size={11} color="#475569" />
+                <Text style={[styles.syncMetaText, { color: "#475569" }]}>
+                  Last synced {formatRelativeTime(lastSynced)}
+                </Text>
+              </View>
+            )}
+            {syncStatus === "error" && (
+              <View style={[styles.syncErrorBox, { backgroundColor: "#1f0a0a", borderColor: "#7f1d1d" }]}>
+                <Feather name="alert-circle" size={13} color="#f87171" />
+                <Text style={styles.syncErrorText}>{syncError}</Text>
+              </View>
+            )}
+            <TouchableOpacity
+              style={[
+                styles.syncBtn,
+                {
+                  backgroundColor: syncStatus === "success" ? "#022c22" : "#0c4a6e",
+                  borderColor: syncStatus === "error" ? "#7f1d1d" : syncStatus === "success" ? "#064e3b" : "#0284c7",
+                  opacity: syncStatus === "syncing" ? 0.6 : 1,
+                },
+              ]}
+              onPress={handleSync}
+              disabled={syncStatus === "syncing"}
+            >
+              {syncStatus === "syncing" ? (
+                <ActivityIndicator size="small" color="#38bdf8" />
+              ) : (
+                <Feather
+                  name={syncStatus === "success" ? "check-circle" : syncStatus === "error" ? "refresh-cw" : "upload"}
+                  size={16}
+                  color={syncStatus === "success" ? "#34d399" : syncStatus === "error" ? "#f87171" : "#38bdf8"}
+                />
+              )}
+              <Text style={[
+                styles.syncBtnText,
+                { color: syncStatus === "success" ? "#34d399" : syncStatus === "error" ? "#fca5a5" : "#f8fafc" },
+              ]}>
+                {syncStatus === "syncing" ? "Syncing…" : syncStatus === "success" ? "Synced!" : syncStatus === "error" ? "Retry Sync" : "Sync to Cloud"}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
       </View>
     </Modal>
@@ -552,4 +646,36 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   clearBtnText: { fontSize: 13, fontWeight: "800", textTransform: "uppercase" },
+  syncBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#022c22",
+    borderRadius: 6,
+    paddingVertical: 3,
+    paddingHorizontal: 7,
+    marginLeft: "auto" as const,
+  },
+  syncBadgeText: { fontSize: 10, fontWeight: "700" as const, color: "#34d399" },
+  syncMeta: { flexDirection: "row", alignItems: "center", gap: 5 },
+  syncMetaText: { fontSize: 11, fontWeight: "500" as const },
+  syncErrorBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  syncErrorText: { fontSize: 12, fontWeight: "500" as const, color: "#fca5a5", flex: 1, lineHeight: 17 },
+  syncBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  syncBtnText: { fontSize: 13, fontWeight: "800" as const, textTransform: "uppercase" as const },
 });

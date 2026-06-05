@@ -98,6 +98,8 @@ export default function InspectionScreen() {
     setShowDailySafetyModal,
     setShowSnbiModal,
     setShowSteelPipePileModal,
+    syncSession,
+    lastSynced,
   } = useInspection();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -111,6 +113,27 @@ export default function InspectionScreen() {
   const [elementPickerOpen, setElementPickerOpen] = useState(false);
   const [defectPickerOpen, setDefectPickerOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [quickSyncStatus, setQuickSyncStatus] = useState<"idle" | "syncing" | "success" | "error">("idle");
+
+  const handleQuickSync = async () => {
+    if (quickSyncStatus === "syncing") return;
+    if (!structureNumber) {
+      Alert.alert("Sync", "Set a structure number before syncing.");
+      return;
+    }
+    setQuickSyncStatus("syncing");
+    try {
+      await syncSession();
+      setQuickSyncStatus("success");
+      setTimeout(() => setQuickSyncStatus("idle"), 3000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Sync failed";
+      const isOffline = err instanceof TypeError || msg.toLowerCase().includes("network");
+      Alert.alert("Sync Failed", isOffline ? "No internet connection." : msg);
+      setQuickSyncStatus("error");
+      setTimeout(() => setQuickSyncStatus("idle"), 3000);
+    }
+  };
 
   const addPhoto = async () => {
     if (Platform.OS === "web") {
@@ -274,6 +297,30 @@ export default function InspectionScreen() {
               ]}>
                 {inspectionType}
               </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.gearBtn,
+                {
+                  backgroundColor:
+                    quickSyncStatus === "success" ? "#064e3b"
+                    : quickSyncStatus === "error" ? "#450a0a"
+                    : "#1e293b",
+                },
+              ]}
+              onPress={handleQuickSync}
+              disabled={quickSyncStatus === "syncing"}
+            >
+              <Feather
+                name="cloud"
+                size={16}
+                color={
+                  quickSyncStatus === "syncing" ? "#475569"
+                  : quickSyncStatus === "success" ? "#34d399"
+                  : quickSyncStatus === "error" ? "#f87171"
+                  : lastSynced ? "#64748b" : "#475569"
+                }
+              />
             </TouchableOpacity>
             <TouchableOpacity style={[styles.gearBtn, { backgroundColor: "#1e293b" }]} onPress={() => setSettingsOpen(true)}>
               <Feather name="settings" size={16} color="#94a3b8" />
