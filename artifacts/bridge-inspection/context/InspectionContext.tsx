@@ -7,7 +7,7 @@ import React, {
   useMemo,
   useState,
 } from "react";
-import { nbiSubNameMatchScore, parseReport } from "../utils/pdfParser";
+import { nbiSubNameMatchScore, parseReport, ParsedUnderclearance, ParsedChannelCrossSection } from "../utils/pdfParser";
 import { setBaseUrl, setAuthTokenGetter, upsertSession } from "@workspace/api-client-react";
 
 setAuthTokenGetter(() => process.env.EXPO_PUBLIC_API_KEY ?? null);
@@ -525,6 +525,8 @@ export interface UnderclearanceEntry {
   minMeasuredVert: UcMeasure; // Item 54.2
   signedVertData: string;
   signedVertTolerance: string;
+  isImported?: boolean;
+  needsVerification?: boolean;
 }
 
 export interface UnderclearanceData {
@@ -760,6 +762,8 @@ export interface ChannelMeasurement {
   distFromLastBent: string; // Distance From Last Bent
   vertDist: string; // Vertical Distance
   notes: string;
+  isImported?: boolean;
+  needsVerification?: boolean;
 }
 
 export type ChannelSection = "upstream" | "downstream";
@@ -2164,7 +2168,13 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     async (source: File | { uri: string; name?: string }) => {
       setParsingActive(true);
       try {
-        const { structureNumber: parsedNum, elements, nbi } = await parseReport(source);
+        const {
+          structureNumber: parsedNum,
+          elements,
+          nbi,
+          underclearance: parsedUnderclearance,
+          channelCrossSection: parsedChannelCrossSection,
+        } = await parseReport(source);
 
         if (parsedNum) {
           setStructureNumber(parsedNum);
@@ -2361,6 +2371,108 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           });
         }
 
+        // ── Underclearance import (Form 2601) ──
+        if (parsedUnderclearance) {
+          setUnderclearanceDataState((prev) => {
+            const merged: UnderclearanceData = {
+              ...prev,
+              district: prev.district || parsedUnderclearance.district,
+              county: prev.county || parsedUnderclearance.county,
+              controlSection: prev.controlSection || parsedUnderclearance.controlSection,
+              structureNumber: prev.structureNumber || parsedUnderclearance.structureNumber,
+              route: prev.route || parsedUnderclearance.route,
+              featureCrossed: prev.featureCrossed || parsedUnderclearance.featureCrossed,
+              // Prefer imported date over default placeholder (today's date)
+              inspectionDate: parsedUnderclearance.inspectionDate || prev.inspectionDate,
+            };
+            if (parsedUnderclearance.entries.length > 0) {
+              const importedEntries = parsedUnderclearance.entries.map((pe) => ({
+                ...createUnderclearanceEntry(),
+                psn: pe.psn,
+                rightLateral: pe.rightLateral,
+                leftLateral: pe.leftLateral,
+                totalHorizontal: pe.totalHorizontal,
+                maxPracticalVert: pe.maxPracticalVert,
+                minMeasuredVert: pe.minMeasuredVert,
+                signedVertData: pe.signedVertData,
+                signedVertTolerance: pe.signedVertTolerance,
+                needsVerification: true,
+                isImported: true,
+              }));
+              const result = [...merged.entries];
+              let importIdx = 0;
+              for (let i = 0; i < result.length && importIdx < importedEntries.length; i++) {
+                const e = result[i];
+                const isEmpty =
+                  !e.psn &&
+                  !e.rightLateral.data && !e.rightLateral.refer &&
+                  !e.leftLateral.data && !e.leftLateral.refer &&
+                  !e.totalHorizontal.data && !e.totalHorizontal.refer &&
+                  !e.maxPracticalVert.data && !e.maxPracticalVert.refer &&
+                  !e.minMeasuredVert.data && !e.minMeasuredVert.refer &&
+                  !e.signedVertData && !e.signedVertTolerance;
+                if (isEmpty) result[i] = importedEntries[importIdx++];
+              }
+              while (importIdx < importedEntries.length) result.push(importedEntries[importIdx++]);
+              merged.entries = result;
+            }
+            AsyncStorage.setItem(STORAGE_KEYS.UNDERCLEARANCE, JSON.stringify(merged)).catch(() => {});
+            return merged;
+          });
+        }
+
+        // ── Channel Cross-Section import (Form 2600) ──
+        if (parsedChannelCrossSection) {
+          setChannelDataState((prev) => {
+            const merged: ChannelData = {
+              ...prev,
+              district: prev.district || parsedChannelCrossSection.district,
+              county: prev.county || parsedChannelCrossSection.county,
+              controlSection: prev.controlSection || parsedChannelCrossSection.controlSection,
+              structureNumber: prev.structureNumber || parsedChannelCrossSection.structureNumber,
+              route: prev.route || parsedChannelCrossSection.route,
+              featureCrossed: prev.featureCrossed || parsedChannelCrossSection.featureCrossed,
+              // Prefer imported date over default placeholder (today's date)
+              inspectionDate: parsedChannelCrossSection.inspectionDate || prev.inspectionDate,
+            };
+            const mergeChannelRows = (
+              existing: typeof merged.upstream,
+              parsed: typeof parsedChannelCrossSection.upstream
+            ) => {
+              if (parsed.length === 0) return existing;
+              const importedRows = parsed.map((pm) => ({
+                ...createChannelMeasurement(),
+                topRef: pm.topRef,
+                botRef: pm.botRef,
+                totalHoriz: pm.totalHoriz,
+                distFromLastBent: pm.distFromLastBent,
+                vertDist: pm.vertDist,
+                notes: pm.notes,
+                needsVerification: true as const,
+                isImported: true as const,
+              }));
+              const result = [...existing];
+              let importIdx = 0;
+              for (let i = 0; i < result.length && importIdx < importedRows.length; i++) {
+                const m = result[i];
+                // Treat default-seeded placeholder (TR/WS refs, no measurements) as empty
+                const isDefaultRef =
+                  (m.topRef === "" || m.topRef === "TR") &&
+                  (m.botRef === "" || m.botRef === "WS");
+                const isEmpty =
+                  isDefaultRef && !m.totalHoriz && !m.distFromLastBent && !m.vertDist && !m.notes;
+                if (isEmpty) result[i] = importedRows[importIdx++];
+              }
+              while (importIdx < importedRows.length) result.push(importedRows[importIdx++]);
+              return result;
+            };
+            merged.upstream = mergeChannelRows(merged.upstream, parsedChannelCrossSection.upstream);
+            merged.downstream = mergeChannelRows(merged.downstream, parsedChannelCrossSection.downstream);
+            AsyncStorage.setItem(STORAGE_KEYS.CHANNEL, JSON.stringify(merged)).catch(() => {});
+            return merged;
+          });
+        }
+
         bumpLastModified();
 
         const unmatchedNames = unmatchedNbi.map((r) => `Item ${r.item}: ${r.componentName}`);
@@ -2391,10 +2503,16 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
             ? `\n\n${unmatchedNames.length} NBI component(s) not matched:\n${unmatchedNames.join("\n")}`
             : "";
 
+        const ucNote = parsedUnderclearance
+          ? `\nUnderclearance (Form 2601): ${parsedUnderclearance.entries.length} entry(ies) imported.`
+          : "";
+        const chNote = parsedChannelCrossSection
+          ? `\nChannel Cross-Section (Form 2600): ${parsedChannelCrossSection.upstream.length} upstream, ${parsedChannelCrossSection.downstream.length} downstream measurement(s) imported.`
+          : "";
         const { Alert } = require("react-native");
         Alert.alert(
           "Import Complete",
-          `Imported ${newDefects.length} element record(s) across ${elementsFound} elements.\n${nbiFilledCount} of ${nbiTotalCount} NBI field(s) pre-filled.${emptySummary}${unmatchedSummary}\n\n${
+          `Imported ${newDefects.length} element record(s) across ${elementsFound} elements.\n${nbiFilledCount} of ${nbiTotalCount} NBI field(s) pre-filled.${ucNote}${chNote}${emptySummary}${unmatchedSummary}\n\n${
             parsedNum ? `Structure: ${parsedNum}` : "Structure number not found."
           }\n\nSee the import audit on the Summary tab. Assign locations and verify records before submitting.`
         );
@@ -2406,7 +2524,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         setParsingActive(false);
       }
     },
-    [setSavedDefectsState, setNbiRatingsState, setStructureNumber, nbiRatings, setImportSummary, bumpLastModified]
+    [setSavedDefectsState, setNbiRatingsState, setUnderclearanceDataState, setChannelDataState, setStructureNumber, nbiRatings, setImportSummary, bumpLastModified]
   );
 
   // Retained fallback hook. The UI always triggers a real PDF import via

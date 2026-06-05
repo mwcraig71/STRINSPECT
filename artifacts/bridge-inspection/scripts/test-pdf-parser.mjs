@@ -398,6 +398,172 @@ function parseElementsTable(pages) {
   return results;
 }
 
+// ─── Form 2601 Underclearance parser ─────────────────────────────────────────
+
+const UC_LABEL_PATTERNS_JS = [
+  { key: "rightLateral", re: /Right\s+Lateral\s+Clearance/i },
+  { key: "leftLateral", re: /Left\s+Lateral\s+Clearance/i },
+  { key: "totalHorizontal", re: /Total\s+Horizontal\s+Cl\w*/i },
+  { key: "maxPracticalVert", re: /Max(?:imum)?\s+Practical\s+Vert/i },
+  { key: "minMeasuredVert", re: /Min(?:imum)?\s+Measured\s+Vert/i },
+];
+
+function isUcMeasureLabelLine(line) {
+  return UC_LABEL_PATTERNS_JS.some(({ re }) => re.test(line)) || /Signed\s+Vertical\s+Cl/i.test(line);
+}
+
+function extractUcDataAfterLabel(labelRe, line) {
+  const rest = line.replace(labelRe, "").trim();
+  if (!rest || /^(?:Field|Data|Refer\.|Item\s+No\.)/i.test(rest)) return null;
+  const parts = rest.split(/\s{2,}/).map(s => s.trim()).filter(Boolean);
+  if (parts.length === 0) return null;
+  return { data: parts[0], refer: parts[1] || "" };
+}
+
+function extractUcDataFromLine(line) {
+  const trimmed = line.trim();
+  if (!trimmed) return null;
+  if (/^(?:Field|Data|Refer\.|Item\s+No\.|Tolerance)/i.test(trimmed)) return null;
+  if (isUcMeasureLabelLine(trimmed) || /^PSN:/i.test(trimmed)) return null;
+  const parts = trimmed.split(/\s{2,}/).map(s => s.trim()).filter(Boolean);
+  if (parts.length === 0) return null;
+  return { data: parts[0], refer: parts[1] || "" };
+}
+
+function parseFormHeaderBlockJS(allLines, anchorIdx) {
+  let district = "", county = "", controlSection = "", structureNumber = "", route = "", featureCrossed = "", inspectionDate = "";
+  const end = Math.min(anchorIdx + 40, allLines.length);
+  for (let i = anchorIdx; i < end; i++) {
+    const line = allLines[i];
+    if (/District:/i.test(line) && /County:/i.test(line)) {
+      const routeM = line.match(/Route:\s*(.+)/i);
+      if (routeM) route = routeM[1].trim();
+      const secSufM = line.match(/Section:.*?-\s*(\d+)\s+Structure/i);
+      const sectionSuffix = secSufM ? secSufM[1].trim() : "";
+      const vLine = allLines[i + 1] || "";
+      const vParts = vLine.trim().split(/\s{2,}/).map(s => s.trim()).filter(s => s && /\d/.test(s));
+      if (vParts.length >= 1) district = vParts[0];
+      if (vParts.length >= 2) county = vParts[1];
+      if (vParts.length >= 3) { const ctrl = vParts[2]; controlSection = sectionSuffix ? `${ctrl}-${sectionSuffix}` : ctrl; }
+      if (vParts.length >= 4) structureNumber = vParts[3];
+    }
+    if (/Feature\s+Crossed:/i.test(line)) {
+      const sameRest = line.replace(/Feature\s+Crossed:/i, "").replace(/Inspector['s\s]+Signature:?/i, "").trim();
+      if (sameRest) { const parts = sameRest.split(/\s{2,}/).filter(Boolean); if (parts.length >= 1) featureCrossed = parts[0].trim(); }
+      if (!featureCrossed) {
+        const nextLine = allLines[i + 1] || "";
+        const dateM2 = nextLine.match(/Date:\s*(\S+)/i);
+        if (dateM2 && !inspectionDate) inspectionDate = dateM2[1];
+        const fcParts = nextLine.replace(/Date:.*$/i, "").trim().split(/\s{2,}/).filter(Boolean);
+        if (fcParts.length >= 1) featureCrossed = fcParts[0].trim();
+      }
+    }
+    if (!inspectionDate) { const dateM = line.match(/\bDate:\s*(\d[\d\/\-]+)/i); if (dateM) inspectionDate = dateM[1].trim(); }
+  }
+  return { district, county, controlSection, structureNumber, route, featureCrossed, inspectionDate };
+}
+
+function parseUnderclearance(pages) {
+  const allLines = pages.flat();
+  const anchorIdx = allLines.findIndex(l => /Underclearance Record/i.test(l));
+  if (anchorIdx < 0) return null;
+  const header = parseFormHeaderBlockJS(allLines, anchorIdx);
+  const psnHeaders = [];
+  for (let i = anchorIdx; i < allLines.length; i++) {
+    if (/^PSN:.*Refer\./i.test(allLines[i])) psnHeaders.push(i);
+  }
+  const EMPTY = { data: "", refer: "" };
+  const entries = [];
+  for (let b = 0; b < psnHeaders.length; b++) {
+    // Extract PSN value from the header line: "PSN:  <value>  Refer.  ..."
+    let psn = "";
+    const psnHeaderLine = allLines[psnHeaders[b]];
+    const psnM = psnHeaderLine.match(/^PSN:\s+(.+?)\s{2,}Refer\./i);
+    if (psnM) {
+      const candidate = psnM[1].trim();
+      if (candidate && !/^Refer\./i.test(candidate)) psn = candidate;
+    }
+    // Fallback: check the line two positions before the PSN header
+    if (!psn) {
+      const prevIdx = psnHeaders[b] - 2;
+      if (prevIdx >= 0) {
+        const prevLine = allLines[prevIdx].trim();
+        if (prevLine && !/^Field\b/i.test(prevLine) && !/^PSN:/i.test(prevLine) && !/^(?:Reference|District|Feature|Signed|Right|Left|Total|Max|Min|Data)\b/i.test(prevLine)) {
+          psn = prevLine;
+        }
+      }
+    }
+
+    let blockStart = psnHeaders[b] + 1;
+    if (blockStart < allLines.length && /^Data\s+Data/i.test(allLines[blockStart])) blockStart++;
+    const blockEnd = b + 1 < psnHeaders.length ? psnHeaders[b + 1] : allLines.length;
+    const blockLines = allLines.slice(blockStart, blockEnd);
+    const meas = {};
+    let signedVertData = "", signedVertTolerance = "";
+    for (let li = 0; li < blockLines.length; li++) {
+      const bline = blockLines[li];
+      if (!bline.trim()) continue;
+      if (/Signed\s+Vertical\s+Cl/i.test(bline)) {
+        const rest = bline.replace(/Signed\s+Vertical\s+Cl\w*\s*/i, "").trim();
+        const tokens = rest.split(/\s+/).filter(s => s && !/^Tolerance$/i.test(s));
+        if (tokens.length >= 1) signedVertData = tokens[0];
+        if (tokens.length >= 2) signedVertTolerance = tokens[1];
+        continue;
+      }
+      for (const { key, re } of UC_LABEL_PATTERNS_JS) {
+        if (re.test(bline)) {
+          let m = extractUcDataAfterLabel(re, bline);
+          if (!m) {
+            const nextLine = blockLines[li + 1] || "";
+            if (nextLine.trim() && !isUcMeasureLabelLine(nextLine)) { m = extractUcDataFromLine(nextLine); if (m) li++; }
+          }
+          if (m) meas[key] = m;
+          break;
+        }
+      }
+    }
+    const hasData = Object.values(meas).some(m => m.data && m.data !== "-") || (signedVertData !== "" && signedVertData !== "-");
+    if (hasData) {
+      entries.push({
+        psn,
+        rightLateral: meas.rightLateral ?? EMPTY,
+        leftLateral: meas.leftLateral ?? EMPTY,
+        totalHorizontal: meas.totalHorizontal ?? EMPTY,
+        maxPracticalVert: meas.maxPracticalVert ?? EMPTY,
+        minMeasuredVert: meas.minMeasuredVert ?? EMPTY,
+        signedVertData,
+        signedVertTolerance,
+      });
+    }
+  }
+  return { ...header, entries };
+}
+
+function parseChannelCrossSection(pages) {
+  const allLines = pages.flat();
+  const anchorIdx = allLines.findIndex(l => /Channel\s+Cross[-\s]Section|Form\s+2600/i.test(l));
+  if (anchorIdx < 0) return null;
+  const header = parseFormHeaderBlockJS(allLines, anchorIdx);
+  const upstream = [], downstream = [];
+  let currentSection = null, inMeasTable = false;
+  for (let i = anchorIdx; i < allLines.length; i++) {
+    const line = allLines[i];
+    if (/\bUPSTREAM\b/i.test(line) && !/\bDOWNSTREAM\b/i.test(line)) { currentSection = "upstream"; inMeasTable = false; continue; }
+    if (/\bDOWNSTREAM\b/i.test(line)) { currentSection = "downstream"; inMeasTable = false; continue; }
+    if (!currentSection) continue;
+    if (/TOP\s+REF|BOT\.?\s+REF|VERT\.?\s+DIST|TOTAL\s+HORIZ/i.test(line)) { inMeasTable = true; continue; }
+    if (!inMeasTable) continue;
+    if (/^(?:COMMENTS?|Inspector|Date:|Page\s+\d|DISTRICT)/i.test(line)) break;
+    const parts = line.trim().split(/\s{2,}/).map(s => s.trim()).filter(Boolean);
+    if (parts.length < 3) continue;
+    if (/^(?:No\.|Row|Station|Top|Bot|Total|Dist|Vert|Notes)/i.test(parts[0])) continue;
+    const offset = /^\d+$/.test(parts[0]) ? 1 : 0;
+    const meas = { topRef: parts[offset]||"", botRef: parts[offset+1]||"", totalHoriz: parts[offset+2]||"", distFromLastBent: parts[offset+3]||"", vertDist: parts[offset+4]||"", notes: parts[offset+5]||"" };
+    if (meas.totalHoriz || meas.vertDist) { if (currentSection === "upstream") upstream.push(meas); else downstream.push(meas); }
+  }
+  return { ...header, upstream, downstream };
+}
+
 let totalPassed = 0;
 let totalFailed = 0;
 const issues = [];
@@ -490,6 +656,296 @@ for (const { label, path, expectedElements, expectedNbi } of PDFS) {
     const found = nbi.find((n) => n.item === exp.item && exp.name.test(n.componentName));
     assert(`NBI Item ${exp.item} has entry matching ${exp.name}`, !!found, `Not found. Available for item ${exp.item}: ${nbi.filter(n=>n.item===exp.item).map(n=>n.componentName).join(", ")}`);
   }
+}
+
+// ─── Form 2601 / Form 2600 tests ─────────────────────────────────────────────
+
+const FORM_PDFS = [
+  {
+    label: "Form 2601 – Underclearance Record",
+    path: resolve(__dirname, "../../../attached_assets/2601_-_Underclearance_1780594111262.pdf"),
+    type: "underclearance",
+    expected: {
+      district: "02",
+      county: "220",
+      routeContains: "Center Pedestrian Bridge",
+      featureCrossed: "FM-157",
+      inspectionDate: "4/14/2024",
+      minEntries: 1,
+      firstEntry: {
+        rightLateralData: "6.5'",
+        totalHorizontalData: "78.9'",
+        signedVertData: "17'10\"",
+      },
+    },
+  },
+  {
+    label: "Form 2600 – Channel Cross-Section (blank fillable)",
+    path: resolve(__dirname, "../../../attached_assets/Channel_Form_Fillable_1780595585246.pdf"),
+    type: "channel",
+    expectedNull: true,
+  },
+];
+
+for (const { label, path, type, expected, expectedNull } of FORM_PDFS) {
+  console.log(`\n${"=".repeat(65)}`);
+  console.log(`Testing: ${label}`);
+  console.log("=".repeat(65));
+
+  let pages;
+  try {
+    pages = await loadPdfText(path);
+    console.log(`  Loaded ${pages.length} pages`);
+  } catch (e) {
+    console.error(`  ERROR loading PDF: ${e.message}`);
+    totalFailed++;
+    issues.push(`Could not load ${label}: ${e.message}`);
+    continue;
+  }
+
+  if (type === "underclearance") {
+    const uc = parseUnderclearance(pages);
+    console.log(`  parseUnderclearance result: ${uc ? "non-null" : "null"}`);
+    assert("parseUnderclearance returns non-null", uc !== null, "Form 2601 not detected");
+    if (uc) {
+      console.log(`  district="${uc.district}" county="${uc.county}" controlSection="${uc.controlSection}" structureNumber="${uc.structureNumber}"`);
+      console.log(`  route="${uc.route}" featureCrossed="${uc.featureCrossed}" inspectionDate="${uc.inspectionDate}"`);
+      console.log(`  entries: ${uc.entries.length}`);
+      assert(`district = "${expected.district}"`, uc.district === expected.district, `Got: "${uc.district}"`);
+      assert(`county = "${expected.county}"`, uc.county === expected.county, `Got: "${uc.county}"`);
+      assert(`route contains "${expected.routeContains}"`, uc.route.includes(expected.routeContains), `Got: "${uc.route}"`);
+      assert(`featureCrossed = "${expected.featureCrossed}"`, uc.featureCrossed === expected.featureCrossed, `Got: "${uc.featureCrossed}"`);
+      assert(`inspectionDate = "${expected.inspectionDate}"`, uc.inspectionDate === expected.inspectionDate, `Got: "${uc.inspectionDate}"`);
+      assert(`at least ${expected.minEntries} entry(ies)`, uc.entries.length >= expected.minEntries, `Got: ${uc.entries.length}`);
+      if (uc.entries.length >= 1) {
+        const e = uc.entries[0];
+        console.log(`  First entry: psn="${e.psn}" rightLateral="${e.rightLateral.data}" totalHorizontal="${e.totalHorizontal.data}" signedVert="${e.signedVertData}"`);
+        assert("first entry has psn field (string, may be blank if not filled in form)", typeof e.psn === "string", `psn is ${typeof e.psn}`);
+        assert(`first entry rightLateral.data = "${expected.firstEntry.rightLateralData}"`, e.rightLateral.data === expected.firstEntry.rightLateralData, `Got: "${e.rightLateral.data}"`);
+        assert(`first entry totalHorizontal.data = "${expected.firstEntry.totalHorizontalData}"`, e.totalHorizontal.data === expected.firstEntry.totalHorizontalData, `Got: "${e.totalHorizontal.data}"`);
+        assert(`first entry signedVertData = "${expected.firstEntry.signedVertData}"`, e.signedVertData === expected.firstEntry.signedVertData, `Got: "${e.signedVertData}"`);
+      }
+    }
+  } else if (type === "channel") {
+    const ch = parseChannelCrossSection(pages);
+    console.log(`  parseChannelCrossSection result: ${ch ? "non-null" : "null"}`);
+    if (expectedNull) {
+      assert("parseChannelCrossSection returns null (blank fillable PDF — expected)", ch === null, `Got non-null result: upstream=${ch?.upstream?.length} downstream=${ch?.downstream?.length}`);
+    }
+  }
+}
+
+// ─── PSN extraction unit test (synthetic) ─────────────────────────────────────
+{
+  console.log(`\n${"=".repeat(65)}`);
+  console.log("Testing: PSN extraction from header line (synthetic)");
+  console.log("=".repeat(65));
+  const mockPages = [[
+    "Underclearance Record",
+    "District: County: Control - Section: - 01 Structure #: Route: FM-1234",
+    "02  300  1111  099",
+    "Feature Crossed:  Inspector's Signature:",
+    "Creek  Date: 5/1/2025",
+    "",
+    "Reference Features:",
+    "A. Beam  B. Slab",
+    "Feature Xed ",
+    "Field  Field  Field  Field",
+    "PSN:  CL  Refer.  Item No.  Refer.  Item No.  Refer.  Item No.  Refer.  Item No.",
+    "Data  Data  Data  Data",
+    "Right Lateral Clearance",
+    "10.5'  A-B  10",
+    "Left Lateral Clearance",
+    "8.0'  A-B  11",
+    "Total Horizontal Clr",
+    "85.0'",
+    "Max Practical Vert Clr",
+    "20'0\"",
+    "Min Measured Vert Clr  19'6\"  A-N  20",
+    "Signed Vertical Clr  19'0\" 1'0\" Tolerance  Tolerance  Tolerance  Tolerance",
+  ]];
+  const uc = parseUnderclearance(mockPages);
+  assert("synthetic: parseUnderclearance returns non-null", uc !== null, "Form not detected");
+  if (uc) {
+    assert("synthetic: district = '02'", uc.district === "02", `Got: "${uc.district}"`);
+    assert("synthetic: at least 1 entry", uc.entries.length >= 1, `Got: ${uc.entries.length}`);
+    if (uc.entries.length >= 1) {
+      const e = uc.entries[0];
+      console.log(`  psn="${e.psn}" rightLateral="${e.rightLateral.data}" totalHoriz="${e.totalHorizontal.data}" signedVert="${e.signedVertData}"`);
+      assert("synthetic: PSN extracted = 'CL'", e.psn === "CL", `Got: "${e.psn}"`);
+      assert("synthetic: rightLateral.data = '10.5''", e.rightLateral.data === "10.5'", `Got: "${e.rightLateral.data}"`);
+      assert("synthetic: totalHorizontal.data = '85.0''", e.totalHorizontal.data === "85.0'", `Got: "${e.totalHorizontal.data}"`);
+      assert("synthetic: signedVertData = '19'0\"'", e.signedVertData === "19'0\"", `Got: "${e.signedVertData}"`);
+      assert("synthetic: signedVertTolerance = '1'0\"'", e.signedVertTolerance === "1'0\"", `Got: "${e.signedVertTolerance}"`);
+    }
+  }
+}
+
+// ─── Form 2600 populated (synthetic) ──────────────────────────────────────────
+{
+  console.log(`\n${"=".repeat(65)}`);
+  console.log("Testing: Form 2600 Channel Cross-Section (synthetic populated)");
+  console.log("=".repeat(65));
+  const mockChannelPages = [[
+    "Channel Cross-Section",
+    "District: County: Control - Section: - 02 Structure #: Route: US-90",
+    "03  150  9999-02  042",
+    "Feature Crossed:  Inspector's Signature:",
+    "Dry Creek  Date: 3/22/2025",
+    "",
+    "UPSTREAM",
+    "TOP REF  BOT REF  TOTAL HORIZ  DIST FROM LAST BENT  VERT DIST  NOTES",
+    "CL  BOT  100.5  50.0  12.5",
+    "L10  BOT  95.0  45.0  11.0",
+    "",
+    "DOWNSTREAM",
+    "TOP REF  BOT REF  TOTAL HORIZ  DIST FROM LAST BENT  VERT DIST  NOTES",
+    "CL  BOT  100.5  50.0  12.3",
+    "R5  BOT  90.0  40.0  10.5",
+  ]];
+  const ch = parseChannelCrossSection(mockChannelPages);
+  console.log(`  parseChannelCrossSection result: ${ch ? "non-null" : "null"}`);
+  assert("synthetic: parseChannelCrossSection returns non-null", ch !== null, "Channel form not detected");
+  if (ch) {
+    console.log(`  district="${ch.district}" county="${ch.county}" featureCrossed="${ch.featureCrossed}" date="${ch.inspectionDate}"`);
+    console.log(`  upstream=${ch.upstream.length} downstream=${ch.downstream.length}`);
+    assert("synthetic: district = '03'", ch.district === "03", `Got: "${ch.district}"`);
+    assert("synthetic: county = '150'", ch.county === "150", `Got: "${ch.county}"`);
+    assert("synthetic: featureCrossed = 'Dry Creek'", ch.featureCrossed === "Dry Creek", `Got: "${ch.featureCrossed}"`);
+    assert("synthetic: inspectionDate = '3/22/2025'", ch.inspectionDate === "3/22/2025", `Got: "${ch.inspectionDate}"`);
+    assert("synthetic: upstream has 2 measurements", ch.upstream.length === 2, `Got: ${ch.upstream.length}`);
+    assert("synthetic: downstream has 2 measurements", ch.downstream.length === 2, `Got: ${ch.downstream.length}`);
+    if (ch.upstream.length >= 1) {
+      const u = ch.upstream[0];
+      console.log(`  upstream[0]: topRef="${u.topRef}" botRef="${u.botRef}" totalHoriz="${u.totalHoriz}" vertDist="${u.vertDist}"`);
+      assert("synthetic: upstream[0].totalHoriz = '100.5'", u.totalHoriz === "100.5", `Got: "${u.totalHoriz}"`);
+      assert("synthetic: upstream[0].vertDist = '12.5'", u.vertDist === "12.5", `Got: "${u.vertDist}"`);
+    }
+    if (ch.downstream.length >= 1) {
+      const d = ch.downstream[0];
+      console.log(`  downstream[0]: topRef="${d.topRef}" totalHoriz="${d.totalHoriz}" vertDist="${d.vertDist}"`);
+      assert("synthetic: downstream[0].totalHoriz = '100.5'", d.totalHoriz === "100.5", `Got: "${d.totalHoriz}"`);
+    }
+  }
+}
+
+// ─── Merge regression: partial existing row must not be overwritten ───────────
+{
+  console.log(`\n${"=".repeat(65)}`);
+  console.log("Testing: underclearance merge – partial row preservation");
+  console.log("=".repeat(65));
+
+  // Helper: simulate the merge logic that InspectionContext uses
+  function mergeUcEntries(existingEntries, importedEntries) {
+    const result = [...existingEntries];
+    let importIdx = 0;
+    for (let i = 0; i < result.length && importIdx < importedEntries.length; i++) {
+      const e = result[i];
+      const isEmpty =
+        !e.psn &&
+        !e.rightLateral?.data && !e.rightLateral?.refer &&
+        !e.leftLateral?.data && !e.leftLateral?.refer &&
+        !e.totalHorizontal?.data && !e.totalHorizontal?.refer &&
+        !e.maxPracticalVert?.data && !e.maxPracticalVert?.refer &&
+        !e.minMeasuredVert?.data && !e.minMeasuredVert?.refer &&
+        !e.signedVertData && !e.signedVertTolerance;
+      if (isEmpty) result[i] = importedEntries[importIdx++];
+    }
+    while (importIdx < importedEntries.length) result.push(importedEntries[importIdx++]);
+    return result;
+  }
+
+  function mergeChannelRows(existing, imported) {
+    if (imported.length === 0) return existing;
+    const result = [...existing];
+    let importIdx = 0;
+    for (let i = 0; i < result.length && importIdx < imported.length; i++) {
+      const m = result[i];
+      const isDefaultRef = (m.topRef === "" || m.topRef === "TR") && (m.botRef === "" || m.botRef === "WS");
+      const isEmpty = isDefaultRef && !m.totalHoriz && !m.distFromLastBent && !m.vertDist && !m.notes;
+      if (isEmpty) result[i] = imported[importIdx++];
+    }
+    while (importIdx < imported.length) result.push(imported[importIdx++]);
+    return result;
+  }
+
+  const emptyUcEntry = (override = {}) => ({
+    psn: "", rightLateral: { data: "", refer: "" }, leftLateral: { data: "", refer: "" },
+    totalHorizontal: { data: "", refer: "" }, maxPracticalVert: { data: "", refer: "" },
+    minMeasuredVert: { data: "", refer: "" }, signedVertData: "", signedVertTolerance: "",
+    ...override,
+  });
+
+  const importedUcEntry = (psn, rightData) => ({
+    ...emptyUcEntry({ psn, rightLateral: { data: rightData, refer: "" } }),
+    needsVerification: true, isImported: true,
+  });
+
+  // Case 0: inspectionDate is overwritten by imported value (even when default was set)
+  const mergeHeader = (prevDate, parsedDate) => parsedDate || prevDate;
+  assert("UC merge: imported inspectionDate wins over default today-date",
+    mergeHeader(new Date().toLocaleDateString("en-US"), "4/14/2024") === "4/14/2024",
+    `Got: "${mergeHeader(new Date().toLocaleDateString("en-US"), "4/14/2024")}"`);
+  assert("UC merge: existing date kept when no parsed date available",
+    mergeHeader("1/1/2024", "") === "1/1/2024",
+    `Got: "${mergeHeader("1/1/2024", "")}"`);
+
+  // Case 1: existing entry with only psn set → must NOT be overwritten
+  const existing1 = [emptyUcEntry({ psn: "Bent 1" })];
+  const imported1 = [importedUcEntry("CL", "10.5'")];
+  const result1 = mergeUcEntries(existing1, imported1);
+  assert("UC merge: row with only psn is NOT overwritten", result1[0].psn === "Bent 1", `Got psn="${result1[0].psn}"`);
+  assert("UC merge: imported entry appended after existing", result1.length === 2, `Got length=${result1.length}`);
+  assert("UC merge: imported entry at index 1", result1[1].rightLateral.data === "10.5'", `Got "${result1[1].rightLateral?.data}"`);
+
+  // Case 2: existing entry with only signedVertTolerance set → must NOT be overwritten
+  const existing2 = [emptyUcEntry({ signedVertTolerance: "1'0\"" })];
+  const imported2 = [importedUcEntry("CL", "8.0'")];
+  const result2 = mergeUcEntries(existing2, imported2);
+  assert("UC merge: row with only signedVertTolerance is NOT overwritten", result2[0].signedVertTolerance === "1'0\"", `Got "${result2[0].signedVertTolerance}"`);
+  assert("UC merge: imported appended (not placed in slot 0)", result2.length === 2, `Got length=${result2.length}`);
+
+  // Case 3: fully empty existing entry → IS replaced with imported
+  const existing3 = [emptyUcEntry()];
+  const imported3 = [importedUcEntry("CL", "12.0'")];
+  const result3 = mergeUcEntries(existing3, imported3);
+  assert("UC merge: fully empty row IS replaced with imported", result3[0].rightLateral.data === "12.0'", `Got "${result3[0].rightLateral?.data}"`);
+  assert("UC merge: no extra appended when slot was filled", result3.length === 1, `Got length=${result3.length}`);
+
+  console.log(`\n${"=".repeat(65)}`);
+  console.log("Testing: channel merge – partial row preservation");
+  console.log("=".repeat(65));
+
+  const emptyChRow = (override = {}) => ({ topRef: "", botRef: "", totalHoriz: "", distFromLastBent: "", vertDist: "", notes: "", ...override });
+  const importedChRow = (totalHoriz, vertDist) => ({ ...emptyChRow({ totalHoriz, vertDist }), needsVerification: true, isImported: true });
+
+  // Case 4a: default-seeded placeholder row (TR/WS, no measurements) IS replaced
+  const existingChDefault = [{ topRef: "TR", botRef: "WS", totalHoriz: "", distFromLastBent: "", vertDist: "", notes: "" }];
+  const importedChDefault = [importedChRow("100.0", "12.0")];
+  const resultChDefault = mergeChannelRows(existingChDefault, importedChDefault);
+  assert("CH merge: default TR/WS placeholder IS replaced with imported", resultChDefault[0].totalHoriz === "100.0", `Got totalHoriz="${resultChDefault[0].totalHoriz}"`);
+  assert("CH merge: no extra appended for default row replacement", resultChDefault.length === 1, `Got length=${resultChDefault.length}`);
+
+  // Case 4b: existing row with non-default topRef → must NOT be overwritten
+  const existingCh1 = [emptyChRow({ topRef: "CL" })];
+  const importedCh1 = [importedChRow("100.0", "12.0")];
+  const resultCh1 = mergeChannelRows(existingCh1, importedCh1);
+  assert("CH merge: row with non-default topRef is NOT overwritten", resultCh1[0].topRef === "CL", `Got topRef="${resultCh1[0].topRef}"`);
+  assert("CH merge: imported appended after existing", resultCh1.length === 2, `Got length=${resultCh1.length}`);
+
+  // Case 5: existing row with only notes → must NOT be overwritten
+  const existingCh2 = [emptyChRow({ notes: "scour observed" })];
+  const importedCh2 = [importedChRow("90.0", "11.0")];
+  const resultCh2 = mergeChannelRows(existingCh2, importedCh2);
+  assert("CH merge: row with only notes is NOT overwritten", resultCh2[0].notes === "scour observed", `Got notes="${resultCh2[0].notes}"`);
+  assert("CH merge: imported appended", resultCh2.length === 2, `Got length=${resultCh2.length}`);
+
+  // Case 6: fully empty channel row IS replaced
+  const existingCh3 = [emptyChRow()];
+  const importedCh3 = [importedChRow("88.5", "9.5")];
+  const resultCh3 = mergeChannelRows(existingCh3, importedCh3);
+  assert("CH merge: fully empty row IS replaced with imported", resultCh3[0].totalHoriz === "88.5", `Got totalHoriz="${resultCh3[0].totalHoriz}"`);
+  assert("CH merge: no extra appended", resultCh3.length === 1, `Got length=${resultCh3.length}`);
 }
 
 console.log("\n" + "=".repeat(65));

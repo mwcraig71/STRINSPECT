@@ -29,6 +29,60 @@ export interface ParsedReport {
   structureNumber: string;
   elements: ParsedElementRow[];
   nbi: ParsedNbiEntry[];
+  underclearance?: ParsedUnderclearance;
+  channelCrossSection?: ParsedChannelCrossSection;
+}
+
+// ─── Form 2601 – Underclearance Record ───────────────────────────────────────
+
+export interface ParsedUcMeasure {
+  data: string;
+  refer: string;
+}
+
+export interface ParsedUnderclearanceEntry {
+  psn: string;
+  rightLateral: ParsedUcMeasure;
+  leftLateral: ParsedUcMeasure;
+  totalHorizontal: ParsedUcMeasure;
+  maxPracticalVert: ParsedUcMeasure;
+  minMeasuredVert: ParsedUcMeasure;
+  signedVertData: string;
+  signedVertTolerance: string;
+}
+
+export interface ParsedUnderclearance {
+  district: string;
+  county: string;
+  controlSection: string;
+  structureNumber: string;
+  route: string;
+  featureCrossed: string;
+  inspectionDate: string;
+  entries: ParsedUnderclearanceEntry[];
+}
+
+// ─── Form 2600 – Channel Cross-Section ───────────────────────────────────────
+
+export interface ParsedChannelMeasurement {
+  topRef: string;
+  botRef: string;
+  totalHoriz: string;
+  distFromLastBent: string;
+  vertDist: string;
+  notes: string;
+}
+
+export interface ParsedChannelCrossSection {
+  district: string;
+  county: string;
+  controlSection: string;
+  structureNumber: string;
+  route: string;
+  featureCrossed: string;
+  inspectionDate: string;
+  upstream: ParsedChannelMeasurement[];
+  downstream: ParsedChannelMeasurement[];
 }
 
 type PdfSource = File | { uri: string };
@@ -586,10 +640,313 @@ export function parseElementsTable(pages: string[][]): ParsedElementRow[] {
   return results;
 }
 
+// ─── Shared header parser (used by both Form 2601 and Form 2600) ─────────────
+
+function parseFormHeaderBlock(
+  allLines: string[],
+  anchorIdx: number
+): {
+  district: string;
+  county: string;
+  controlSection: string;
+  structureNumber: string;
+  route: string;
+  featureCrossed: string;
+  inspectionDate: string;
+} {
+  let district = "",
+    county = "",
+    controlSection = "",
+    structureNumber = "",
+    route = "",
+    featureCrossed = "",
+    inspectionDate = "";
+  const end = Math.min(anchorIdx + 40, allLines.length);
+
+  for (let i = anchorIdx; i < end; i++) {
+    const line = allLines[i];
+
+    // Line with "District:" and "County:" holds labels; values follow on the next line
+    if (/District:/i.test(line) && /County:/i.test(line)) {
+      // Route value is embedded at the end of the label line
+      const routeM = line.match(/Route:\s*(.+)/i);
+      if (routeM) route = routeM[1].trim();
+
+      // Section suffix embedded: "Section:  -  NN  Structure" pattern
+      const secSufM = line.match(/Section:.*?-\s*(\d+)\s+Structure/i);
+      const sectionSuffix = secSufM ? secSufM[1].trim() : "";
+
+      // Values line immediately follows
+      const vLine = allLines[i + 1] || "";
+      const vParts = vLine
+        .trim()
+        .split(/\s{2,}/)
+        .map((s) => s.trim())
+        .filter((s) => s && /\d/.test(s));
+      if (vParts.length >= 1) district = vParts[0];
+      if (vParts.length >= 2) county = vParts[1];
+      if (vParts.length >= 3) {
+        const ctrl = vParts[2];
+        controlSection = sectionSuffix ? `${ctrl}-${sectionSuffix}` : ctrl;
+      }
+      if (vParts.length >= 4) structureNumber = vParts[3];
+    }
+
+    // "Feature Crossed:" — value may be on same or next line
+    if (/Feature\s+Crossed:/i.test(line)) {
+      const sameRest = line
+        .replace(/Feature\s+Crossed:/i, "")
+        .replace(/Inspector['s\s]+Signature:?/i, "")
+        .trim();
+      if (sameRest) {
+        const parts = sameRest.split(/\s{2,}/).filter(Boolean);
+        if (parts.length >= 1) featureCrossed = parts[0].trim();
+      }
+      if (!featureCrossed) {
+        const nextLine = allLines[i + 1] || "";
+        const dateM2 = nextLine.match(/Date:\s*(\S+)/i);
+        if (dateM2 && !inspectionDate) inspectionDate = dateM2[1];
+        const fcParts = nextLine
+          .replace(/Date:.*$/i, "")
+          .trim()
+          .split(/\s{2,}/)
+          .filter(Boolean);
+        if (fcParts.length >= 1) featureCrossed = fcParts[0].trim();
+      }
+    }
+
+    // Date (pick up on any near-header line)
+    if (!inspectionDate) {
+      const dateM = line.match(/\bDate:\s*(\d[\d\/\-]+)/i);
+      if (dateM) inspectionDate = dateM[1].trim();
+    }
+  }
+
+  return { district, county, controlSection, structureNumber, route, featureCrossed, inspectionDate };
+}
+
+// ─── Form 2601 – Underclearance Record ───────────────────────────────────────
+
+const UC_LABEL_PATTERNS: {
+  key: "rightLateral" | "leftLateral" | "totalHorizontal" | "maxPracticalVert" | "minMeasuredVert";
+  re: RegExp;
+}[] = [
+  { key: "rightLateral", re: /Right\s+Lateral\s+Clearance/i },
+  { key: "leftLateral", re: /Left\s+Lateral\s+Clearance/i },
+  { key: "totalHorizontal", re: /Total\s+Horizontal\s+Cl\w*/i },
+  { key: "maxPracticalVert", re: /Max(?:imum)?\s+Practical\s+Vert/i },
+  { key: "minMeasuredVert", re: /Min(?:imum)?\s+Measured\s+Vert/i },
+];
+
+function isUcMeasureLabelLine(line: string): boolean {
+  return (
+    UC_LABEL_PATTERNS.some(({ re }) => re.test(line)) ||
+    /Signed\s+Vertical\s+Cl/i.test(line)
+  );
+}
+
+function extractUcDataAfterLabel(labelRe: RegExp, line: string): ParsedUcMeasure | null {
+  const rest = line.replace(labelRe, "").trim();
+  if (!rest || /^(?:Field|Data|Refer\.|Item\s+No\.)/i.test(rest)) return null;
+  const parts = rest
+    .split(/\s{2,}/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (parts.length === 0) return null;
+  return { data: parts[0], refer: parts[1] || "" };
+}
+
+function extractUcDataFromLine(line: string): ParsedUcMeasure | null {
+  const trimmed = line.trim();
+  if (!trimmed) return null;
+  if (/^(?:Field|Data|Refer\.|Item\s+No\.|Tolerance)/i.test(trimmed)) return null;
+  if (isUcMeasureLabelLine(trimmed) || /^PSN:/i.test(trimmed)) return null;
+  const parts = trimmed
+    .split(/\s{2,}/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (parts.length === 0) return null;
+  return { data: parts[0], refer: parts[1] || "" };
+}
+
+export function parseUnderclearance(pages: string[][]): ParsedUnderclearance | null {
+  const allLines = pages.flat();
+  const anchorIdx = allLines.findIndex((l) => /Underclearance Record/i.test(l));
+  if (anchorIdx < 0) return null;
+
+  const header = parseFormHeaderBlock(allLines, anchorIdx);
+
+  // PSN header rows delimit each clearance-point block
+  const psnHeaders: number[] = [];
+  for (let i = anchorIdx; i < allLines.length; i++) {
+    if (/^PSN:.*Refer\./i.test(allLines[i])) psnHeaders.push(i);
+  }
+
+  const EMPTY: ParsedUcMeasure = { data: "", refer: "" };
+  const entries: ParsedUnderclearanceEntry[] = [];
+
+  for (let b = 0; b < psnHeaders.length; b++) {
+    // Extract PSN value from the header line: "PSN:  <value>  Refer.  ..."
+    let psn = "";
+    const psnHeaderLine = allLines[psnHeaders[b]];
+    const psnM = psnHeaderLine.match(/^PSN:\s+(.+?)\s{2,}Refer\./i);
+    if (psnM) {
+      const candidate = psnM[1].trim();
+      if (candidate && !/^Refer\./i.test(candidate)) psn = candidate;
+    }
+    // Fallback: check the line two positions before the PSN header (after "Field  Field..." row)
+    if (!psn) {
+      const prevIdx = psnHeaders[b] - 2;
+      if (prevIdx >= 0) {
+        const prevLine = allLines[prevIdx].trim();
+        if (prevLine && !/^Field\b/i.test(prevLine) && !/^PSN:/i.test(prevLine) && !/^(?:Reference|District|Feature|Signed|Right|Left|Total|Max|Min|Data)\b/i.test(prevLine)) {
+          psn = prevLine;
+        }
+      }
+    }
+
+    let blockStart = psnHeaders[b] + 1;
+    // Skip optional "Data  Data  Data  Data" sub-header
+    if (blockStart < allLines.length && /^Data\s+Data/i.test(allLines[blockStart])) {
+      blockStart++;
+    }
+    const blockEnd = b + 1 < psnHeaders.length ? psnHeaders[b + 1] : allLines.length;
+    const blockLines = allLines.slice(blockStart, blockEnd);
+
+    const meas: Partial<
+      Record<
+        "rightLateral" | "leftLateral" | "totalHorizontal" | "maxPracticalVert" | "minMeasuredVert",
+        ParsedUcMeasure
+      >
+    > = {};
+    let signedVertData = "";
+    let signedVertTolerance = "";
+
+    for (let li = 0; li < blockLines.length; li++) {
+      const bline = blockLines[li];
+      if (!bline.trim()) continue;
+
+      if (/Signed\s+Vertical\s+Cl/i.test(bline)) {
+        const rest = bline.replace(/Signed\s+Vertical\s+Cl\w*\s*/i, "").trim();
+        const tokens = rest.split(/\s+/).filter((s) => s && !/^Tolerance$/i.test(s));
+        if (tokens.length >= 1) signedVertData = tokens[0];
+        if (tokens.length >= 2) signedVertTolerance = tokens[1];
+        continue;
+      }
+
+      for (const { key, re } of UC_LABEL_PATTERNS) {
+        if (re.test(bline)) {
+          let m = extractUcDataAfterLabel(re, bline);
+          if (!m) {
+            const nextLine = blockLines[li + 1] || "";
+            if (nextLine.trim() && !isUcMeasureLabelLine(nextLine)) {
+              m = extractUcDataFromLine(nextLine);
+              if (m) li++;
+            }
+          }
+          if (m) meas[key] = m;
+          break;
+        }
+      }
+    }
+
+    const hasData =
+      Object.values(meas).some((m) => m.data && m.data !== "-") ||
+      (signedVertData !== "" && signedVertData !== "-");
+
+    if (hasData) {
+      entries.push({
+        psn,
+        rightLateral: meas.rightLateral ?? EMPTY,
+        leftLateral: meas.leftLateral ?? EMPTY,
+        totalHorizontal: meas.totalHorizontal ?? EMPTY,
+        maxPracticalVert: meas.maxPracticalVert ?? EMPTY,
+        minMeasuredVert: meas.minMeasuredVert ?? EMPTY,
+        signedVertData,
+        signedVertTolerance,
+      });
+    }
+  }
+
+  return { ...header, entries };
+}
+
+// ─── Form 2600 – Channel Cross-Section ───────────────────────────────────────
+
+export function parseChannelCrossSection(pages: string[][]): ParsedChannelCrossSection | null {
+  const allLines = pages.flat();
+  const anchorIdx = allLines.findIndex((l) =>
+    /Channel\s+Cross[-\s]Section|Form\s+2600/i.test(l)
+  );
+  if (anchorIdx < 0) return null;
+
+  const header = parseFormHeaderBlock(allLines, anchorIdx);
+
+  const upstream: ParsedChannelMeasurement[] = [];
+  const downstream: ParsedChannelMeasurement[] = [];
+  let currentSection: "upstream" | "downstream" | null = null;
+  let inMeasTable = false;
+
+  for (let i = anchorIdx; i < allLines.length; i++) {
+    const line = allLines[i];
+
+    if (/\bUPSTREAM\b/i.test(line) && !/\bDOWNSTREAM\b/i.test(line)) {
+      currentSection = "upstream";
+      inMeasTable = false;
+      continue;
+    }
+    if (/\bDOWNSTREAM\b/i.test(line)) {
+      currentSection = "downstream";
+      inMeasTable = false;
+      continue;
+    }
+    if (!currentSection) continue;
+
+    // Column header row detection
+    if (/TOP\s+REF|BOT\.?\s+REF|VERT\.?\s+DIST|TOTAL\s+HORIZ/i.test(line)) {
+      inMeasTable = true;
+      continue;
+    }
+    if (!inMeasTable) continue;
+
+    // Section-ending anchors
+    if (/^(?:COMMENTS?|Inspector|Date:|Page\s+\d|DISTRICT)/i.test(line)) break;
+
+    const parts = line
+      .trim()
+      .split(/\s{2,}/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (parts.length < 3) continue;
+    if (/^(?:No\.|Row|Station|Top|Bot|Total|Dist|Vert|Notes)/i.test(parts[0])) continue;
+
+    const offset = /^\d+$/.test(parts[0]) ? 1 : 0;
+    const meas: ParsedChannelMeasurement = {
+      topRef: parts[offset] || "",
+      botRef: parts[offset + 1] || "",
+      totalHoriz: parts[offset + 2] || "",
+      distFromLastBent: parts[offset + 3] || "",
+      vertDist: parts[offset + 4] || "",
+      notes: parts[offset + 5] || "",
+    };
+
+    if (meas.totalHoriz || meas.vertDist) {
+      if (currentSection === "upstream") upstream.push(meas);
+      else downstream.push(meas);
+    }
+  }
+
+  return { ...header, upstream, downstream };
+}
+
+// ─── Top-level report parser ──────────────────────────────────────────────────
+
 export async function parseReport(source: PdfSource): Promise<ParsedReport> {
   const pages = await loadPdfText(source);
   const structureNumber = parseStructureNumber(pages);
   const elements = parseElementsTable(pages);
   const nbi = parseNbiRatings(pages);
-  return { structureNumber, elements, nbi };
+  const underclearance = parseUnderclearance(pages) ?? undefined;
+  const channelCrossSection = parseChannelCrossSection(pages) ?? undefined;
+  return { structureNumber, elements, nbi, underclearance, channelCrossSection };
 }
