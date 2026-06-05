@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Download, FileText, Info } from "lucide-react";
+import { Download, FileText, Info, Cloud, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import { useUpsertSession } from "@workspace/api-client-react";
 
 interface BridgeConfig {
   structureNumber: string;
@@ -39,9 +40,13 @@ export default function BridgeSetup() {
     numberOfSupports: 2,
   });
   const [downloaded, setDownloaded] = useState(false);
+  const [cloudSaved, setCloudSaved] = useState(false);
+  const [cloudError, setCloudError] = useState("");
+
+  const upsertSession = useUpsertSession();
 
   const set = (field: keyof FormFields, value: string | number) =>
-    setForm((prev) => ({ ...prev, [field]: value, }));
+    setForm((prev) => ({ ...prev, [field]: value }));
 
   const isValid = form.structureNumber.trim() !== "" && form.inspectorName.trim() !== "";
 
@@ -57,6 +62,18 @@ export default function BridgeSetup() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     setDownloaded(true);
+  };
+
+  const saveToCloud = () => {
+    setCloudError("");
+    setCloudSaved(false);
+    upsertSession.mutate(
+      { data: { structureNumber: form.structureNumber.trim(), defects: [], nbiRatings: [] } },
+      {
+        onSuccess: () => setCloudSaved(true),
+        onError: () => setCloudError("Could not reach the API server. Check that it is running."),
+      }
+    );
   };
 
   return (
@@ -75,7 +92,7 @@ export default function BridgeSetup() {
               data-testid="input-structure-number"
               className={inputClass}
               value={form.structureNumber}
-              onChange={(e) => set("structureNumber", e.target.value)}
+              onChange={(e) => { set("structureNumber", e.target.value); setCloudSaved(false); setCloudError(""); }}
               placeholder="e.g. 0800-01-001"
             />
           </Field>
@@ -143,7 +160,7 @@ export default function BridgeSetup() {
           </Field>
         </div>
 
-        <div className="pt-2 flex items-center gap-4">
+        <div className="pt-2 flex flex-wrap items-center gap-3">
           <button
             data-testid="button-download-config"
             disabled={!isValid}
@@ -153,10 +170,37 @@ export default function BridgeSetup() {
             <Download className="h-4 w-4" />
             Download .bridge.json
           </button>
+
+          <button
+            data-testid="button-save-cloud"
+            disabled={!isValid || upsertSession.isPending}
+            onClick={saveToCloud}
+            className="flex items-center gap-2 bg-secondary border border-border text-foreground px-5 py-2.5 rounded-md text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-secondary/80 transition-colors"
+          >
+            {upsertSession.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Cloud className="h-4 w-4" />
+            )}
+            {upsertSession.isPending ? "Saving…" : "Save to cloud"}
+          </button>
+
           {downloaded && (
             <span className="text-xs text-green-400 font-medium">Config downloaded</span>
           )}
-          {!isValid && (
+          {cloudSaved && (
+            <span className="flex items-center gap-1 text-xs text-green-400 font-medium">
+              <CheckCircle className="h-3.5 w-3.5" />
+              Saved to cloud
+            </span>
+          )}
+          {cloudError && (
+            <span className="flex items-center gap-1 text-xs text-destructive font-medium">
+              <AlertCircle className="h-3.5 w-3.5" />
+              {cloudError}
+            </span>
+          )}
+          {!isValid && !upsertSession.isPending && (
             <span className="text-xs text-muted-foreground">Structure number and inspector name required</span>
           )}
         </div>
@@ -168,10 +212,10 @@ export default function BridgeSetup() {
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">About the config file</p>
           <p className="text-sm text-muted-foreground leading-relaxed">
             The <code className="bg-secondary px-1 py-0.5 rounded text-xs font-mono">.bridge.json</code> file
-            contains bridge metadata for the mobile inspection app. After completing the inspection, export the
-            session from the mobile app and upload it in the{" "}
-            <strong className="text-foreground font-medium">Inspection Progress</strong> or{" "}
-            <strong className="text-foreground font-medium">Review &amp; Export</strong> modules.
+            contains bridge metadata for the mobile inspection app. Use{" "}
+            <strong className="text-foreground font-medium">Save to cloud</strong> to register the bridge in the
+            database immediately. After completing the inspection, the session appears in{" "}
+            <strong className="text-foreground font-medium">Inspection Progress</strong> once the mobile app syncs.
           </p>
         </div>
       </div>
