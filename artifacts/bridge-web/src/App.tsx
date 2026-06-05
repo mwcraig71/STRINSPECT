@@ -1,37 +1,57 @@
+import { useState } from "react";
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
+import { AppSidebar } from "@/components/layout/sidebar";
+import { SessionData } from "@/lib/types";
+
+import BridgeSetup from "@/pages/bridge-setup";
+import InspectionProgress from "@/pages/inspection-progress";
+import ReviewExport from "@/pages/review-export";
 
 const queryClient = new QueryClient();
 
-function Home() {
+function Router({
+  sessionData,
+  setSessionData,
+}: {
+  sessionData: SessionData | null;
+  setSessionData: (data: SessionData | null) => void;
+}) {
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gray-50">
-      <div className="text-center">
-        <h1 className="text-2xl font-bold text-gray-900">Replit Agent is building...</h1>
-        <p className="mt-2 text-sm text-gray-600">Your app will appear here once it's ready.</p>
-      </div>
+    <div className="flex min-h-screen w-full bg-background text-foreground dark">
+      <AppSidebar />
+      <main className="flex-1 p-8 overflow-y-auto">
+        <Switch>
+          <Route path="/" component={BridgeSetup} />
+          <Route path="/progress">
+            {() => <InspectionProgress sessionData={sessionData} setSessionData={setSessionData} />}
+          </Route>
+          <Route path="/review">
+            {() => <ReviewExport sessionData={sessionData} setSessionData={setSessionData} />}
+          </Route>
+          <Route component={NotFound} />
+        </Switch>
+      </main>
     </div>
   );
 }
 
-function Router() {
-  return (
-    <Switch>
-      <Route path="/" component={Home} />
-      <Route component={NotFound} />
-    </Switch>
-  );
-}
-
 function App() {
+  const [sessionData, setSessionData] = useState<SessionData | null>(null);
+
+  // Force dark mode
+  if (typeof document !== "undefined") {
+    document.documentElement.classList.add("dark");
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
+          <Router sessionData={sessionData} setSessionData={setSessionData} />
         </WouterRouter>
         <Toaster />
       </TooltipProvider>

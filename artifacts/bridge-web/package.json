@@ -73,5 +73,10 @@
     "vite": "catalog:",
     "wouter": "^3.3.5",
     "zod": "catalog:"
+  },
+  "dependencies": {
+    "docx": "^9.7.1",
+    "pdfjs-dist": "4.4.168",
+    "xlsx": "^0.18.5"
   }
 }
