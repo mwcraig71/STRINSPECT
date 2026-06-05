@@ -9,7 +9,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
-import { SessionData, DefectRecord, NbiRating } from "@/lib/types";
+import { SessionData, DefectRecord, NbiRating, ImportSummary } from "@/lib/types";
 import {
   useListSessions,
   useGetSession,
@@ -79,6 +79,7 @@ export default function InspectionProgress({ sessionData, setSessionData }: Prop
         structureNumber: sessionDetail.structureNumber,
         defects: sessionDetail.defects as DefectRecord[],
         nbiRatings: sessionDetail.nbiRatings as NbiRating[],
+        importSummary: (sessionDetail.importSummary as ImportSummary | null) ?? null,
       });
       setSelectedId("");
     }

@@ -36,6 +36,7 @@ export const UpsertSessionBody = zod.object({
   structureNumber: zod.string(),
   defects: zod.array(zod.unknown()).optional(),
   nbiRatings: zod.array(zod.unknown()).optional(),
+  importSummary: zod.unknown().optional(),
 });
 
 export const UpsertSessionResponse = zod.object({
@@ -61,6 +62,7 @@ export const GetSessionResponse = zod.object({
   syncedAt: zod.coerce.date(),
   defects: zod.array(zod.unknown()),
   nbiRatings: zod.array(zod.unknown()),
+  importSummary: zod.unknown().nullable().optional(),
 });
 
 /**

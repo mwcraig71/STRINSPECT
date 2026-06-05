@@ -1,3 +1,9 @@
+export interface PhotoItem {
+  uri: string;
+  description: string;
+  heading?: number | null;
+}
+
 export interface DefectRecord {
   id: string;
   location: string;
@@ -13,6 +19,7 @@ export interface DefectRecord {
   size: string;
   locationDesc: string;
   photosCount: number;
+  photos?: PhotoItem[];
   isCritical: boolean;
   isMaintenance: boolean;
   needsVerification: boolean;
@@ -34,8 +41,30 @@ export interface NbiRating {
   subComponents: SubComponent[];
 }
 
+export interface ImportSectionAudit {
+  item: string;
+  description: string;
+  filled: number;
+  total: number;
+  hasData: boolean;
+}
+
+export interface ImportSummary {
+  timestamp: number;
+  structureNumber: string;
+  structureNumberFound: boolean;
+  elementsFound: number;
+  elementRecordsCreated: number;
+  nbiFilledCount: number;
+  nbiTotalCount: number;
+  sections: ImportSectionAudit[];
+  emptySections: ImportSectionAudit[];
+  unmatchedComponents: string[];
+}
+
 export interface SessionData {
   structureNumber?: string;
   defects?: DefectRecord[];
   nbiRatings?: NbiRating[];
+  importSummary?: ImportSummary | null;
 }

@@ -408,6 +408,7 @@ export type ConditionState = "CS1" | "CS2" | "CS3" | "CS4";
 export interface PhotoItem {
   uri: string;
   description: string;
+  heading?: number | null;
 }
 
 export interface DefectRecord {
@@ -1681,11 +1682,12 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
       structureNumber: structureNumber.trim() || "UNKNOWN",
       defects: savedDefects,
       nbiRatings,
+      importSummary: importSummary ?? undefined,
     });
     const ts = new Date().toISOString();
     setLastSynced(ts);
     AsyncStorage.setItem(STORAGE_KEYS.LAST_SYNCED, ts).catch(() => {});
-  }, [structureNumber, savedDefects, nbiRatings]);
+  }, [structureNumber, savedDefects, nbiRatings, importSummary]);
 
   const setStructureNumber = useCallback((v: string) => {
     setStructureNumberState(v);

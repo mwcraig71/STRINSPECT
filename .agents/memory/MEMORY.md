@@ -6,4 +6,5 @@
 - [CS descriptions data](cs-descriptions.md) — long-press help lives in data/csDescriptions.ts; keyed "Material:defectId" beats plain "defectId"; lookupCS takes optional elementId for wearing-surface (510) spall edge case.
 - [SNBI code mapping fixes](snbi-code-corrections.md) — original had 3 wrong mappings (1020→crack_s, 1090→spall, 4000→spall); now corrected + 30 new codes for bearings/joints/scour/settlement.
 - [Bridge web app architecture](bridge-web-arch.md) — file-based (no backend); sessionData lifted to App level for progress→review handoff; wouter Link renders its own <a>, never wrap with another <a>.
+- [TS project references stale dist](ts-project-refs-stale.md) — after editing a workspace lib's source, run `tsc -p tsconfig.json` in that lib to regenerate dist/ d.ts or downstream packages see stale types.
 - [Orval zod codegen barrel conflict](orval-zod-codegen.md) — orval overwrites workspace-root index.ts in split mode; use mode:"single" + absolute target path to avoid it.

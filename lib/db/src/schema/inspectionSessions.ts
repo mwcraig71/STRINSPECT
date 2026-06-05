@@ -12,6 +12,7 @@ export const inspectionSessionsTable = pgTable(
     syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
     defects: jsonb("defects").notNull().default([]),
     nbiRatings: jsonb("nbi_ratings").notNull().default([]),
+    importSummary: jsonb("import_summary"),
   },
   (t) => [uniqueIndex("uq_inspection_sessions_structure_number").on(t.structureNumber)],
 );

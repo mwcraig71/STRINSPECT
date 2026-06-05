@@ -1,6 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
+import * as Location from "expo-location";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import React, { useState } from "react";
 import {
@@ -166,7 +167,16 @@ export default function InspectionScreen() {
     }
     const result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
     if (!result.canceled) {
-      setPhotos([...photos, { uri: result.assets[0].uri, description: "" }]);
+      let heading: number | null = null;
+      try {
+        const perm = await Location.getForegroundPermissionsAsync();
+        if (perm.granted) {
+          const h = await Location.getHeadingAsync();
+          const raw = h.trueHeading >= 0 ? h.trueHeading : h.magHeading;
+          if (raw >= 0) heading = Math.round(raw);
+        }
+      } catch {}
+      setPhotos([...photos, { uri: result.assets[0].uri, description: "", heading }]);
     }
   };
 

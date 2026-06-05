@@ -25,12 +25,14 @@ export interface SessionDetail {
   syncedAt: string;
   defects: unknown[];
   nbiRatings: unknown[];
+  importSummary?: unknown | null;
 }
 
 export interface UpsertSessionBody {
   structureNumber: string;
   defects?: unknown[];
   nbiRatings?: unknown[];
+  importSummary?: unknown;
 }
 
 export interface ErrorResponse {
