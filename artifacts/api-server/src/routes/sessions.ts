@@ -1,7 +1,14 @@
 import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
 import { db, inspectionSessionsTable } from "@workspace/db";
-import { UpsertSessionBody } from "@workspace/api-zod";
+import {
+  UpsertSessionBody,
+  UpsertSessionResponse,
+  ListSessionsResponse,
+  GetSessionParams,
+  GetSessionResponse,
+  DeleteSessionParams,
+} from "@workspace/api-zod";
 
 const router: IRouter = Router();
 
@@ -17,72 +24,56 @@ router.get("/sessions", async (_req, res) => {
     .from(inspectionSessionsTable)
     .orderBy(inspectionSessionsTable.syncedAt);
 
-  res.json(rows);
+  res.json(ListSessionsResponse.parse(rows));
 });
 
 router.post("/sessions", async (req, res) => {
-  const parsed = UpsertSessionBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
+  const bodyParsed = UpsertSessionBody.safeParse(req.body);
+  if (!bodyParsed.success) {
+    res.status(400).json({ error: bodyParsed.error.message });
     return;
   }
 
-  const { structureNumber } = parsed.data;
-  const defects = parsed.data.defects ?? [];
-  const nbiRatings = parsed.data.nbiRatings ?? [];
+  const { structureNumber } = bodyParsed.data;
+  const defects = bodyParsed.data.defects ?? [];
+  const nbiRatings = bodyParsed.data.nbiRatings ?? [];
   const defectCount = defects.length;
   const cs4Count = defects.filter(
-    (d): d is { cs: string } => typeof d === "object" && d !== null && (d as Record<string, unknown>)["cs"] === "CS4",
+    (d): d is { cs: string } =>
+      typeof d === "object" &&
+      d !== null &&
+      (d as Record<string, unknown>)["cs"] === "CS4",
   ).length;
 
-  const existing = await db
-    .select({ id: inspectionSessionsTable.id })
-    .from(inspectionSessionsTable)
-    .where(eq(inspectionSessionsTable.structureNumber, structureNumber))
-    .limit(1);
+  const [row] = await db
+    .insert(inspectionSessionsTable)
+    .values({ structureNumber, defects, nbiRatings, defectCount, cs4Count })
+    .onConflictDoUpdate({
+      target: inspectionSessionsTable.structureNumber,
+      set: { defects, nbiRatings, defectCount, cs4Count, syncedAt: new Date() },
+    })
+    .returning({
+      id: inspectionSessionsTable.id,
+      structureNumber: inspectionSessionsTable.structureNumber,
+      defectCount: inspectionSessionsTable.defectCount,
+      cs4Count: inspectionSessionsTable.cs4Count,
+      syncedAt: inspectionSessionsTable.syncedAt,
+    });
 
-  let row;
-  if (existing.length > 0) {
-    const updated = await db
-      .update(inspectionSessionsTable)
-      .set({
-        defects,
-        nbiRatings,
-        defectCount,
-        cs4Count,
-        syncedAt: new Date(),
-      })
-      .where(eq(inspectionSessionsTable.structureNumber, structureNumber))
-      .returning({
-        id: inspectionSessionsTable.id,
-        structureNumber: inspectionSessionsTable.structureNumber,
-        defectCount: inspectionSessionsTable.defectCount,
-        cs4Count: inspectionSessionsTable.cs4Count,
-        syncedAt: inspectionSessionsTable.syncedAt,
-      });
-    row = updated[0];
-  } else {
-    const inserted = await db
-      .insert(inspectionSessionsTable)
-      .values({ structureNumber, defects, nbiRatings, defectCount, cs4Count })
-      .returning({
-        id: inspectionSessionsTable.id,
-        structureNumber: inspectionSessionsTable.structureNumber,
-        defectCount: inspectionSessionsTable.defectCount,
-        cs4Count: inspectionSessionsTable.cs4Count,
-        syncedAt: inspectionSessionsTable.syncedAt,
-      });
-    row = inserted[0];
-  }
-
-  res.json(row);
+  res.json(UpsertSessionResponse.parse(row));
 });
 
 router.get("/sessions/:id", async (req, res) => {
+  const paramsParsed = GetSessionParams.safeParse(req.params);
+  if (!paramsParsed.success) {
+    res.status(400).json({ error: paramsParsed.error.message });
+    return;
+  }
+
   const rows = await db
     .select()
     .from(inspectionSessionsTable)
-    .where(eq(inspectionSessionsTable.id, req.params.id))
+    .where(eq(inspectionSessionsTable.id, paramsParsed.data.id))
     .limit(1);
 
   if (rows.length === 0) {
@@ -90,22 +81,19 @@ router.get("/sessions/:id", async (req, res) => {
     return;
   }
 
-  const row = rows[0];
-  res.json({
-    id: row.id,
-    structureNumber: row.structureNumber,
-    defectCount: row.defectCount,
-    cs4Count: row.cs4Count,
-    syncedAt: row.syncedAt,
-    defects: row.defects,
-    nbiRatings: row.nbiRatings,
-  });
+  res.json(GetSessionResponse.parse(rows[0]));
 });
 
 router.delete("/sessions/:id", async (req, res) => {
+  const paramsParsed = DeleteSessionParams.safeParse(req.params);
+  if (!paramsParsed.success) {
+    res.status(400).json({ error: paramsParsed.error.message });
+    return;
+  }
+
   const deleted = await db
     .delete(inspectionSessionsTable)
-    .where(eq(inspectionSessionsTable.id, req.params.id))
+    .where(eq(inspectionSessionsTable.id, paramsParsed.data.id))
     .returning({ id: inspectionSessionsTable.id });
 
   if (deleted.length === 0) {

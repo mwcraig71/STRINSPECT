@@ -1,4 +1,4 @@
-import { pgTable, text, integer, timestamp, jsonb, uuid, index } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, timestamp, jsonb, uuid, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -13,7 +13,7 @@ export const inspectionSessionsTable = pgTable(
     defects: jsonb("defects").notNull().default([]),
     nbiRatings: jsonb("nbi_ratings").notNull().default([]),
   },
-  (t) => [index("idx_inspection_sessions_structure_number").on(t.structureNumber)],
+  (t) => [uniqueIndex("uq_inspection_sessions_structure_number").on(t.structureNumber)],
 );
 
 export const insertInspectionSessionSchema = createInsertSchema(inspectionSessionsTable).omit({
