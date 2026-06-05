@@ -80,14 +80,14 @@ export const SUBSTRUCTURE_TYPES = [
   {
     id: "CONCRETE_PILE",
     label: "Concrete Pile/Cap",
-    sub: "PSC Pile · RC Pile · Pile Cap · Cap",
-    elementIds: ["226", "227", "220", "234"],
+    sub: "RC Pile · Pile Cap · Cap",
+    elementIds: ["227", "220", "234"],
   },
   {
     id: "STEEL_PILE",
     label: "Steel Pile",
     sub: "H-Pile · Steel Pipe Pile",
-    elementIds: ["225", "900"],
+    elementIds: ["225", "226", "900"],
   },
   {
     id: "TIMBER_PILE",
@@ -112,11 +112,10 @@ export const ENVIRONMENTS = [
 
 // Element catalog based on the AASHTO Manual for Bridge Element Inspection (MBEI),
 // Second Edition (2019). Includes National Bridge Elements (NBE), Bridge
-// Management Elements (BME), and one agency-defined element. `core: true`
+// Management Elements (BME), and two agency-defined elements. `core: true`
 // elements show in the dropdown by default; the rest are reachable via the
-// in-dropdown search. Element 226 is the standard AASHTO Prestressed Concrete
-// Pile; the custom TxDOT-style "Steel Pipe Pile" (remaining-section form) is the
-// agency-defined element 900.
+// in-dropdown search. Element 226 is a custom Steel Pipe Pile (visual inspection);
+// element 900 is the agency-defined remaining-section (ultrasonic/caliper) form.
 export const SNBI_ELEMENTS = [
   // --- Decks / Slabs ---
   { id: "12", name: "RC Deck", category: "Deck", material: "Concrete", unit: "sq ft", core: true },
@@ -184,7 +183,7 @@ export const SNBI_ELEMENTS = [
   { id: "219", name: "Steel Abutment", category: "Substructure", material: "Steel", unit: "ft", core: false },
   { id: "220", name: "RC Pile Cap/Footing", category: "Substructure", material: "Concrete", unit: "ft", core: true },
   { id: "225", name: "Steel Pile", category: "Substructure", material: "Steel", unit: "ea", core: true },
-  { id: "226", name: "Prestressed Concrete Pile", category: "Substructure", material: "Concrete", unit: "ea", core: true },
+  { id: "226", name: "Steel Pipe Pile", category: "Substructure", material: "Steel", unit: "ea", core: true },
   { id: "227", name: "Reinforced Concrete Pile", category: "Substructure", material: "Concrete", unit: "ea", core: true },
   { id: "228", name: "Timber Pile", category: "Substructure", material: "Timber", unit: "ea", core: true },
   { id: "229", name: "Other Pile", category: "Substructure", material: "Other", unit: "ea", core: false },

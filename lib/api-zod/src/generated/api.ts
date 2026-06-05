@@ -14,3 +14,58 @@ import * as zod from "zod";
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
 });
+
+/**
+ * Returns metadata for all synced sessions (no defect/NBI payload)
+ * @summary List all inspection sessions
+ */
+export const ListSessionsResponseItem = zod.object({
+  id: zod.string(),
+  structureNumber: zod.string(),
+  defectCount: zod.number(),
+  cs4Count: zod.number(),
+  syncedAt: zod.coerce.date(),
+});
+export const ListSessionsResponse = zod.array(ListSessionsResponseItem);
+
+/**
+ * Creates or replaces the session for a given structure number
+ * @summary Upsert an inspection session
+ */
+export const UpsertSessionBody = zod.object({
+  structureNumber: zod.string(),
+  defects: zod.array(zod.unknown()).optional(),
+  nbiRatings: zod.array(zod.unknown()).optional(),
+});
+
+export const UpsertSessionResponse = zod.object({
+  id: zod.string(),
+  structureNumber: zod.string(),
+  defectCount: zod.number(),
+  cs4Count: zod.number(),
+  syncedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Get a single session with full data
+ */
+export const GetSessionParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+export const GetSessionResponse = zod.object({
+  id: zod.string(),
+  structureNumber: zod.string(),
+  defectCount: zod.number(),
+  cs4Count: zod.number(),
+  syncedAt: zod.coerce.date(),
+  defects: zod.array(zod.unknown()),
+  nbiRatings: zod.array(zod.unknown()),
+});
+
+/**
+ * @summary Delete a session
+ */
+export const DeleteSessionParams = zod.object({
+  id: zod.coerce.string(),
+});

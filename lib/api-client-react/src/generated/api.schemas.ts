@@ -8,3 +8,31 @@
 export interface HealthStatus {
   status: string;
 }
+
+export interface SessionSummary {
+  id: string;
+  structureNumber: string;
+  defectCount: number;
+  cs4Count: number;
+  syncedAt: string;
+}
+
+export interface SessionDetail {
+  id: string;
+  structureNumber: string;
+  defectCount: number;
+  cs4Count: number;
+  syncedAt: string;
+  defects: unknown[];
+  nbiRatings: unknown[];
+}
+
+export interface UpsertSessionBody {
+  structureNumber: string;
+  defects?: unknown[];
+  nbiRatings?: unknown[];
+}
+
+export interface ErrorResponse {
+  error: string;
+}

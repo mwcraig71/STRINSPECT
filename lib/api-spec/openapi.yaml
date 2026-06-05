@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: sessions
+    description: Bridge inspection session operations
 paths:
   /healthz:
     get:
@@ -24,6 +26,87 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /sessions:
+    get:
+      operationId: listSessions
+      tags: [sessions]
+      summary: List all inspection sessions
+      description: Returns metadata for all synced sessions (no defect/NBI payload)
+      responses:
+        "200":
+          description: Session list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SessionSummary"
+
+    post:
+      operationId: upsertSession
+      tags: [sessions]
+      summary: Upsert an inspection session
+      description: Creates or replaces the session for a given structure number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertSessionBody"
+      responses:
+        "200":
+          description: Session saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionSummary"
+
+  /sessions/{id}:
+    get:
+      operationId: getSession
+      tags: [sessions]
+      summary: Get a single session with full data
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Full session data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    delete:
+      operationId: deleteSession
+      tags: [sessions]
+      summary: Delete a session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +117,74 @@ components:
       required:
         - status
 
+    SessionSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        structureNumber:
+          type: string
+        defectCount:
+          type: integer
+        cs4Count:
+          type: integer
+        syncedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - structureNumber
+        - defectCount
+        - cs4Count
+        - syncedAt
+
+    SessionDetail:
+      type: object
+      properties:
+        id:
+          type: string
+        structureNumber:
+          type: string
+        defectCount:
+          type: integer
+        cs4Count:
+          type: integer
+        syncedAt:
+          type: string
+          format: date-time
+        defects:
+          type: array
+          items: {}
+        nbiRatings:
+          type: array
+          items: {}
+      required:
+        - id
+        - structureNumber
+        - defectCount
+        - cs4Count
+        - syncedAt
+        - defects
+        - nbiRatings
+
+    UpsertSessionBody:
+      type: object
+      properties:
+        structureNumber:
+          type: string
+        defects:
+          type: array
+          items: {}
+        nbiRatings:
+          type: array
+          items: {}
+      required:
+        - structureNumber
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
