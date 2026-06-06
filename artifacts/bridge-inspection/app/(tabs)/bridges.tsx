@@ -1,5 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
+import { Asset } from "expo-asset";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
@@ -64,6 +65,22 @@ export default function BridgesScreen() {
       await importFromPdf({ uri: asset.uri, name: asset.name });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Could not open document picker.";
+      Alert.alert("Error", message);
+    }
+  };
+
+  const handleLoadSampleReport = async () => {
+    try {
+      const module = require("@/assets/docs/sample-inspection-report.pdf");
+      const asset = Asset.fromModule(module);
+      await asset.downloadAsync();
+      if (!asset.localUri) {
+        Alert.alert("Error", "Could not load sample report from device storage.");
+        return;
+      }
+      await importFromPdf({ uri: asset.localUri, name: "18-061-0081-13-133_RTInsp_2025-02.pdf" });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Could not load sample report.";
       Alert.alert("Error", message);
     }
   };
@@ -418,6 +435,16 @@ export default function BridgesScreen() {
                     {parsingActive ? "Parsing PDF…" : "Import Previous Report"}
                   </Text>
                 </TouchableOpacity>
+
+                {!importedPdfPath && !parsingActive && (
+                  <TouchableOpacity
+                    style={[styles.newBtn, { backgroundColor: "#0c1a2e", borderColor: "#334155" }]}
+                    onPress={handleLoadSampleReport}
+                  >
+                    <Feather name="download" size={13} color="#94a3b8" />
+                    <Text style={[styles.newBtnText, { color: "#94a3b8" }]}>Load Sample Report</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           ) : (
