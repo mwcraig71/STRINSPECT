@@ -1176,6 +1176,7 @@ interface InspectionContextType {
   importedPdfPath: string | null;
   pdfAnnotations: unknown[] | null;
   setPdfAnnotations: (a: unknown[] | null) => void;
+  pdfUploaded: boolean;
 }
 
 export interface ElementSummaryRow {
@@ -1419,6 +1420,7 @@ const STORAGE_KEYS = {
   LAST_MODIFIED: "@bridge_last_modified",
   IMPORTED_PDF_PATH: "@bridge_imported_pdf_path",
   PDF_ANNOTATIONS: "@bridge_pdf_annotations",
+  PDF_UPLOADED: "@bridge_pdf_uploaded",
 };
 
 export function InspectionProvider({ children }: { children: React.ReactNode }) {
@@ -1482,6 +1484,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const [importSummary, setImportSummaryState] = useState<ImportSummary | null>(null);
   const [importedPdfPath, setImportedPdfPathState] = useState<string | null>(null);
   const [pdfAnnotations, setPdfAnnotationsState] = useState<unknown[] | null>(null);
+  const [pdfUploaded, setPdfUploadedState] = useState(false);
 
   // ── AsyncStorage load on mount ──
   useEffect(() => {
@@ -1497,7 +1500,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           ]);
           await AsyncStorage.setItem(STORAGE_KEYS.DEMO_CLEARED, "1");
         }
-        const [defects, nbi, nom, insType, superType, subType, superMat, subMat, structNum, uc, ch, sb, sn, spp, impSummary, lastJoint, lastSync, lastMod, pdfPath, pdfAnns] = await Promise.all([
+        const [defects, nbi, nom, insType, superType, subType, superMat, subMat, structNum, uc, ch, sb, sn, spp, impSummary, lastJoint, lastSync, lastMod, pdfPath, pdfAnns, pdfUploadedStr] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.SAVED_DEFECTS),
           AsyncStorage.getItem(STORAGE_KEYS.NBI_RATINGS),
           AsyncStorage.getItem(STORAGE_KEYS.NOMENCLATURE),
@@ -1518,12 +1521,14 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           AsyncStorage.getItem(STORAGE_KEYS.LAST_MODIFIED),
           AsyncStorage.getItem(STORAGE_KEYS.IMPORTED_PDF_PATH),
           AsyncStorage.getItem(STORAGE_KEYS.PDF_ANNOTATIONS),
+          AsyncStorage.getItem(STORAGE_KEYS.PDF_UPLOADED),
         ]);
         if (lastJoint) setLastJointElementIdState(lastJoint);
         if (lastSync) setLastSynced(lastSync);
         if (lastMod) setLastModifiedState(lastMod);
         if (pdfPath) setImportedPdfPathState(pdfPath);
         if (pdfAnns) { try { setPdfAnnotationsState(JSON.parse(pdfAnns) as unknown[]); } catch {} }
+        if (pdfUploadedStr === "1") setPdfUploadedState(true);
         if (defects) setSavedDefectsState(JSON.parse(defects));
         if (nbi) setNbiRatingsState(JSON.parse(nbi));
         if (impSummary) {
@@ -1709,17 +1714,43 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         ? `https://${process.env.EXPO_PUBLIC_DOMAIN}:8080`
         : null);
     setBaseUrl(apiUrl ?? null);
+    const sn = structureNumber.trim() || "UNKNOWN";
     await upsertSession({
-      structureNumber: structureNumber.trim() || "UNKNOWN",
+      structureNumber: sn,
       defects: savedDefects,
       nbiRatings,
       importSummary: importSummary ?? undefined,
       pdfAnnotations: pdfAnnotations ?? undefined,
     });
+
+    // Upload PDF binary if available and not yet uploaded
+    if (importedPdfPath && !pdfUploaded && Platform.OS !== "web") {
+      try {
+        const FS = await import("expo-file-system/legacy");
+        const info = await FS.getInfoAsync(importedPdfPath);
+        if (info.exists) {
+          const b64 = await FS.readAsStringAsync(importedPdfPath, { encoding: FS.EncodingType.Base64 });
+          const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+          const uploadUrl = (apiUrl ?? "") + `/sessions/pdf/${encodeURIComponent(sn)}`;
+          const uploadRes = await fetch(uploadUrl, {
+            method: "PUT",
+            headers: { "Content-Type": "application/pdf" },
+            body: bytes,
+          });
+          if (uploadRes.ok) {
+            setPdfUploadedState(true);
+            AsyncStorage.setItem(STORAGE_KEYS.PDF_UPLOADED, "1").catch(() => {});
+          }
+        }
+      } catch (uploadErr) {
+        console.warn("[PDF upload]", uploadErr);
+      }
+    }
+
     const ts = new Date().toISOString();
     setLastSynced(ts);
     AsyncStorage.setItem(STORAGE_KEYS.LAST_SYNCED, ts).catch(() => {});
-  }, [structureNumber, savedDefects, nbiRatings, importSummary, pdfAnnotations]);
+  }, [structureNumber, savedDefects, nbiRatings, importSummary, pdfAnnotations, importedPdfPath, pdfUploaded]);
 
   const setStructureNumber = useCallback((v: string) => {
     setStructureNumberState(v);
@@ -1764,16 +1795,19 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     AsyncStorage.removeItem(STORAGE_KEYS.IMPORTED_PDF_PATH).catch(() => {});
     setPdfAnnotationsState(null);
     AsyncStorage.removeItem(STORAGE_KEYS.PDF_ANNOTATIONS).catch(() => {});
+    setPdfUploadedState(false);
+    AsyncStorage.removeItem(STORAGE_KEYS.PDF_UPLOADED).catch(() => {});
   }, [setStructureNumber, setImportSummary]);
 
   const setPdfAnnotations = useCallback((a: unknown[] | null) => {
     setPdfAnnotationsState(a);
+    bumpLastModified();
     if (a !== null) {
       AsyncStorage.setItem(STORAGE_KEYS.PDF_ANNOTATIONS, JSON.stringify(a)).catch(() => {});
     } else {
       AsyncStorage.removeItem(STORAGE_KEYS.PDF_ANNOTATIONS).catch(() => {});
     }
-  }, []);
+  }, [bumpLastModified]);
 
   // ── Persist underclearance ──
   const setUnderclearanceData = useCallback((v: UnderclearanceData) => {
@@ -2541,8 +2575,10 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
             await FS.copyAsync({ from: srcUri, to: destUri });
             setImportedPdfPathState(destUri);
             setPdfAnnotationsState(null);
+            setPdfUploadedState(false);
             AsyncStorage.setItem(STORAGE_KEYS.IMPORTED_PDF_PATH, destUri).catch(() => {});
             AsyncStorage.removeItem(STORAGE_KEYS.PDF_ANNOTATIONS).catch(() => {});
+            AsyncStorage.removeItem(STORAGE_KEYS.PDF_UPLOADED).catch(() => {});
           } catch (copyErr) {
             console.warn("[PDF copy]", copyErr);
           }
@@ -2714,6 +2750,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     importedPdfPath,
     pdfAnnotations,
     setPdfAnnotations,
+    pdfUploaded,
   };
 
   return (

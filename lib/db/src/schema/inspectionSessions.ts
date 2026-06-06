@@ -1,6 +1,13 @@
 import { pgTable, text, integer, timestamp, jsonb, uuid, uniqueIndex } from "drizzle-orm/pg-core";
+import { customType } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType() {
+    return "bytea";
+  },
+});
 
 export const SESSION_SOURCES = ["mobile_sync", "pdf_import"] as const;
 export type SessionSource = typeof SESSION_SOURCES[number];
@@ -18,6 +25,7 @@ export const inspectionSessionsTable = pgTable(
     nbiRatings: jsonb("nbi_ratings").notNull().default([]),
     importSummary: jsonb("import_summary"),
     pdfAnnotations: jsonb("pdf_annotations"),
+    pdfDocument: bytea("pdf_document"),
   },
   (t) => [uniqueIndex("uq_inspection_sessions_structure_number").on(t.structureNumber)],
 );

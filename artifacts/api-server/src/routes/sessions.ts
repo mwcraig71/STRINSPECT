@@ -93,6 +93,73 @@ router.post("/sessions", requireApiKey, async (req, res) => {
   res.json(UpsertSessionResponse.parse(row));
 });
 
+// ── PDF binary upload/download ────────────────────────────────────────────────
+
+router.put(
+  "/sessions/pdf/:structureNumber",
+  requireApiKey,
+  (req: Request, _res: Response, next: NextFunction) => {
+    const chunks: Buffer[] = [];
+    req.on("data", (chunk: Buffer) => chunks.push(chunk));
+    req.on("end", () => {
+      (req as Request & { rawBody?: Buffer }).rawBody = Buffer.concat(chunks);
+      next();
+    });
+    req.on("error", next);
+  },
+  async (req: Request, res: Response) => {
+    const structureNumber = String(req.params["structureNumber"] ?? "");
+    if (!structureNumber) {
+      res.status(400).json({ error: "structureNumber is required" });
+      return;
+    }
+
+    const body = (req as Request & { rawBody?: Buffer }).rawBody;
+    if (!body || body.length === 0) {
+      res.status(400).json({ error: "Empty PDF body" });
+      return;
+    }
+
+    const [updated] = await db
+      .update(inspectionSessionsTable)
+      .set({ pdfDocument: body })
+      .where(eq(inspectionSessionsTable.structureNumber, structureNumber))
+      .returning({ id: inspectionSessionsTable.id });
+
+    if (!updated) {
+      res.status(404).json({ error: "Session not found" });
+      return;
+    }
+
+    res.json({ ok: true, bytes: body.length });
+  },
+);
+
+router.get("/sessions/pdf/:structureNumber", async (req, res) => {
+  const structureNumber = String(req.params["structureNumber"] ?? "");
+  if (!structureNumber) {
+    res.status(400).json({ error: "structureNumber is required" });
+    return;
+  }
+
+  const rows = await db
+    .select({ pdfDocument: inspectionSessionsTable.pdfDocument })
+    .from(inspectionSessionsTable)
+    .where(eq(inspectionSessionsTable.structureNumber, structureNumber))
+    .limit(1);
+
+  if (rows.length === 0 || !rows[0].pdfDocument) {
+    res.status(404).json({ error: "No PDF found for this session" });
+    return;
+  }
+
+  res.set("Content-Type", "application/pdf");
+  res.set("Content-Disposition", `inline; filename="${structureNumber}.pdf"`);
+  res.send(rows[0].pdfDocument);
+});
+
+// ── Single session (by UUID id) ────────────────────────────────────────────────
+
 router.get("/sessions/:id", async (req, res) => {
   const paramsParsed = GetSessionParams.safeParse(req.params);
   if (!paramsParsed.success) {

@@ -365,11 +365,13 @@ export default function InspectionProgress({ sessionData, setSessionData }: Prop
 
           {/* PDF Redlines panel */}
           {sessionAnnotations && sessionAnnotations.length > 0 && (() => {
-            const anns = sessionAnnotations as Array<{ type: string; page: number; color?: string }>;
+            const anns = sessionAnnotations as Array<{ type: string; page: number; color?: string; text?: string }>;
             const strokes = anns.filter((a) => a.type === "stroke");
             const highlights = anns.filter((a) => a.type === "highlight");
             const texts = anns.filter((a) => a.type === "text");
-            const pages = new Set(anns.map((a) => a.page)).size;
+            const pageNums = [...new Set(anns.map((a) => a.page))].sort((a, b) => a - b);
+            const sn = sessionData?.structureNumber ?? "";
+            const pdfUrl = sn ? `/api/sessions/pdf/${encodeURIComponent(sn)}` : null;
             return (
               <div className="bg-card border border-border rounded-lg overflow-hidden mb-5">
                 <div className="px-4 py-3 border-b border-border flex items-center gap-2">
@@ -378,8 +380,19 @@ export default function InspectionProgress({ sessionData, setSessionData }: Prop
                   <span className="text-xs bg-amber-500/10 text-amber-400 rounded-full px-2 py-0.5 font-semibold">
                     {anns.length} marks
                   </span>
+                  {pdfUrl && (
+                    <a
+                      href={pdfUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="ml-auto text-xs text-sky-400 underline hover:text-sky-300"
+                    >
+                      View / Download PDF
+                    </a>
+                  )}
                 </div>
-                <div className="px-4 py-4">
+                <div className="px-4 py-4 space-y-4">
+                  {/* Summary counts */}
                   <div className="grid grid-cols-4 gap-3">
                     <div className="text-center">
                       <p className="text-2xl font-bold text-foreground">{strokes.length}</p>
@@ -394,13 +407,52 @@ export default function InspectionProgress({ sessionData, setSessionData }: Prop
                       <p className="text-xs text-muted-foreground mt-0.5">Text notes</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-2xl font-bold text-foreground">{pages}</p>
+                      <p className="text-2xl font-bold text-foreground">{pageNums.length}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">Pages marked</p>
                     </div>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-3 italic">
-                    Annotations created on the mobile inspector. Open the app to view or edit the annotated PDF.
-                  </p>
+                  {/* Per-page breakdown */}
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Per-page breakdown</p>
+                    <div className="divide-y divide-border rounded-md border border-border overflow-hidden">
+                      {pageNums.map((pg) => {
+                        const pgAnns = anns.filter((a) => a.page === pg);
+                        const pgStrokes = pgAnns.filter((a) => a.type === "stroke").length;
+                        const pgHighlights = pgAnns.filter((a) => a.type === "highlight").length;
+                        const pgTexts = pgAnns.filter((a) => a.type === "text");
+                        return (
+                          <div key={pg} className="px-3 py-2 flex items-start gap-3 bg-muted/30">
+                            <span className="text-xs font-bold text-foreground min-w-[54px]">Page {pg}</span>
+                            <div className="flex flex-wrap gap-2 flex-1">
+                              {pgStrokes > 0 && (
+                                <span className="text-xs text-muted-foreground">{pgStrokes} stroke{pgStrokes !== 1 ? "s" : ""}</span>
+                              )}
+                              {pgHighlights > 0 && (
+                                <span className="text-xs text-yellow-500">{pgHighlights} highlight{pgHighlights !== 1 ? "s" : ""}</span>
+                              )}
+                              {pgTexts.length > 0 && (
+                                <span className="text-xs text-sky-400">
+                                  {pgTexts.map((t) => t.text).filter(Boolean).join(" · ") || `${pgTexts.length} note${pgTexts.length !== 1 ? "s" : ""}`}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  {/* Embedded PDF viewer (if uploaded) */}
+                  {pdfUrl && (
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Annotated PDF preview</p>
+                      <iframe
+                        src={pdfUrl}
+                        className="w-full rounded border border-border"
+                        style={{ height: 480 }}
+                        title={`PDF for ${sn}`}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             );

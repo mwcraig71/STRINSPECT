@@ -1,3 +1,5 @@
+import { PDFJS_INLINE_SCRIPT } from "./pdfAnnotatorPdfjsBundled";
+
 export function getPdfAnnotatorHtml(): string {
   return `<!DOCTYPE html>
 <html>
@@ -40,7 +42,7 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
 
 <div id="loading">
   <div class="spinner"></div>
-  <div id="load-txt">Loading PDF viewer…</div>
+  <div id="load-txt">Loading PDF viewer\u2026</div>
   <div id="err-txt"></div>
 </div>
 
@@ -66,14 +68,52 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
 </div>
 
 <div id="text-input-wrap">
-  <input id="text-input" placeholder="Type here…" autocomplete="off" autocorrect="off" spellcheck="false">
+  <input id="text-input" placeholder="Type here\u2026" autocomplete="off" autocorrect="off" spellcheck="false">
 </div>
 
+<!-- PDF.js bundled locally — no network dependency -->
+<script>
+${PDFJS_INLINE_SCRIPT}
+</script>
+
 <script type="module">
+/* ── UI helpers (defined first so they are available throughout) ── */
+function showError(msg) {
+  var s = document.querySelector('.spinner');
+  if (s) s.style.display = 'none';
+  var l = document.getElementById('load-txt');
+  if (l) l.style.display = 'none';
+  var e = document.getElementById('err-txt');
+  if (e) { e.style.display = 'block'; e.textContent = msg; }
+}
+
+function setLoadTxt(t) {
+  var el = document.getElementById('load-txt');
+  if (el) el.textContent = t;
+}
+
+function showUI() {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('topbar').style.display = 'flex';
+  document.getElementById('toolbar').style.display = 'flex';
+  document.getElementById('page-info').textContent = 'Page 1 of ' + pageCount;
+}
+
+/* ── Initialise PDF.js from bundled global ── */
+var pdfjsLib = window.pdfjsLib;
+if (!pdfjsLib) {
+  showError('PDF viewer failed to initialise. Please close and try again.');
+} else {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = ''; // run in main thread (offline-safe)
+}
+
+/* ── State ── */
 var tool = 'pan';
 var penColor = '#ef4444';
 var penSize = 4;
 var annotations = [];
+var initialAnnotationCount = 0;
+var isDirty = false;
 var currentStroke = null;
 var pdfDoc = null;
 var pageCount = 0;
@@ -93,8 +133,19 @@ function postRN(msg) {
   } catch(e) {}
 }
 
-document.getElementById('btn-save').onclick = function() { postRN({ type:'save', annotations: annotations }); };
-document.getElementById('btn-close').onclick = function() { postRN({ type:'close' }); };
+document.getElementById('btn-save').onclick = function() {
+  postRN({ type:'save', annotations: annotations });
+  isDirty = false;
+};
+
+document.getElementById('btn-close').onclick = function() {
+  if (isDirty) {
+    postRN({ type: 'confirm-close' });
+  } else {
+    postRN({ type:'close' });
+  }
+};
+
 document.getElementById('btn-pan').onclick = function() { setTool('pan'); };
 document.getElementById('btn-pen').onclick = function() { setTool('pen'); };
 document.getElementById('btn-highlight').onclick = function() { setTool('highlight'); };
@@ -110,6 +161,7 @@ function onMsg(e) {
   if (data && data.type === 'init') {
     if (Array.isArray(data.annotations) && data.annotations.length > 0) {
       annotations = data.annotations;
+      initialAnnotationCount = annotations.length;
     }
     loadPdf(data.pdfBase64);
   }
@@ -117,21 +169,14 @@ function onMsg(e) {
 window.addEventListener('message', onMsg);
 document.addEventListener('message', onMsg);
 
-/* ── Load PDF.js ── */
-var pdfjsLib = null;
-try {
-  pdfjsLib = await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs');
-  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs';
-} catch(e) {
-  showError('PDF viewer failed to load. Check internet connection. ' + (e && e.message ? e.message : ''));
-}
-
+/* ── Load and render PDF ── */
 async function loadPdf(base64Uri) {
+  if (!pdfjsLib) { showError('PDF.js not available.'); return; }
   try {
-    setLoadTxt('Decoding PDF…');
+    setLoadTxt('Decoding PDF\u2026');
     var resp = await fetch(base64Uri);
     var buf = await resp.arrayBuffer();
-    setLoadTxt('Rendering pages…');
+    setLoadTxt('Rendering pages\u2026');
     pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
     pageCount = pdfDoc.numPages;
     await renderAllPages();
@@ -148,7 +193,7 @@ async function renderAllPages() {
   area.innerHTML = '';
   var vw = area.clientWidth || window.innerWidth;
   for (var pn = 1; pn <= pageCount; pn++) {
-    setLoadTxt('Rendering page ' + pn + ' of ' + pageCount + '…');
+    setLoadTxt('Rendering page ' + pn + ' of ' + pageCount + '\u2026');
     var page = await pdfDoc.getPage(pn);
     var baseVp = page.getViewport({ scale: 1 });
     var scale = (vw - 4) / baseVp.width;
@@ -236,6 +281,7 @@ function onUp(e, cv, pn) {
   isDrawing = false;
   if (currentStroke.points.length > 0) {
     annotations.push(Object.assign({}, currentStroke, { points: currentStroke.points.slice() }));
+    isDirty = true;
   }
   currentStroke = null;
   redrawPage(pn);
@@ -260,6 +306,7 @@ function showTextInput(clientX, clientY, pn) {
     inp.removeEventListener('blur', onBlur);
     if (txt) {
       annotations.push({ type:'text', page: textPendingPage, x: textPendingX, y: textPendingY, text: txt, fontSize: penSize * 4 + 10, color: penColor });
+      isDirty = true;
       redrawPage(textPendingPage);
     }
   }
@@ -323,6 +370,7 @@ function replayAnnotations() {
 function undoLast() {
   if (annotations.length === 0) return;
   var last = annotations.pop();
+  isDirty = annotations.length !== initialAnnotationCount;
   redrawPage(last.page);
 }
 
@@ -370,32 +418,15 @@ function renderOptRow() {
   sep.className = 'sep';
   row.appendChild(sep);
 
-  var labels = ['S','M','L'];
+  var sizeLabels = ['S','M','L'];
   SIZES.forEach(function(s,i) {
     var b = document.createElement('button');
     b.className = 'sz-btn' + (s === penSize ? ' active' : '');
-    b.textContent = labels[i];
+    b.textContent = sizeLabels[i];
+    b.title = tool === 'text' ? ['Small','Medium','Large'][i] + ' font' : ['Thin','Medium','Thick'][i] + ' line';
     b.onclick = function() { penSize = s; renderOptRow(); };
     row.appendChild(b);
   });
-}
-
-/* ── UI helpers ── */
-function showUI() {
-  document.getElementById('loading').style.display = 'none';
-  document.getElementById('topbar').style.display = 'flex';
-  document.getElementById('toolbar').style.display = 'flex';
-  document.getElementById('page-info').textContent = 'Page 1 of ' + pageCount;
-}
-
-function setLoadTxt(t) { document.getElementById('load-txt').textContent = t; }
-
-function showError(msg) {
-  document.querySelector('.spinner').style.display = 'none';
-  document.getElementById('load-txt').style.display = 'none';
-  var e = document.getElementById('err-txt');
-  e.style.display = 'block';
-  e.textContent = msg;
 }
 
 function observePages() {

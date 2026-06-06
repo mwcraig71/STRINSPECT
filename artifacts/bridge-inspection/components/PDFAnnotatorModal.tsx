@@ -88,6 +88,15 @@ export default function PDFAnnotatorModal({ visible, pdfPath, annotations, onSav
         Alert.alert("Saved", "Annotations saved.");
       } else if (data.type === "close") {
         onClose();
+      } else if (data.type === "confirm-close") {
+        Alert.alert(
+          "Unsaved Annotations",
+          "You have unsaved changes. Discard them and close?",
+          [
+            { text: "Cancel", style: "cancel" },
+            { text: "Discard", style: "destructive", onPress: onClose },
+          ],
+        );
       }
     } catch {}
   }, [onSave, onClose]);
@@ -122,8 +131,6 @@ export default function PDFAnnotatorModal({ visible, pdfPath, annotations, onSav
               javaScriptEnabled
               originWhitelist={["*"]}
               allowFileAccess
-              allowFileAccessFromFileURLs
-              allowUniversalAccessFromFileURLs
               onLoad={onWebViewLoad}
               onMessage={onMessage}
               onError={(e) => setLoadError(e.nativeEvent.description || "WebView error")}
