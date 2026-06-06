@@ -1,5 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import { resizePhoto } from "@/lib/photoUtils";
 import {
   Alert,
   Image,
@@ -57,6 +58,8 @@ export function SteelPipePileModal() {
     setShowSteelPipePileModal,
     steelPipePileData,
     setSteelPipePileData,
+    imageSize,
+    dateStampEnabled,
   } = useInspection();
   const d = steelPipePileData;
 
@@ -97,7 +100,15 @@ export function SteelPipePileModal() {
       quality: 0.8,
     });
     if (!result.canceled) {
-      addRowPhotos(id, result.assets.map((a) => ({ uri: a.uri, description: "" })));
+      const capturedAt = new Date().toISOString();
+      const newPhotos: PhotoItem[] = await Promise.all(
+        result.assets.map(async (a) => ({
+          uri: await resizePhoto(a.uri, imageSize, a.width, a.height),
+          description: "",
+          capturedAt,
+        }))
+      );
+      addRowPhotos(id, newPhotos);
     }
   };
 
@@ -113,7 +124,9 @@ export function SteelPipePileModal() {
     }
     const result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
     if (!result.canceled) {
-      addRowPhotos(id, [{ uri: result.assets[0].uri, description: "" }]);
+      const asset = result.assets[0];
+      const uri = await resizePhoto(asset.uri, imageSize, asset.width, asset.height);
+      addRowPhotos(id, [{ uri, description: "", capturedAt: new Date().toISOString() }]);
     }
   };
 
@@ -281,7 +294,16 @@ export function SteelPipePileModal() {
                       key={pIdx}
                       style={[styles.photoRow, { backgroundColor: c.background, borderColor: c.border }]}
                     >
-                      <Image source={{ uri: p.uri }} style={styles.photoThumb} />
+                      <View style={{ position: "relative" }}>
+                        <Image source={{ uri: p.uri }} style={styles.photoThumb} />
+                        {dateStampEnabled && p.capturedAt && (
+                          <View style={styles.dateStampBadge}>
+                            <Text style={styles.dateStampText}>
+                              {new Date(p.capturedAt).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "2-digit" })}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
                       <TextInput
                         style={[styles.photoInput, { backgroundColor: c.secondary, borderColor: c.border, color: c.foreground }]}
                         value={p.description}
@@ -369,6 +391,8 @@ const styles = StyleSheet.create({
   photoBtnText: { fontSize: 10, fontWeight: "800", textTransform: "uppercase" },
   photoRow: { flexDirection: "row", alignItems: "center", gap: 8, padding: 8, borderRadius: 10, borderWidth: 1 },
   photoThumb: { width: 52, height: 52, borderRadius: 8 },
+  dateStampBadge: { position: "absolute", bottom: 3, right: 3, backgroundColor: "rgba(0,0,0,0.65)", borderRadius: 3, paddingHorizontal: 3, paddingVertical: 1 },
+  dateStampText: { fontSize: 7, color: "#fff", fontWeight: "700" },
   photoInput: { flex: 1, minWidth: 0, borderWidth: 1, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 6, fontSize: 11, fontWeight: "600", minHeight: 40 },
   addBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, padding: 12, borderRadius: 12, borderWidth: 2, borderStyle: "dashed", marginTop: 4 },
   addBtnText: { fontSize: 13, fontWeight: "900", textTransform: "uppercase", letterSpacing: 0.5 },

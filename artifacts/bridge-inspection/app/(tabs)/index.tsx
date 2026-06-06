@@ -1,6 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
+import { resizePhoto } from "@/lib/photoUtils";
 import * as Location from "expo-location";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import React, { useState } from "react";
@@ -99,6 +100,8 @@ export default function InspectionScreen() {
     setShowDailySafetyModal,
     setShowSnbiModal,
     setShowSteelPipePileModal,
+    imageSize,
+    dateStampEnabled,
   } = useInspection();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -121,10 +124,14 @@ export default function InspectionScreen() {
       quality: 0.8,
     });
     if (!result.canceled) {
-      const newPhotos: PhotoItem[] = result.assets.map((a) => ({
-        uri: a.uri,
-        description: "",
-      }));
+      const capturedAt = new Date().toISOString();
+      const newPhotos: PhotoItem[] = await Promise.all(
+        result.assets.map(async (a) => ({
+          uri: await resizePhoto(a.uri, imageSize, a.width, a.height),
+          description: "",
+          capturedAt,
+        }))
+      );
       setPhotos([...photos, ...newPhotos]);
     }
   };
@@ -150,7 +157,9 @@ export default function InspectionScreen() {
           if (raw >= 0) heading = Math.round(raw);
         }
       } catch {}
-      setPhotos([...photos, { uri: result.assets[0].uri, description: "", heading }]);
+      const asset = result.assets[0];
+      const uri = await resizePhoto(asset.uri, imageSize, asset.width, asset.height);
+      setPhotos([...photos, { uri, description: "", heading, capturedAt: new Date().toISOString() }]);
     }
   };
 
@@ -680,7 +689,16 @@ export default function InspectionScreen() {
             </View>
             {photos.map((p, idx) => (
               <View key={idx} style={[styles.photoRow, { backgroundColor: c.secondary, borderColor: c.border }]}>
-                <Image source={{ uri: p.uri }} style={styles.photoThumb} />
+                <View style={{ position: "relative" }}>
+                  <Image source={{ uri: p.uri }} style={styles.photoThumb} />
+                  {dateStampEnabled && p.capturedAt && (
+                    <View style={styles.dateStampBadge}>
+                      <Text style={styles.dateStampText}>
+                        {new Date(p.capturedAt).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "2-digit" })}
+                      </Text>
+                    </View>
+                  )}
+                </View>
                 <View style={styles.photoInfo}>
                   <TextInput
                     style={[styles.photoInput, { backgroundColor: c.card, borderColor: c.border, color: c.foreground }]}
@@ -1047,6 +1065,8 @@ const styles = StyleSheet.create({
   photoBtnLargeText: { fontSize: 12, fontWeight: "800", textTransform: "uppercase" },
   photoRow: { flexDirection: "row", alignItems: "center", gap: 8, padding: 8, borderRadius: 10, borderWidth: 1 },
   photoThumb: { width: 50, height: 50, borderRadius: 8 },
+  dateStampBadge: { position: "absolute", bottom: 3, right: 3, backgroundColor: "rgba(0,0,0,0.65)", borderRadius: 3, paddingHorizontal: 3, paddingVertical: 1 },
+  dateStampText: { fontSize: 7, color: "#fff", fontWeight: "700" },
   photoInfo: { flex: 1 },
   photoInput: { borderWidth: 1, borderRadius: 6, padding: 6, fontSize: 11 },
   flagRow: { flexDirection: "row", gap: 8 },

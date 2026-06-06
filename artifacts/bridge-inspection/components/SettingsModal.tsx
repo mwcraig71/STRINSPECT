@@ -51,6 +51,10 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
     importSummary,
     lastSynced,
     syncSession,
+    imageSize,
+    setImageSize,
+    dateStampEnabled,
+    setDateStampEnabled,
   } = useInspection();
 
   const hasInspectionData =
@@ -429,6 +433,62 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
             </View>
           </View>
 
+          {/* Photo Settings */}
+          <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
+            <View style={styles.cardHeader}>
+              <Feather name="camera" size={15} color={c.mutedForeground} />
+              <Text style={[styles.cardTitle, { color: c.foreground }]}>Photo Settings</Text>
+            </View>
+            <Text style={[styles.cardDesc, { color: c.mutedForeground }]}>
+              Output size applied when photos are captured or imported. Larger sizes retain more detail.
+            </Text>
+            <View style={styles.matRow}>
+              {[
+                { key: "original", label: "Original" },
+                { key: "4x6", label: '4"×6"' },
+                { key: "5x7", label: '5"×7"' },
+                { key: "8x10", label: '8"×10"' },
+              ].map((opt) => {
+                const active = imageSize === opt.key;
+                return (
+                  <TouchableOpacity
+                    key={opt.key}
+                    style={[
+                      styles.matChip,
+                      {
+                        borderColor: active ? "#38bdf8" : c.border,
+                        backgroundColor: active ? "rgba(56,189,248,0.12)" : c.secondary,
+                      },
+                    ]}
+                    onPress={() => setImageSize(opt.key)}
+                  >
+                    <Text style={[styles.matChipText, { color: active ? "#38bdf8" : c.mutedForeground }]}>
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <View style={[styles.clearDivider, { borderTopColor: c.border }]} />
+            <View style={styles.photoToggleRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.optionTitle, { color: c.foreground }]}>Date Stamp</Text>
+                <Text style={[styles.optionSub, { color: c.mutedForeground }]}>
+                  Show the capture date on each photo (bottom right)
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={[
+                  styles.toggleTrack,
+                  { backgroundColor: dateStampEnabled ? "#0284c7" : c.muted, borderColor: dateStampEnabled ? "#38bdf8" : c.border },
+                ]}
+                onPress={() => setDateStampEnabled(!dateStampEnabled)}
+              >
+                <View style={[styles.toggleThumb, { alignSelf: dateStampEnabled ? "flex-end" : "flex-start" }]} />
+              </TouchableOpacity>
+            </View>
+          </View>
+
           {/* Import */}
           <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
             <View style={styles.cardHeader}>
@@ -612,6 +672,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   matChipText: { fontSize: 12, fontWeight: "700" },
+  photoToggleRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  toggleTrack: { width: 44, height: 26, borderRadius: 13, borderWidth: 1, justifyContent: "center", paddingHorizontal: 2 },
+  toggleThumb: { width: 20, height: 20, borderRadius: 10, backgroundColor: "#fff" },
   structDivider: { borderTopWidth: 1, marginVertical: 2 },
   buildSummary: {
     borderRadius: 10,

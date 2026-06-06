@@ -411,6 +411,7 @@ export interface PhotoItem {
   uri: string;
   description: string;
   heading?: number | null;
+  capturedAt?: string;
 }
 
 export interface DefectRecord {
@@ -1131,6 +1132,10 @@ interface InspectionContextType {
   setRangeMax: (v: string) => void;
   syncToCurrentLoc: boolean;
   setSyncToCurrentLoc: (v: boolean) => void;
+  imageSize: string;
+  setImageSize: (v: string) => void;
+  dateStampEnabled: boolean;
+  setDateStampEnabled: (v: boolean) => void;
 
   // Derived
   locationSequence: string[];
@@ -1421,6 +1426,8 @@ const STORAGE_KEYS = {
   IMPORTED_PDF_PATH: "@bridge_imported_pdf_path",
   PDF_ANNOTATIONS: "@bridge_pdf_annotations",
   PDF_UPLOADED: "@bridge_pdf_uploaded",
+  IMAGE_SIZE: "@bridge_image_size",
+  DATE_STAMP: "@bridge_date_stamp",
 };
 
 export function InspectionProvider({ children }: { children: React.ReactNode }) {
@@ -1480,6 +1487,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const [rangeMin, setRangeMin] = useState("");
   const [rangeMax, setRangeMax] = useState("");
   const [syncToCurrentLoc, setSyncToCurrentLoc] = useState(false);
+  const [imageSize, setImageSizeState] = useState("original");
+  const [dateStampEnabled, setDateStampEnabledState] = useState(false);
   const [parsingActive, setParsingActive] = useState(false);
   const [importSummary, setImportSummaryState] = useState<ImportSummary | null>(null);
   const [importedPdfPath, setImportedPdfPathState] = useState<string | null>(null);
@@ -1500,7 +1509,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           ]);
           await AsyncStorage.setItem(STORAGE_KEYS.DEMO_CLEARED, "1");
         }
-        const [defects, nbi, nom, insType, superType, subType, superMat, subMat, structNum, uc, ch, sb, sn, spp, impSummary, lastJoint, lastSync, lastMod, pdfPath, pdfAnns, pdfUploadedStr] = await Promise.all([
+        const [defects, nbi, nom, insType, superType, subType, superMat, subMat, structNum, uc, ch, sb, sn, spp, impSummary, lastJoint, lastSync, lastMod, pdfPath, pdfAnns, pdfUploadedStr, imgSz, dateStampStr] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.SAVED_DEFECTS),
           AsyncStorage.getItem(STORAGE_KEYS.NBI_RATINGS),
           AsyncStorage.getItem(STORAGE_KEYS.NOMENCLATURE),
@@ -1522,6 +1531,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           AsyncStorage.getItem(STORAGE_KEYS.IMPORTED_PDF_PATH),
           AsyncStorage.getItem(STORAGE_KEYS.PDF_ANNOTATIONS),
           AsyncStorage.getItem(STORAGE_KEYS.PDF_UPLOADED),
+          AsyncStorage.getItem(STORAGE_KEYS.IMAGE_SIZE),
+          AsyncStorage.getItem(STORAGE_KEYS.DATE_STAMP),
         ]);
         if (lastJoint) setLastJointElementIdState(lastJoint);
         if (lastSync) setLastSynced(lastSync);
@@ -1529,6 +1540,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         if (pdfPath) setImportedPdfPathState(pdfPath);
         if (pdfAnns) { try { setPdfAnnotationsState(JSON.parse(pdfAnns) as unknown[]); } catch {} }
         if (pdfUploadedStr === "1") setPdfUploadedState(true);
+        if (imgSz) setImageSizeState(imgSz);
+        if (dateStampStr === "1") setDateStampEnabledState(true);
         if (defects) setSavedDefectsState(JSON.parse(defects));
         if (nbi) setNbiRatingsState(JSON.parse(nbi));
         if (impSummary) {
@@ -2723,6 +2736,16 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     setRangeMax,
     syncToCurrentLoc,
     setSyncToCurrentLoc,
+    imageSize,
+    setImageSize: (v: string) => {
+      setImageSizeState(v);
+      AsyncStorage.setItem(STORAGE_KEYS.IMAGE_SIZE, v).catch(() => {});
+    },
+    dateStampEnabled,
+    setDateStampEnabled: (v: boolean) => {
+      setDateStampEnabledState(v);
+      AsyncStorage.setItem(STORAGE_KEYS.DATE_STAMP, v ? "1" : "0").catch(() => {});
+    },
     locationSequence,
     filteredElements,
     sessionManifest,

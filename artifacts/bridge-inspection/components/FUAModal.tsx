@@ -1,5 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import { resizePhoto } from "@/lib/photoUtils";
 import React from "react";
 import {
   Alert,
@@ -27,7 +28,7 @@ const PRIORITY_OPTIONS = [
 
 export function FUAModal() {
   const colors = useColors();
-  const { showFUAModal, setShowFUAModal, fuaData, setFuaData, completeFUA } =
+  const { showFUAModal, setShowFUAModal, fuaData, setFuaData, completeFUA, imageSize, dateStampEnabled } =
     useInspection();
 
   const addPhoto = async () => {
@@ -41,10 +42,14 @@ export function FUAModal() {
       quality: 0.8,
     });
     if (!result.canceled) {
-      const newPhotos: PhotoItem[] = result.assets.map((a) => ({
-        uri: a.uri,
-        description: "",
-      }));
+      const capturedAt = new Date().toISOString();
+      const newPhotos: PhotoItem[] = await Promise.all(
+        result.assets.map(async (a) => ({
+          uri: await resizePhoto(a.uri, imageSize, a.width, a.height),
+          description: "",
+          capturedAt,
+        }))
+      );
       setFuaData({ ...fuaData, photos: [...fuaData.photos, ...newPhotos] });
     }
   };
@@ -61,7 +66,9 @@ export function FUAModal() {
     }
     const result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
     if (!result.canceled) {
-      const newPhoto: PhotoItem = { uri: result.assets[0].uri, description: "" };
+      const asset = result.assets[0];
+      const uri = await resizePhoto(asset.uri, imageSize, asset.width, asset.height);
+      const newPhoto: PhotoItem = { uri, description: "", capturedAt: new Date().toISOString() };
       setFuaData({ ...fuaData, photos: [...fuaData.photos, newPhoto] });
     }
   };
@@ -235,7 +242,16 @@ export function FUAModal() {
               </View>
               {fuaData.photos.map((p, idx) => (
                 <View key={idx} style={[styles.photoRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-                  <Image source={{ uri: p.uri }} style={styles.photoThumb} />
+                  <View style={{ position: "relative" }}>
+                    <Image source={{ uri: p.uri }} style={styles.photoThumb} />
+                    {dateStampEnabled && p.capturedAt && (
+                      <View style={styles.dateStampBadge}>
+                        <Text style={styles.dateStampText}>
+                          {new Date(p.capturedAt).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "2-digit" })}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
                   <View style={styles.photoDetails}>
                     <TextInput
                       style={[styles.photoInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
@@ -356,6 +372,8 @@ const styles = StyleSheet.create({
   photoButtons: { flexDirection: "row", gap: 8 },
   photoBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
   photoBtnText: { fontSize: 11, fontWeight: "800", textTransform: "uppercase" },
+  dateStampBadge: { position: "absolute", bottom: 3, right: 3, backgroundColor: "rgba(0,0,0,0.65)", borderRadius: 3, paddingHorizontal: 3, paddingVertical: 1 },
+  dateStampText: { fontSize: 7, color: "#fff", fontWeight: "700" },
   photoRow: { flexDirection: "row", alignItems: "center", gap: 10, padding: 8, borderRadius: 10, borderWidth: 1 },
   photoThumb: { width: 56, height: 56, borderRadius: 8 },
   photoDetails: { flex: 1 },

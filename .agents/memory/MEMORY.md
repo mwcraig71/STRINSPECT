@@ -1,5 +1,6 @@
 - [RN Web TextInput overflow](rn-web-textinput-overflow.md) — TextInputs overflow narrow flex rows on RN Web; add `minWidth: 0` to the `flex:1` input.
 - [Metro react dedup for Expo web](metro-react-dedup-web.md) — react/react-dom must be aliased in metro.config.js for Expo apps in this pnpm monorepo.
+- [New Expo packages + Metro pnpm symlinks](metro-new-package-resolution.md) — any new Expo package installed via pnpm may need an extraNodeModules entry in metro.config.js to resolve; pnpm symlinks alone are insufficient for Metro in this monorepo.
 - [Opening bundled PDFs in Expo](expo-bundled-pdf-open.md) — bundle + open a static PDF across web/native; web popup-blocker gotcha.
 - [structure-number sync](structure-number-sync.md) — how the bridge structure number stays consistent across CIF, Underclearance, and the global header.
 - [Bridge element catalog](bridge-element-catalog.md) — 226=Steel Pipe Pile (custom, visual inspection); 900=Steel Pipe Pile remaining-section (ultrasonic/caliper) agency form; 227=RC Pile; never put 226 back as PSC Pile.
