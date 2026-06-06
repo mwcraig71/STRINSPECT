@@ -1725,25 +1725,28 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
 
     // Upload PDF binary if available and not yet uploaded
     if (importedPdfPath && !pdfUploaded && Platform.OS !== "web") {
-      try {
-        const FS = await import("expo-file-system/legacy");
-        const info = await FS.getInfoAsync(importedPdfPath);
-        if (info.exists) {
-          const b64 = await FS.readAsStringAsync(importedPdfPath, { encoding: FS.EncodingType.Base64 });
-          const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-          const uploadUrl = (apiUrl ?? "") + `/sessions/pdf/${encodeURIComponent(sn)}`;
-          const uploadRes = await fetch(uploadUrl, {
-            method: "PUT",
-            headers: { "Content-Type": "application/pdf" },
-            body: bytes,
-          });
-          if (uploadRes.ok) {
-            setPdfUploadedState(true);
-            AsyncStorage.setItem(STORAGE_KEYS.PDF_UPLOADED, "1").catch(() => {});
-          }
+      const FS = await import("expo-file-system/legacy");
+      const info = await FS.getInfoAsync(importedPdfPath);
+      if (info.exists) {
+        const b64 = await FS.readAsStringAsync(importedPdfPath, { encoding: FS.EncodingType.Base64 });
+        const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+        // URL must include /api prefix (API server mounts router at /api)
+        const uploadUrl = (apiUrl ?? "") + `/api/sessions/pdf/${encodeURIComponent(sn)}`;
+        const apiKey = process.env.EXPO_PUBLIC_API_KEY;
+        const uploadRes = await fetch(uploadUrl, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/pdf",
+            ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+          },
+          body: bytes,
+        });
+        if (!uploadRes.ok) {
+          const text = await uploadRes.text().catch(() => uploadRes.status.toString());
+          throw new Error(`PDF upload failed (${uploadRes.status}): ${text}`);
         }
-      } catch (uploadErr) {
-        console.warn("[PDF upload]", uploadErr);
+        setPdfUploadedState(true);
+        AsyncStorage.setItem(STORAGE_KEYS.PDF_UPLOADED, "1").catch(() => {});
       }
     }
 

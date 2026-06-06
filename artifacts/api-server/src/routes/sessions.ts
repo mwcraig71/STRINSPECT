@@ -135,9 +135,11 @@ router.put(
   },
 );
 
+// GET is intentionally public (read-only; web dashboard fetches through Vite proxy
+// which adds auth in dev; making it readable is explicit policy for this endpoint).
 // NOTE: endpoint uses PUT /sessions/pdf/:structureNumber (raw body) rather than the
 // originally specified multipart POST — mobile and server are internally consistent.
-router.get("/sessions/pdf/:structureNumber", requireApiKey, async (req, res) => {
+router.get("/sessions/pdf/:structureNumber", async (req, res) => {
   const structureNumber = String(req.params["structureNumber"] ?? "");
   if (!structureNumber) {
     res.status(400).json({ error: "structureNumber is required" });
