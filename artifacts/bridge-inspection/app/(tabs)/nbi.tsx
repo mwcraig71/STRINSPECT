@@ -430,7 +430,7 @@ const styles = StyleSheet.create({
   },
   dropdownItemText: { fontSize: 13, fontWeight: "700" },
   tabStrip: { borderBottomWidth: 1 },
-  tabStripContent: { padding: 8, gap: 6 },
+  tabStripContent: { padding: 8, gap: 6, flexDirection: "row", alignItems: "center" },
   tab: {
     paddingHorizontal: 16,
     paddingVertical: 10,
