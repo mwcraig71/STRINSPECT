@@ -71,7 +71,9 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
   <input id="text-input" placeholder="Type here\u2026" autocomplete="off" autocorrect="off" spellcheck="false">
 </div>
 
-<!-- PDF.js bundled locally — no network dependency -->
+<!-- PDF.js bundled locally — no network dependency.
+     This is the ESM build with its trailing export statement stripped at embed
+     time (see scripts/embed-pdfjs.mjs); it exposes the API via globalThis.pdfjsLib. -->
 <script>
 ${PDFJS_INLINE_SCRIPT}
 </script>

@@ -9,4 +9,5 @@
 - [Bridge web app architecture](bridge-web-arch.md) — file-based (no backend); sessionData lifted to App level for progress→review handoff; wouter Link renders its own <a>, never wrap with another <a>.
 - [TS project references stale dist](ts-project-refs-stale.md) — after editing a workspace lib's source, run `tsc -p tsconfig.json` in that lib to regenerate dist/ d.ts or downstream packages see stale types.
 - [Orval zod codegen barrel conflict](orval-zod-codegen.md) — orval overwrites workspace-root index.ts in split mode; use mode:"single" + absolute target path to avoid it.
+- [pdf.js inline bundle in WKWebView](pdfjs-webview-esm-classic-script.md) — embed as classic <script>, strip trailing ESM export{} or whole script is discarded; no backticks in the HTML template literal.
 - [Offline-first sync architecture](offline-sync-arch.md) — persistent queue (offlineQueue.ts), photo upload to session_photos table, syncSession returns "synced"|"queued" (never throws when offline).
