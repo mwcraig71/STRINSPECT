@@ -65,6 +65,7 @@ router.post("/sessions", requireApiKey, async (req, res) => {
   const defects = bodyParsed.data.defects ?? [];
   const nbiRatings = bodyParsed.data.nbiRatings ?? [];
   const importSummary = bodyParsed.data.importSummary ?? null;
+  const pdfAnnotations = bodyParsed.data.pdfAnnotations ?? null;
   const defectCount = defects.length;
   const cs4Count = defects.filter(
     (d): d is { cs: string } =>
@@ -75,10 +76,10 @@ router.post("/sessions", requireApiKey, async (req, res) => {
 
   const [row] = await db
     .insert(inspectionSessionsTable)
-    .values({ structureNumber, source, defects, nbiRatings, importSummary, defectCount, cs4Count })
+    .values({ structureNumber, source, defects, nbiRatings, importSummary, pdfAnnotations, defectCount, cs4Count })
     .onConflictDoUpdate({
       target: inspectionSessionsTable.structureNumber,
-      set: { source, defects, nbiRatings, importSummary, defectCount, cs4Count, syncedAt: new Date() },
+      set: { source, defects, nbiRatings, importSummary, pdfAnnotations, defectCount, cs4Count, syncedAt: new Date() },
     })
     .returning({
       id: inspectionSessionsTable.id,

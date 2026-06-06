@@ -17,6 +17,7 @@ import {
 import { useColors } from "@/hooks/useColors";
 import { useInspection } from "@/context/InspectionContext";
 import { useListSessions, getListSessionsQueryKey } from "@workspace/api-client-react";
+import PDFAnnotatorModal from "@/components/PDFAnnotatorModal";
 
 function formatRelativeTime(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime();
@@ -39,11 +40,15 @@ export default function BridgesScreen() {
     hasUnsyncedChanges,
     syncSession,
     clearInspection,
+    importedPdfPath,
+    pdfAnnotations,
+    setPdfAnnotations,
   } = useInspection();
 
   const [submitStatus, setSubmitStatus] = useState<"idle" | "syncing" | "success" | "error">("idle");
   const [newBridgeVisible, setNewBridgeVisible] = useState(false);
   const [newBridgeDraft, setNewBridgeDraft] = useState("");
+  const [annotatorOpen, setAnnotatorOpen] = useState(false);
 
   const {
     data: sessions,
@@ -188,6 +193,19 @@ export default function BridgesScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
+      {Platform.OS !== "web" && (
+        <PDFAnnotatorModal
+          visible={annotatorOpen}
+          pdfPath={importedPdfPath}
+          annotations={pdfAnnotations}
+          onSave={(anns) => {
+            setPdfAnnotations(anns);
+            setAnnotatorOpen(false);
+          }}
+          onClose={() => setAnnotatorOpen(false)}
+        />
+      )}
+
       <View style={[styles.header, { backgroundColor: c.headerBg }]}>
         <View style={styles.headerRow}>
           <View style={styles.headerLeft}>
@@ -320,6 +338,16 @@ export default function BridgesScreen() {
                       : "Submit to Cloud"}
                   </Text>
                 </TouchableOpacity>
+
+                {importedPdfPath && Platform.OS !== "web" && (
+                  <TouchableOpacity
+                    style={[styles.newBtn, { backgroundColor: "#0c1a2e", borderColor: "#0284c7" }]}
+                    onPress={() => setAnnotatorOpen(true)}
+                  >
+                    <Feather name="edit-3" size={13} color="#38bdf8" />
+                    <Text style={[styles.newBtnText, { color: "#38bdf8" }]}>Annotate PDF</Text>
+                  </TouchableOpacity>
+                )}
 
                 <TouchableOpacity
                   style={[styles.newBtn, { backgroundColor: "#1e293b", borderColor: "#334155" }]}

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { Upload, AlertTriangle, Wrench, HelpCircle, RefreshCw, Cloud, ChevronDown, ChevronUp, Smartphone, FileText } from "lucide-react";
+import { Upload, AlertTriangle, Wrench, HelpCircle, RefreshCw, Cloud, ChevronDown, ChevronUp, Smartphone, FileText, PenLine } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -59,6 +59,7 @@ export default function InspectionProgress({ sessionData, setSessionData }: Prop
   const [fileError, setFileError] = useState("");
   const [showUpload, setShowUpload] = useState(false);
   const [selectedId, setSelectedId] = useState("");
+  const [sessionAnnotations, setSessionAnnotations] = useState<unknown[] | null>(null);
 
   const {
     data: sessions,
@@ -81,6 +82,8 @@ export default function InspectionProgress({ sessionData, setSessionData }: Prop
         nbiRatings: sessionDetail.nbiRatings as NbiRating[],
         importSummary: (sessionDetail.importSummary as ImportSummary | null) ?? null,
       });
+      const anns = sessionDetail.pdfAnnotations;
+      setSessionAnnotations(Array.isArray(anns) && anns.length > 0 ? anns : null);
       setSelectedId("");
     }
   }, [sessionDetail, setSessionData]);
@@ -359,6 +362,49 @@ export default function InspectionProgress({ sessionData, setSessionData }: Prop
               </div>
             ))}
           </div>
+
+          {/* PDF Redlines panel */}
+          {sessionAnnotations && sessionAnnotations.length > 0 && (() => {
+            const anns = sessionAnnotations as Array<{ type: string; page: number; color?: string }>;
+            const strokes = anns.filter((a) => a.type === "stroke");
+            const highlights = anns.filter((a) => a.type === "highlight");
+            const texts = anns.filter((a) => a.type === "text");
+            const pages = new Set(anns.map((a) => a.page)).size;
+            return (
+              <div className="bg-card border border-border rounded-lg overflow-hidden mb-5">
+                <div className="px-4 py-3 border-b border-border flex items-center gap-2">
+                  <PenLine className="h-4 w-4 text-amber-400" />
+                  <span className="text-sm font-semibold text-foreground">PDF Redlines</span>
+                  <span className="text-xs bg-amber-500/10 text-amber-400 rounded-full px-2 py-0.5 font-semibold">
+                    {anns.length} marks
+                  </span>
+                </div>
+                <div className="px-4 py-4">
+                  <div className="grid grid-cols-4 gap-3">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-foreground">{strokes.length}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Pen strokes</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-yellow-400">{highlights.length}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Highlights</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-blue-400">{texts.length}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Text notes</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-foreground">{pages}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Pages marked</p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-3 italic">
+                    Annotations created on the mobile inspector. Open the app to view or edit the annotated PDF.
+                  </p>
+                </div>
+              </div>
+            );
+          })()}
 
           <div className="grid grid-cols-2 gap-4 mb-4">
             {/* CS Distribution chart */}

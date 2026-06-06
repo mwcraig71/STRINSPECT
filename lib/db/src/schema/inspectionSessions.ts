@@ -17,6 +17,7 @@ export const inspectionSessionsTable = pgTable(
     defects: jsonb("defects").notNull().default([]),
     nbiRatings: jsonb("nbi_ratings").notNull().default([]),
     importSummary: jsonb("import_summary"),
+    pdfAnnotations: jsonb("pdf_annotations"),
   },
   (t) => [uniqueIndex("uq_inspection_sessions_structure_number").on(t.structureNumber)],
 );

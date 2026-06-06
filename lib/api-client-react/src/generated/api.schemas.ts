@@ -30,6 +30,7 @@ export interface SessionDetail {
   defects: unknown[];
   nbiRatings: unknown[];
   importSummary?: unknown | null;
+  pdfAnnotations?: unknown[] | null;
 }
 
 export interface UpsertSessionBody {
@@ -38,6 +39,7 @@ export interface UpsertSessionBody {
   defects?: unknown[];
   nbiRatings?: unknown[];
   importSummary?: unknown;
+  pdfAnnotations?: unknown[];
 }
 
 export interface ErrorResponse {

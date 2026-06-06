@@ -9,7 +9,7 @@ import React, {
 } from "react";
 import { nbiSubNameMatchScore, parseReport, ParsedUnderclearance, ParsedChannelCrossSection } from "../utils/pdfParser";
 import { setBaseUrl, setAuthTokenGetter, upsertSession } from "@workspace/api-client-react";
-
+import { Platform } from "react-native";
 setAuthTokenGetter(() => process.env.EXPO_PUBLIC_API_KEY ?? null);
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -1173,6 +1173,9 @@ interface InspectionContextType {
   lastModified: string | null;
   hasUnsyncedChanges: boolean;
   syncSession: () => Promise<void>;
+  importedPdfPath: string | null;
+  pdfAnnotations: unknown[] | null;
+  setPdfAnnotations: (a: unknown[] | null) => void;
 }
 
 export interface ElementSummaryRow {
@@ -1414,6 +1417,8 @@ const STORAGE_KEYS = {
   DEMO_CLEARED: "@bridge_demo_cleared_v1",
   LAST_SYNCED: "@bridge_last_synced",
   LAST_MODIFIED: "@bridge_last_modified",
+  IMPORTED_PDF_PATH: "@bridge_imported_pdf_path",
+  PDF_ANNOTATIONS: "@bridge_pdf_annotations",
 };
 
 export function InspectionProvider({ children }: { children: React.ReactNode }) {
@@ -1475,6 +1480,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const [syncToCurrentLoc, setSyncToCurrentLoc] = useState(false);
   const [parsingActive, setParsingActive] = useState(false);
   const [importSummary, setImportSummaryState] = useState<ImportSummary | null>(null);
+  const [importedPdfPath, setImportedPdfPathState] = useState<string | null>(null);
+  const [pdfAnnotations, setPdfAnnotationsState] = useState<unknown[] | null>(null);
 
   // ── AsyncStorage load on mount ──
   useEffect(() => {
@@ -1490,7 +1497,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           ]);
           await AsyncStorage.setItem(STORAGE_KEYS.DEMO_CLEARED, "1");
         }
-        const [defects, nbi, nom, insType, superType, subType, superMat, subMat, structNum, uc, ch, sb, sn, spp, impSummary, lastJoint, lastSync, lastMod] = await Promise.all([
+        const [defects, nbi, nom, insType, superType, subType, superMat, subMat, structNum, uc, ch, sb, sn, spp, impSummary, lastJoint, lastSync, lastMod, pdfPath, pdfAnns] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.SAVED_DEFECTS),
           AsyncStorage.getItem(STORAGE_KEYS.NBI_RATINGS),
           AsyncStorage.getItem(STORAGE_KEYS.NOMENCLATURE),
@@ -1509,10 +1516,14 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           AsyncStorage.getItem(STORAGE_KEYS.LAST_JOINT_ELEMENT),
           AsyncStorage.getItem(STORAGE_KEYS.LAST_SYNCED),
           AsyncStorage.getItem(STORAGE_KEYS.LAST_MODIFIED),
+          AsyncStorage.getItem(STORAGE_KEYS.IMPORTED_PDF_PATH),
+          AsyncStorage.getItem(STORAGE_KEYS.PDF_ANNOTATIONS),
         ]);
         if (lastJoint) setLastJointElementIdState(lastJoint);
         if (lastSync) setLastSynced(lastSync);
         if (lastMod) setLastModifiedState(lastMod);
+        if (pdfPath) setImportedPdfPathState(pdfPath);
+        if (pdfAnns) { try { setPdfAnnotationsState(JSON.parse(pdfAnns) as unknown[]); } catch {} }
         if (defects) setSavedDefectsState(JSON.parse(defects));
         if (nbi) setNbiRatingsState(JSON.parse(nbi));
         if (impSummary) {
@@ -1703,11 +1714,12 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
       defects: savedDefects,
       nbiRatings,
       importSummary: importSummary ?? undefined,
+      pdfAnnotations: pdfAnnotations ?? undefined,
     });
     const ts = new Date().toISOString();
     setLastSynced(ts);
     AsyncStorage.setItem(STORAGE_KEYS.LAST_SYNCED, ts).catch(() => {});
-  }, [structureNumber, savedDefects, nbiRatings, importSummary]);
+  }, [structureNumber, savedDefects, nbiRatings, importSummary, pdfAnnotations]);
 
   const setStructureNumber = useCallback((v: string) => {
     setStructureNumberState(v);
@@ -1748,7 +1760,20 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     AsyncStorage.removeItem(STORAGE_KEYS.SAFETY_BRIEFING).catch(() => {});
     setLastSynced(null);
     AsyncStorage.removeItem(STORAGE_KEYS.LAST_SYNCED).catch(() => {});
+    setImportedPdfPathState(null);
+    AsyncStorage.removeItem(STORAGE_KEYS.IMPORTED_PDF_PATH).catch(() => {});
+    setPdfAnnotationsState(null);
+    AsyncStorage.removeItem(STORAGE_KEYS.PDF_ANNOTATIONS).catch(() => {});
   }, [setStructureNumber, setImportSummary]);
+
+  const setPdfAnnotations = useCallback((a: unknown[] | null) => {
+    setPdfAnnotationsState(a);
+    if (a !== null) {
+      AsyncStorage.setItem(STORAGE_KEYS.PDF_ANNOTATIONS, JSON.stringify(a)).catch(() => {});
+    } else {
+      AsyncStorage.removeItem(STORAGE_KEYS.PDF_ANNOTATIONS).catch(() => {});
+    }
+  }, []);
 
   // ── Persist underclearance ──
   const setUnderclearanceData = useCallback((v: UnderclearanceData) => {
@@ -2504,6 +2529,25 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         };
         setImportSummary(summary);
 
+        // ── Copy PDF to local storage for annotation (native only) ──
+        if (Platform.OS !== "web" && typeof source === "object" && "uri" in source) {
+          const srcUri = (source as { uri: string }).uri;
+          try {
+            const FS = await import("expo-file-system/legacy");
+            const destDir = (FS.documentDirectory ?? "") + "imported_pdfs/";
+            await FS.makeDirectoryAsync(destDir, { intermediates: true });
+            const safeName = (parsedNum || "bridge").replace(/[^a-z0-9_-]/gi, "_");
+            const destUri = destDir + safeName + ".pdf";
+            await FS.copyAsync({ from: srcUri, to: destUri });
+            setImportedPdfPathState(destUri);
+            setPdfAnnotationsState(null);
+            AsyncStorage.setItem(STORAGE_KEYS.IMPORTED_PDF_PATH, destUri).catch(() => {});
+            AsyncStorage.removeItem(STORAGE_KEYS.PDF_ANNOTATIONS).catch(() => {});
+          } catch (copyErr) {
+            console.warn("[PDF copy]", copyErr);
+          }
+        }
+
         const emptySummary =
           emptySections.length > 0
             ? `\n\n${emptySections.length} NBI section(s) with no data extracted — review manually:\n${emptySections
@@ -2667,6 +2711,9 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     lastModified,
     hasUnsyncedChanges: lastModified !== null && (lastSynced === null || lastModified > lastSynced),
     syncSession,
+    importedPdfPath,
+    pdfAnnotations,
+    setPdfAnnotations,
   };
 
   return (
