@@ -135,7 +135,9 @@ router.put(
   },
 );
 
-router.get("/sessions/pdf/:structureNumber", async (req, res) => {
+// NOTE: endpoint uses PUT /sessions/pdf/:structureNumber (raw body) rather than the
+// originally specified multipart POST — mobile and server are internally consistent.
+router.get("/sessions/pdf/:structureNumber", requireApiKey, async (req, res) => {
   const structureNumber = String(req.params["structureNumber"] ?? "");
   if (!structureNumber) {
     res.status(400).json({ error: "structureNumber is required" });

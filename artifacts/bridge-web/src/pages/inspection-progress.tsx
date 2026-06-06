@@ -10,6 +10,7 @@ import {
   Cell,
 } from "recharts";
 import { SessionData, DefectRecord, NbiRating, ImportSummary } from "@/lib/types";
+import PDFRedlineViewer from "@/components/PDFRedlineViewer";
 import {
   useListSessions,
   useGetSession,
@@ -441,15 +442,13 @@ export default function InspectionProgress({ sessionData, setSessionData }: Prop
                       })}
                     </div>
                   </div>
-                  {/* Embedded PDF viewer (if uploaded) */}
-                  {pdfUrl && (
+                  {/* Canvas-rendered PDF with annotation overlay */}
+                  {pdfUrl && anns.length > 0 && (
                     <div>
                       <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Annotated PDF preview</p>
-                      <iframe
-                        src={pdfUrl}
-                        className="w-full rounded border border-border"
-                        style={{ height: 480 }}
-                        title={`PDF for ${sn}`}
+                      <PDFRedlineViewer
+                        pdfUrl={pdfUrl}
+                        annotations={anns as Parameters<typeof PDFRedlineViewer>[0]["annotations"]}
                       />
                     </div>
                   )}
