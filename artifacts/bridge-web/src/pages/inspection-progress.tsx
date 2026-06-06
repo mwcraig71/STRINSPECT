@@ -366,7 +366,13 @@ export default function InspectionProgress({ sessionData, setSessionData }: Prop
 
           {/* PDF Redlines panel */}
           {sessionAnnotations && sessionAnnotations.length > 0 && (() => {
-            const anns = sessionAnnotations as Array<{ type: string; page: number; color?: string; text?: string }>;
+            type MetaEntry = { type: "_meta"; pageDimensions: Record<string, { w: number; h: number }> };
+            type AnnEntry = { type: string; page: number; color?: string; text?: string };
+            const all = sessionAnnotations as Array<MetaEntry | AnnEntry>;
+            const metaEntry = all.find((a) => a.type === "_meta") as MetaEntry | undefined;
+            const pageDimensions = metaEntry?.pageDimensions;
+            const anns = all.filter((a) => a.type !== "_meta") as AnnEntry[];
+            if (anns.length === 0) return null;
             const strokes = anns.filter((a) => a.type === "stroke");
             const highlights = anns.filter((a) => a.type === "highlight");
             const texts = anns.filter((a) => a.type === "text");
@@ -449,6 +455,7 @@ export default function InspectionProgress({ sessionData, setSessionData }: Prop
                       <PDFRedlineViewer
                         pdfUrl={pdfUrl}
                         annotations={anns as Parameters<typeof PDFRedlineViewer>[0]["annotations"]}
+                        pageDimensions={pageDimensions}
                       />
                     </div>
                   )}

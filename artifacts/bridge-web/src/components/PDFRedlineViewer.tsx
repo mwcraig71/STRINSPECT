@@ -18,17 +18,21 @@ type Annotation = {
   fontSize?: number;
 };
 
+type PageDim = { w: number; h: number };
+
 type Props = {
   pdfUrl: string;
   annotations: Annotation[];
+  /** Per-page canvas dimensions recorded on the mobile device during annotation. */
+  pageDimensions?: Record<string, PageDim>;
 };
 
 /**
- * Assumed mobile canvas width used when inspector annotated the PDF.
- * Mobile renders at scale = (vw-4) / pdfPageWidth, so canvas.width = vw-4.
- * Standard Expo device viewport ~390px → canvas width ≈ 386px.
+ * Fallback assumed mobile canvas width when no stored pageDimensions are available
+ * (legacy annotations saved before v2 format). Mobile renders at scale=(vw-4)/pageWidth,
+ * so canvas.width = vw-4. Standard 390px device → canvas width ≈ 386px.
  */
-const MOBILE_CANVAS_WIDTH = 386;
+const FALLBACK_MOBILE_CANVAS_WIDTH = 386;
 
 function drawStroke(
   ctx: CanvasRenderingContext2D,
@@ -71,7 +75,7 @@ function drawText(
   ctx.restore();
 }
 
-export default function PDFRedlineViewer({ pdfUrl, annotations }: Props) {
+export default function PDFRedlineViewer({ pdfUrl, annotations, pageDimensions }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<"loading" | "error" | "done">("loading");
   const [errorMsg, setErrorMsg] = useState("");
@@ -142,12 +146,13 @@ export default function PDFRedlineViewer({ pdfUrl, annotations }: Props) {
         await page.render({ canvasContext: pdfCtx, viewport: vp }).promise;
 
         // Scale annotation coordinates from mobile canvas space to web canvas space.
-        // Mobile canvas width ≈ MOBILE_CANVAS_WIDTH (device-independent assumption).
-        // Mobile canvas height = MOBILE_CANVAS_WIDTH * (pageHeight / pageWidth).
-        const mobileCanvasHeight =
-          (MOBILE_CANVAS_WIDTH / baseVp.width) * baseVp.height;
-        const scaleX = vp.width / MOBILE_CANVAS_WIDTH;
-        const scaleY = vp.height / mobileCanvasHeight;
+        // Use stored per-page dimensions when available (v2 format); fall back to
+        // FALLBACK_MOBILE_CANVAS_WIDTH assumption for legacy annotations.
+        const stored = pageDimensions?.[String(pn)];
+        const mobileW = stored?.w ?? FALLBACK_MOBILE_CANVAS_WIDTH;
+        const mobileH = stored?.h ?? (FALLBACK_MOBILE_CANVAS_WIDTH / baseVp.width) * baseVp.height;
+        const scaleX = vp.width / mobileW;
+        const scaleY = vp.height / mobileH;
 
         const pageAnns = annotations.filter((a) => a.page === pn);
         if (pageAnns.length > 0) {

@@ -118,6 +118,7 @@ var currentStroke = null;
 var pdfDoc = null;
 var pageCount = 0;
 var pageCanvases = {};
+var pageDimensions = {}; // keyed by page number → {w, h} canvas pixel dimensions
 var isDrawing = false;
 var textPendingPage = 0;
 var textPendingX = 0;
@@ -134,7 +135,7 @@ function postRN(msg) {
 }
 
 document.getElementById('btn-save').onclick = function() {
-  postRN({ type:'save', annotations: annotations });
+  postRN({ type:'save', annotations: annotations, pageDimensions: pageDimensions });
   isDirty = false;
 };
 
@@ -220,6 +221,7 @@ async function renderAllPages() {
     wrap.appendChild(annCv);
     area.appendChild(wrap);
     pageCanvases[pn] = { pdf: pdfCv, ann: annCv };
+    pageDimensions[pn] = { w: vp.width, h: vp.height };
 
     var ctx = pdfCv.getContext('2d');
     await page.render({ canvasContext: ctx, viewport: vp }).promise;

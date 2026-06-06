@@ -57,7 +57,10 @@ export default function PDFAnnotatorModal({ visible, pdfPath, annotations, onSav
       const b64 = await FileSystem.readAsStringAsync(pdfPath, { encoding: FileSystem.EncodingType.Base64 });
       base64Uri = "data:application/pdf;base64," + b64;
 
-      const existingAnnotations = annotations ?? [];
+      // Filter out _meta entries (pageDimensions bookkeeping) before sending to annotator
+      const existingAnnotations = (annotations ?? []).filter(
+        (a) => (a as { type?: string } | null)?.type !== "_meta",
+      );
       const msg = JSON.stringify({ type: "init", pdfBase64: base64Uri, annotations: existingAnnotations });
       const js = `
         (function() {
@@ -81,10 +84,16 @@ export default function PDFAnnotatorModal({ visible, pdfPath, annotations, onSav
 
   const onMessage = useCallback((e: { nativeEvent: { data: string } }) => {
     try {
-      const data = JSON.parse(e.nativeEvent.data) as { type: string; annotations?: unknown[] };
+      const data = JSON.parse(e.nativeEvent.data) as {
+        type: string;
+        annotations?: unknown[];
+        pageDimensions?: Record<string, { w: number; h: number }>;
+      };
       if (data.type === "save") {
         const saved = Array.isArray(data.annotations) ? data.annotations : [];
-        onSave(saved);
+        // Prepend _meta entry so web viewer can look up per-page canvas dimensions
+        const meta = { type: "_meta", pageDimensions: data.pageDimensions ?? {} };
+        onSave([meta, ...saved]);
         Alert.alert("Saved", "Annotations saved.");
       } else if (data.type === "close") {
         onClose();

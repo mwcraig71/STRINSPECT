@@ -201,6 +201,8 @@ export default function BridgesScreen() {
           onSave={(anns) => {
             setPdfAnnotations(anns);
             setAnnotatorOpen(false);
+            // Fire-and-forget sync so annotations reach server immediately
+            syncSession().catch(() => {});
           }}
           onClose={() => setAnnotatorOpen(false)}
         />
