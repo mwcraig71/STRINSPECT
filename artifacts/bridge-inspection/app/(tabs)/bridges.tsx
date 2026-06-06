@@ -3,10 +3,14 @@ import React, { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Modal,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -28,6 +32,7 @@ export default function BridgesScreen() {
   const c = useColors();
   const {
     structureNumber,
+    setStructureNumber,
     savedDefects,
     lastModified,
     lastSynced,
@@ -37,6 +42,8 @@ export default function BridgesScreen() {
   } = useInspection();
 
   const [submitStatus, setSubmitStatus] = useState<"idle" | "syncing" | "success" | "error">("idle");
+  const [newBridgeVisible, setNewBridgeVisible] = useState(false);
+  const [newBridgeDraft, setNewBridgeDraft] = useState("");
 
   const {
     data: sessions,
@@ -69,38 +76,139 @@ export default function BridgesScreen() {
     }
   };
 
-  const handleStartNew = () => {
-    Alert.alert(
-      "Start New Inspection",
-      hasUnsyncedChanges
-        ? "You have unsubmitted changes. Submit first, or they will be lost. Are you sure you want to start a new inspection?"
-        : "This will clear the current inspection and start fresh. Are you sure?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Start New",
-          style: "destructive",
-          onPress: clearInspection,
-        },
-      ]
-    );
+  const openNewBridgeFlow = () => {
+    if (Platform.OS === "ios") {
+      const doPrompt = () => {
+        Alert.prompt(
+          "New Bridge",
+          "Enter the structure number for the new bridge",
+          (text) => {
+            if (text === undefined) return;
+            clearInspection();
+            setStructureNumber(text.trim());
+          },
+          "plain-text",
+          "",
+        );
+      };
+      if (hasUnsyncedChanges) {
+        Alert.alert(
+          "Unsubmitted Changes",
+          "You have data that hasn't been submitted. Starting a new bridge will permanently discard it.",
+          [
+            { text: "Cancel", style: "cancel" },
+            { text: "Discard & Continue", style: "destructive", onPress: doPrompt },
+          ],
+        );
+      } else {
+        doPrompt();
+      }
+    } else {
+      if (hasUnsyncedChanges) {
+        Alert.alert(
+          "Unsubmitted Changes",
+          "You have data that hasn't been submitted. Starting a new bridge will permanently discard it.",
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Discard & Continue",
+              style: "destructive",
+              onPress: () => { setNewBridgeDraft(""); setNewBridgeVisible(true); },
+            },
+          ],
+        );
+      } else {
+        setNewBridgeDraft("");
+        setNewBridgeVisible(true);
+      }
+    }
+  };
+
+  const handleConfirmNewBridge = () => {
+    clearInspection();
+    setStructureNumber(newBridgeDraft.trim());
+    setNewBridgeVisible(false);
+    setNewBridgeDraft("");
   };
 
   return (
     <View style={[styles.container, { backgroundColor: c.background }]}>
+      {/* ── New Bridge Modal (Android / Web) ── */}
+      <Modal
+        visible={newBridgeVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setNewBridgeVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+        >
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => setNewBridgeVisible(false)}
+          >
+            <Pressable style={[styles.modalCard, { backgroundColor: c.card, borderColor: c.border }]}>
+              <View style={styles.modalHeader}>
+                <Feather name="layers" size={16} color="#38bdf8" />
+                <Text style={[styles.modalTitle, { color: c.foreground }]}>New Bridge</Text>
+              </View>
+              <Text style={[styles.modalSubtitle, { color: c.mutedForeground }]}>
+                Enter the structure number to start a new inspection. All current data will be cleared.
+              </Text>
+              <TextInput
+                style={[styles.modalInput, { color: c.foreground, backgroundColor: "#0f172a", borderColor: "#334155" }]}
+                value={newBridgeDraft}
+                onChangeText={setNewBridgeDraft}
+                placeholder="e.g. 18057026103105"
+                placeholderTextColor="#475569"
+                autoFocus
+                autoCapitalize="characters"
+                returnKeyType="done"
+                onSubmitEditing={handleConfirmNewBridge}
+              />
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={[styles.modalCancelBtn, { borderColor: "#334155" }]}
+                  onPress={() => setNewBridgeVisible(false)}
+                >
+                  <Text style={{ color: "#94a3b8", fontSize: 13, fontWeight: "700" }}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalConfirmBtn, !newBridgeDraft.trim() && { opacity: 0.4 }]}
+                  onPress={handleConfirmNewBridge}
+                  disabled={!newBridgeDraft.trim()}
+                >
+                  <Feather name="plus" size={14} color="#fff" />
+                  <Text style={{ color: "#fff", fontSize: 13, fontWeight: "900" }}>Start Inspection</Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </Pressable>
+        </KeyboardAvoidingView>
+      </Modal>
+
       <View style={[styles.header, { backgroundColor: c.headerBg }]}>
         <View style={styles.headerRow}>
           <View style={styles.headerLeft}>
             <Feather name="layers" size={16} color="#38bdf8" />
             <Text style={styles.headerTitle}>My Bridges</Text>
           </View>
-          <TouchableOpacity
-            style={[styles.iconBtn, { backgroundColor: "#1e293b" }]}
-            onPress={() => refetch()}
-            disabled={isFetching}
-          >
-            <Feather name="refresh-cw" size={14} color={isFetching ? "#475569" : "#94a3b8"} />
-          </TouchableOpacity>
+          <View style={styles.headerRight}>
+            <TouchableOpacity
+              style={[styles.iconBtn, { backgroundColor: "#1e293b" }]}
+              onPress={openNewBridgeFlow}
+            >
+              <Feather name="plus" size={14} color="#38bdf8" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.iconBtn, { backgroundColor: "#1e293b" }]}
+              onPress={() => refetch()}
+              disabled={isFetching}
+            >
+              <Feather name="refresh-cw" size={14} color={isFetching ? "#475569" : "#94a3b8"} />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -215,20 +323,27 @@ export default function BridgesScreen() {
 
                 <TouchableOpacity
                   style={[styles.newBtn, { backgroundColor: "#1e293b", borderColor: "#334155" }]}
-                  onPress={handleStartNew}
+                  onPress={openNewBridgeFlow}
                 >
                   <Feather name="plus" size={13} color="#94a3b8" />
-                  <Text style={[styles.newBtnText, { color: "#94a3b8" }]}>Start New</Text>
+                  <Text style={[styles.newBtnText, { color: "#94a3b8" }]}>New Bridge</Text>
                 </TouchableOpacity>
               </View>
             </View>
           ) : (
             <View style={[styles.emptyCard, { backgroundColor: c.card, borderColor: c.border }]}>
-              <Feather name="plus-circle" size={28} color={c.mutedForeground} />
+              <Feather name="layers" size={28} color={c.mutedForeground} />
               <Text style={[styles.emptyTitle, { color: c.foreground }]}>No Active Inspection</Text>
               <Text style={[styles.emptyText, { color: c.mutedForeground }]}>
-                Go to the Inspection tab to start recording defects for a bridge.
+                Enter a structure number to begin a new bridge inspection.
               </Text>
+              <TouchableOpacity
+                style={styles.emptyStartBtn}
+                onPress={openNewBridgeFlow}
+              >
+                <Feather name="plus" size={14} color="#fff" />
+                <Text style={styles.emptyStartBtnText}>Start New Inspection</Text>
+              </TouchableOpacity>
             </View>
           )}
         </View>
@@ -330,6 +445,7 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   headerLeft: { flexDirection: "row", alignItems: "center", gap: 7 },
+  headerRight: { flexDirection: "row", alignItems: "center", gap: 6 },
   headerTitle: {
     fontSize: 14,
     fontWeight: "900",
@@ -418,6 +534,63 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: 13, fontWeight: "800" },
   emptyText: { fontSize: 11, fontWeight: "600", textAlign: "center", lineHeight: 16 },
+  emptyStartBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    backgroundColor: "#0284c7",
+    paddingHorizontal: 18,
+    paddingVertical: 11,
+    borderRadius: 12,
+    marginTop: 6,
+  },
+  emptyStartBtnText: { color: "#fff", fontSize: 13, fontWeight: "900" },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  modalCard: {
+    width: "100%",
+    maxWidth: 400,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 20,
+    gap: 14,
+  },
+  modalHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
+  modalTitle: { fontSize: 16, fontWeight: "900" },
+  modalSubtitle: { fontSize: 12, fontWeight: "600", lineHeight: 18 },
+  modalInput: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
+  modalActions: { flexDirection: "row", gap: 10, marginTop: 2 },
+  modalCancelBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalConfirmBtn: {
+    flex: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#0284c7",
+    borderRadius: 12,
+    paddingVertical: 12,
+  },
   retryBtn: {
     backgroundColor: "#1e293b",
     paddingHorizontal: 16,

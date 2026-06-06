@@ -1736,6 +1736,18 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     setImportSummary(null);
     setLastModifiedState(null);
     AsyncStorage.removeItem(STORAGE_KEYS.LAST_MODIFIED).catch(() => {});
+    setCifData(INITIAL_CIF);
+    setUnderclearanceDataState(INITIAL_UNDERCLEARANCE);
+    AsyncStorage.setItem(STORAGE_KEYS.UNDERCLEARANCE, JSON.stringify(INITIAL_UNDERCLEARANCE)).catch(() => {});
+    setChannelDataState(INITIAL_CHANNEL);
+    AsyncStorage.setItem(STORAGE_KEYS.CHANNEL, JSON.stringify(INITIAL_CHANNEL)).catch(() => {});
+    setSnbiDataState(INITIAL_SNBI);
+    AsyncStorage.removeItem(STORAGE_KEYS.SNBI).catch(() => {});
+    setSteelPipePileDataState(INITIAL_STEEL_PIPE_PILE);
+    AsyncStorage.removeItem(STORAGE_KEYS.STEEL_PIPE_PILE).catch(() => {});
+    AsyncStorage.removeItem(STORAGE_KEYS.SAFETY_BRIEFING).catch(() => {});
+    setLastSynced(null);
+    AsyncStorage.removeItem(STORAGE_KEYS.LAST_SYNCED).catch(() => {});
   }, [setStructureNumber, setImportSummary]);
 
   // ── Persist underclearance ──
