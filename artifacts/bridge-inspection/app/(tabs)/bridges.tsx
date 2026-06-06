@@ -154,6 +154,37 @@ export default function BridgesScreen() {
     setNewBridgeDraft("");
   };
 
+  const handleOpenSubmitted = (sn: string) => {
+    const doOpen = () => {
+      clearInspection();
+      setStructureNumber(sn);
+    };
+
+    const confirmEdit = () => {
+      Alert.alert(
+        "Re-open for Editing?",
+        `Open "${sn}" as the active inspection? You can add or update data and resubmit when done.`,
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Open for Editing", onPress: doOpen },
+        ]
+      );
+    };
+
+    if (hasUnsyncedChanges) {
+      Alert.alert(
+        "Unsubmitted Changes",
+        "You have data that hasn't been submitted. Opening another bridge will permanently discard it.",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Discard & Continue", style: "destructive", onPress: confirmEdit },
+        ]
+      );
+    } else {
+      confirmEdit();
+    }
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: c.background }]}>
       {/* ── New Bridge Modal (Android / Web) ── */}
@@ -435,9 +466,11 @@ export default function BridgesScreen() {
             </View>
           ) : (
             sessions.map((s) => (
-              <View
+              <TouchableOpacity
                 key={s.id}
                 style={[styles.submittedCard, { backgroundColor: c.card, borderColor: c.border }]}
+                onPress={() => handleOpenSubmitted(s.structureNumber || "")}
+                activeOpacity={0.75}
               >
                 <View style={styles.submittedTop}>
                   <View style={{ flex: 1 }}>
@@ -448,30 +481,33 @@ export default function BridgesScreen() {
                       Submitted {formatRelativeTime(s.syncedAt)}
                     </Text>
                   </View>
-                  <View style={[
-                    styles.sourceBadge,
-                    { backgroundColor: (s.source as string) === "pdf_import" ? "#451a03" : "#0c1a2e" },
-                  ]}>
-                    <Feather
-                      name={(s.source as string) === "pdf_import" ? "file-text" : "smartphone"}
-                      size={11}
-                      color={(s.source as string) === "pdf_import" ? "#fb923c" : "#38bdf8"}
-                    />
-                    <Text style={[
-                      styles.sourceText,
-                      { color: (s.source as string) === "pdf_import" ? "#fb923c" : "#38bdf8" },
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <View style={[
+                      styles.sourceBadge,
+                      { backgroundColor: (s.source as string) === "pdf_import" ? "#451a03" : "#0c1a2e" },
                     ]}>
-                      {(s.source as string) === "pdf_import" ? "PDF Import" : "Device"}
-                    </Text>
+                      <Feather
+                        name={(s.source as string) === "pdf_import" ? "file-text" : "smartphone"}
+                        size={11}
+                        color={(s.source as string) === "pdf_import" ? "#fb923c" : "#38bdf8"}
+                      />
+                      <Text style={[
+                        styles.sourceText,
+                        { color: (s.source as string) === "pdf_import" ? "#fb923c" : "#38bdf8" },
+                      ]}>
+                        {(s.source as string) === "pdf_import" ? "PDF Import" : "Device"}
+                      </Text>
+                    </View>
+                    <Feather name="edit-2" size={13} color={c.mutedForeground} />
                   </View>
                 </View>
                 <View style={[styles.webNoteRow, { borderTopColor: c.border }]}>
                   <Feather name="monitor" size={11} color={c.mutedForeground} />
                   <Text style={[styles.webNote, { color: c.mutedForeground }]}>
-                    Open Bridge Inspection Manager on web to review and export
+                    Tap to re-open for editing · View full report on web
                   </Text>
                 </View>
-              </View>
+              </TouchableOpacity>
             ))
           )}
         </View>
