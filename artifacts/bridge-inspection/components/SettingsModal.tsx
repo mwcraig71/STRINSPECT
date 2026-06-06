@@ -51,6 +51,7 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
     importSummary,
     lastSynced,
     syncSession,
+    pendingSyncCount,
     imageSize,
     setImageSize,
     dateStampEnabled,
@@ -60,7 +61,7 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
   const hasInspectionData =
     savedDefects.length > 0 || !!structureNumber || !!importSummary;
 
-  type SyncStatus = "idle" | "syncing" | "success" | "error";
+  type SyncStatus = "idle" | "syncing" | "success" | "queued" | "error";
   const [syncStatus, setSyncStatus] = React.useState<SyncStatus>("idle");
   const [syncError, setSyncError] = React.useState("");
 
@@ -79,15 +80,11 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
     setSyncStatus("syncing");
     setSyncError("");
     try {
-      await syncSession();
-      setSyncStatus("success");
+      const result = await syncSession();
+      setSyncStatus(result === "queued" ? "queued" : "success");
     } catch (err: unknown) {
       const raw = err instanceof Error ? err.message : "Sync failed.";
-      const isOffline =
-        err instanceof TypeError ||
-        raw.toLowerCase().includes("network") ||
-        raw.toLowerCase().includes("failed to fetch");
-      setSyncError(isOffline ? "No internet connection. Check your network and try again." : raw);
+      setSyncError(raw);
       setSyncStatus("error");
     }
   };
@@ -552,11 +549,27 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
                   <Text style={styles.syncBadgeText}>Synced</Text>
                 </View>
               )}
+              {(syncStatus === "queued" || (syncStatus === "idle" && pendingSyncCount > 0)) && (
+                <View style={[styles.syncBadge, { backgroundColor: "#1c1917", borderColor: "#78350f" }]}>
+                  <Feather name="clock" size={10} color="#fbbf24" />
+                  <Text style={[styles.syncBadgeText, { color: "#fbbf24" }]}>
+                    {pendingSyncCount > 0 ? `${pendingSyncCount} queued` : "Queued"}
+                  </Text>
+                </View>
+              )}
             </View>
             <Text style={[styles.cardDesc, { color: c.mutedForeground }]}>
-              Upload structure number, defect records, and NBI ratings to the server. Photos stay on this device.
+              Uploads defect records, NBI ratings, redlined PDF, and photos. When offline, data is queued and uploads automatically when connectivity returns.
             </Text>
-            {lastSynced && syncStatus !== "error" && (
+            {pendingSyncCount > 0 && syncStatus !== "syncing" && (
+              <View style={[styles.syncErrorBox, { backgroundColor: "#1c1917", borderColor: "#78350f" }]}>
+                <Feather name="wifi-off" size={13} color="#fbbf24" />
+                <Text style={[styles.syncErrorText, { color: "#fde68a" }]}>
+                  {pendingSyncCount} inspection{pendingSyncCount !== 1 ? "s" : ""} queued — will sync automatically when online.
+                </Text>
+              </View>
+            )}
+            {lastSynced && syncStatus !== "error" && syncStatus !== "queued" && pendingSyncCount === 0 && (
               <View style={styles.syncMeta}>
                 <Feather name="clock" size={11} color="#475569" />
                 <Text style={[styles.syncMetaText, { color: "#475569" }]}>
@@ -567,15 +580,22 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
             {syncStatus === "error" && (
               <View style={[styles.syncErrorBox, { backgroundColor: "#1f0a0a", borderColor: "#7f1d1d" }]}>
                 <Feather name="alert-circle" size={13} color="#f87171" />
-                <Text style={styles.syncErrorText}>{syncError}</Text>
+                <Text style={styles.syncErrorText}>{syncError} Queued for retry.</Text>
               </View>
             )}
             <TouchableOpacity
               style={[
                 styles.syncBtn,
                 {
-                  backgroundColor: syncStatus === "success" ? "#022c22" : "#0c4a6e",
-                  borderColor: syncStatus === "error" ? "#7f1d1d" : syncStatus === "success" ? "#064e3b" : "#0284c7",
+                  backgroundColor:
+                    syncStatus === "success" ? "#022c22"
+                    : syncStatus === "queued" ? "#1c1917"
+                    : "#0c4a6e",
+                  borderColor:
+                    syncStatus === "error" ? "#7f1d1d"
+                    : syncStatus === "success" ? "#064e3b"
+                    : syncStatus === "queued" ? "#78350f"
+                    : "#0284c7",
                   opacity: syncStatus === "syncing" ? 0.6 : 1,
                 },
               ]}
@@ -586,16 +606,36 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
                 <ActivityIndicator size="small" color="#38bdf8" />
               ) : (
                 <Feather
-                  name={syncStatus === "success" ? "check-circle" : syncStatus === "error" ? "refresh-cw" : "upload"}
+                  name={
+                    syncStatus === "success" ? "check-circle"
+                    : syncStatus === "error" ? "refresh-cw"
+                    : syncStatus === "queued" ? "clock"
+                    : "upload"
+                  }
                   size={16}
-                  color={syncStatus === "success" ? "#34d399" : syncStatus === "error" ? "#f87171" : "#38bdf8"}
+                  color={
+                    syncStatus === "success" ? "#34d399"
+                    : syncStatus === "error" ? "#f87171"
+                    : syncStatus === "queued" ? "#fbbf24"
+                    : "#38bdf8"
+                  }
                 />
               )}
               <Text style={[
                 styles.syncBtnText,
-                { color: syncStatus === "success" ? "#34d399" : syncStatus === "error" ? "#fca5a5" : "#f8fafc" },
+                {
+                  color:
+                    syncStatus === "success" ? "#34d399"
+                    : syncStatus === "error" ? "#fca5a5"
+                    : syncStatus === "queued" ? "#fde68a"
+                    : "#f8fafc",
+                },
               ]}>
-                {syncStatus === "syncing" ? "Syncing…" : syncStatus === "success" ? "Synced!" : syncStatus === "error" ? "Retry Sync" : "Sync to Cloud"}
+                {syncStatus === "syncing" ? "Syncing…"
+                  : syncStatus === "success" ? "Synced!"
+                  : syncStatus === "error" ? "Retry Sync"
+                  : syncStatus === "queued" ? "Queued — tap to retry"
+                  : "Sync to Cloud"}
               </Text>
             </TouchableOpacity>
           </View>

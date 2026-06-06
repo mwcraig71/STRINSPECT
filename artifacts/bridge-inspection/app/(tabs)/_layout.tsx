@@ -35,7 +35,8 @@ function NativeTabLayout() {
   );
 }
 
-function ClassicTabLayout() {
+
+function ClassicTabLayoutWithSync({ pendingCount }: { pendingCount: number }) {
   const colors = useColors();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
@@ -70,6 +71,8 @@ function ClassicTabLayout() {
         name="bridges"
         options={{
           title: "Bridges",
+          tabBarBadge: pendingCount > 0 ? pendingCount : undefined,
+          tabBarBadgeStyle: { backgroundColor: "#f59e0b", fontSize: 10 },
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="square.stack" tintColor={color} size={22} />
@@ -119,10 +122,10 @@ function ClassicTabLayout() {
 }
 
 function TabContent() {
-  const { toastVisible, toastKey } = useAutoSync();
+  const { toastVisible, toastKey, pendingCount } = useAutoSync();
   return (
     <View style={{ flex: 1 }}>
-      {isLiquidGlassAvailable() ? <NativeTabLayout /> : <ClassicTabLayout />}
+      {isLiquidGlassAvailable() ? <NativeTabLayout /> : <ClassicTabLayoutWithSync pendingCount={pendingCount} />}
       <SyncToast key={toastKey} visible={toastVisible} message="Auto-synced to cloud" />
     </View>
   );

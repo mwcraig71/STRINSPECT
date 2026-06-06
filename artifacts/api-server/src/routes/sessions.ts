@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
-import { eq } from "drizzle-orm";
-import { db, inspectionSessionsTable } from "@workspace/db";
+import { eq, and } from "drizzle-orm";
+import { db, inspectionSessionsTable, sessionPhotosTable } from "@workspace/db";
 import {
   UpsertSessionBody,
   UpsertSessionResponse,
@@ -160,6 +160,76 @@ router.get("/sessions/pdf/:structureNumber", async (req, res) => {
   res.set("Content-Type", "application/pdf");
   res.set("Content-Disposition", `inline; filename="${structureNumber}.pdf"`);
   res.send(rows[0].pdfDocument);
+});
+
+// ── Photo binary upload/download ───────────────────────────────────────────────
+
+router.put(
+  "/sessions/photos/:structureNumber/:photoId",
+  requireApiKey,
+  (req: Request, _res: Response, next: NextFunction) => {
+    const chunks: Buffer[] = [];
+    req.on("data", (chunk: Buffer) => chunks.push(chunk));
+    req.on("end", () => {
+      (req as Request & { rawBody?: Buffer }).rawBody = Buffer.concat(chunks);
+      next();
+    });
+    req.on("error", next);
+  },
+  async (req: Request, res: Response) => {
+    const structureNumber = String(req.params["structureNumber"] ?? "");
+    const photoId = String(req.params["photoId"] ?? "");
+    if (!structureNumber || !photoId) {
+      res.status(400).json({ error: "structureNumber and photoId are required" });
+      return;
+    }
+
+    const body = (req as Request & { rawBody?: Buffer }).rawBody;
+    if (!body || body.length === 0) {
+      res.status(400).json({ error: "Empty photo body" });
+      return;
+    }
+
+    const mimeType = String(req.headers["content-type"] ?? "image/jpeg");
+
+    await db
+      .insert(sessionPhotosTable)
+      .values({ structureNumber, photoId, photoData: body, mimeType })
+      .onConflictDoUpdate({
+        target: [sessionPhotosTable.structureNumber, sessionPhotosTable.photoId],
+        set: { photoData: body, mimeType },
+      });
+
+    res.json({ ok: true, bytes: body.length });
+  },
+);
+
+router.get("/sessions/photos/:structureNumber/:photoId", async (req, res) => {
+  const structureNumber = String(req.params["structureNumber"] ?? "");
+  const photoId = String(req.params["photoId"] ?? "");
+  if (!structureNumber || !photoId) {
+    res.status(400).json({ error: "structureNumber and photoId are required" });
+    return;
+  }
+
+  const rows = await db
+    .select({ photoData: sessionPhotosTable.photoData, mimeType: sessionPhotosTable.mimeType })
+    .from(sessionPhotosTable)
+    .where(
+      and(
+        eq(sessionPhotosTable.structureNumber, structureNumber),
+        eq(sessionPhotosTable.photoId, photoId),
+      ),
+    )
+    .limit(1);
+
+  if (rows.length === 0 || !rows[0].photoData) {
+    res.status(404).json({ error: "Photo not found" });
+    return;
+  }
+
+  res.set("Content-Type", rows[0].mimeType ?? "image/jpeg");
+  res.send(rows[0].photoData);
 });
 
 // ── Single session (by UUID id) ────────────────────────────────────────────────

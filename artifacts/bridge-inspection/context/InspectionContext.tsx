@@ -10,6 +10,14 @@ import React, {
 import { nbiSubNameMatchScore, parseReport, ParsedUnderclearance, ParsedChannelCrossSection } from "../utils/pdfParser";
 import { setBaseUrl, setAuthTokenGetter, upsertSession } from "@workspace/api-client-react";
 import { Platform } from "react-native";
+import * as Network from "expo-network";
+import {
+  enqueueSession,
+  removeFromQueue,
+  getQueueLength,
+  collectPhotosFromDefects,
+  uploadPhotos,
+} from "@/lib/offlineQueue";
 setAuthTokenGetter(() => process.env.EXPO_PUBLIC_API_KEY ?? null);
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -1177,7 +1185,8 @@ interface InspectionContextType {
   lastSynced: string | null;
   lastModified: string | null;
   hasUnsyncedChanges: boolean;
-  syncSession: () => Promise<void>;
+  syncSession: () => Promise<"synced" | "queued">;
+  pendingSyncCount: number;
   importedPdfPath: string | null;
   pdfAnnotations: unknown[] | null;
   setPdfAnnotations: (a: unknown[] | null) => void;
@@ -1494,6 +1503,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const [importedPdfPath, setImportedPdfPathState] = useState<string | null>(null);
   const [pdfAnnotations, setPdfAnnotationsState] = useState<unknown[] | null>(null);
   const [pdfUploaded, setPdfUploadedState] = useState(false);
+  const [pendingSyncCount, setPendingSyncCount] = useState(0);
 
   // ── AsyncStorage load on mount ──
   useEffect(() => {
@@ -1657,6 +1667,11 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     load();
   }, []);
 
+  // Load offline queue count on mount
+  useEffect(() => {
+    getQueueLength().then(setPendingSyncCount).catch(() => {});
+  }, []);
+
   // ── Persist savedDefects ──
   const bumpLastModified = useCallback(() => {
     const ts = new Date().toISOString();
@@ -1721,51 +1736,99 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     AsyncStorage.setItem(STORAGE_KEYS.SUBSTRUCTURE_MATERIAL, v).catch(() => {});
   }, []);
 
-  const syncSession = useCallback(async (): Promise<void> => {
+  const syncSession = useCallback(async (): Promise<"synced" | "queued"> => {
     const apiUrl = process.env.EXPO_PUBLIC_API_URL ??
       (process.env.EXPO_PUBLIC_DOMAIN
         ? `https://${process.env.EXPO_PUBLIC_DOMAIN}:8080`
         : null);
     setBaseUrl(apiUrl ?? null);
     const sn = structureNumber.trim() || "UNKNOWN";
-    await upsertSession({
+    const apiKey = process.env.EXPO_PUBLIC_API_KEY;
+
+    const buildQueueEntry = () => ({
       structureNumber: sn,
-      defects: savedDefects,
-      nbiRatings,
-      importSummary: importSummary ?? undefined,
-      pdfAnnotations: pdfAnnotations ?? undefined,
+      payload: {
+        defects: savedDefects as unknown[],
+        nbiRatings: nbiRatings as unknown[],
+        importSummary: importSummary ?? null,
+        pdfAnnotations: pdfAnnotations ?? null,
+      },
+      pdfPath: importedPdfPath ?? undefined,
+      photos: collectPhotosFromDefects(savedDefects as unknown[]),
     });
 
-    // Upload PDF binary if available and not yet uploaded
-    if (importedPdfPath && !pdfUploaded && Platform.OS !== "web") {
-      const FS = await import("expo-file-system/legacy");
-      const info = await FS.getInfoAsync(importedPdfPath);
-      if (info.exists) {
-        const b64 = await FS.readAsStringAsync(importedPdfPath, { encoding: FS.EncodingType.Base64 });
-        const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-        // URL must include /api prefix (API server mounts router at /api)
-        const uploadUrl = (apiUrl ?? "") + `/api/sessions/pdf/${encodeURIComponent(sn)}`;
-        const apiKey = process.env.EXPO_PUBLIC_API_KEY;
-        const uploadRes = await fetch(uploadUrl, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/pdf",
-            ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
-          },
-          body: bytes,
-        });
-        if (!uploadRes.ok) {
-          const text = await uploadRes.text().catch(() => uploadRes.status.toString());
-          throw new Error(`PDF upload failed (${uploadRes.status}): ${text}`);
-        }
-        setPdfUploadedState(true);
-        AsyncStorage.setItem(STORAGE_KEYS.PDF_UPLOADED, "1").catch(() => {});
-      }
+    // Check connectivity first — queue immediately if offline
+    let isOnline = false;
+    try {
+      const netState = await Network.getNetworkStateAsync();
+      isOnline = !!netState.isConnected && netState.isInternetReachable !== false;
+    } catch {}
+
+    if (!isOnline) {
+      await enqueueSession(buildQueueEntry());
+      const qLen = await getQueueLength();
+      setPendingSyncCount(qLen);
+      return "queued";
     }
 
-    const ts = new Date().toISOString();
-    setLastSynced(ts);
-    AsyncStorage.setItem(STORAGE_KEYS.LAST_SYNCED, ts).catch(() => {});
+    // Online — attempt full upload
+    try {
+      await upsertSession({
+        structureNumber: sn,
+        defects: savedDefects,
+        nbiRatings,
+        importSummary: importSummary ?? undefined,
+        pdfAnnotations: pdfAnnotations ?? undefined,
+      });
+
+      // Upload PDF binary if available and not yet uploaded
+      if (importedPdfPath && !pdfUploaded && Platform.OS !== "web") {
+        const FS = await import("expo-file-system/legacy");
+        const info = await FS.getInfoAsync(importedPdfPath);
+        if (info.exists) {
+          const b64 = await FS.readAsStringAsync(importedPdfPath, { encoding: FS.EncodingType.Base64 });
+          const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+          const uploadUrl = (apiUrl ?? "") + `/api/sessions/pdf/${encodeURIComponent(sn)}`;
+          const uploadRes = await fetch(uploadUrl, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/pdf",
+              ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+            },
+            body: bytes,
+          });
+          if (!uploadRes.ok) {
+            const text = await uploadRes.text().catch(() => uploadRes.status.toString());
+            throw new Error(`PDF upload failed (${uploadRes.status}): ${text}`);
+          }
+          setPdfUploadedState(true);
+          AsyncStorage.setItem(STORAGE_KEYS.PDF_UPLOADED, "1").catch(() => {});
+        }
+      }
+
+      // Upload photos (best-effort — non-fatal if some fail)
+      if (Platform.OS !== "web" && apiUrl) {
+        const photos = collectPhotosFromDefects(savedDefects as unknown[]);
+        uploadPhotos(photos, sn, apiUrl, apiKey).catch(() => {});
+      }
+
+      // Clear this bridge from the offline queue (in case it was previously queued)
+      await removeFromQueue(sn);
+      const qLen = await getQueueLength();
+      setPendingSyncCount(qLen);
+
+      const ts = new Date().toISOString();
+      setLastSynced(ts);
+      AsyncStorage.setItem(STORAGE_KEYS.LAST_SYNCED, ts).catch(() => {});
+
+      return "synced";
+    } catch (err) {
+      // Upload failed despite being online — queue for auto-retry
+      await enqueueSession(buildQueueEntry());
+      const qLen = await getQueueLength();
+      setPendingSyncCount(qLen);
+      throw err; // re-throw so SettingsModal can display error state
+    }
   }, [structureNumber, savedDefects, nbiRatings, importSummary, pdfAnnotations, importedPdfPath, pdfUploaded]);
 
   const setStructureNumber = useCallback((v: string) => {
@@ -2773,6 +2836,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     lastModified,
     hasUnsyncedChanges: lastModified !== null && (lastSynced === null || lastModified > lastSynced),
     syncSession,
+    pendingSyncCount,
     importedPdfPath,
     pdfAnnotations,
     setPdfAnnotations,

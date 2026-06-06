@@ -86,14 +86,22 @@ export default function BridgesScreen() {
     }
     setSubmitStatus("syncing");
     try {
-      await syncSession();
-      setSubmitStatus("success");
-      setTimeout(() => setSubmitStatus("idle"), 4000);
-      refetch();
+      const result = await syncSession();
+      if (result === "queued") {
+        setSubmitStatus("idle");
+        Alert.alert(
+          "Saved — Waiting for Connection",
+          "Your inspection is saved locally and queued for upload. It will sync automatically as soon as you have internet access.",
+          [{ text: "OK" }]
+        );
+      } else {
+        setSubmitStatus("success");
+        setTimeout(() => setSubmitStatus("idle"), 4000);
+        refetch();
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Sync failed";
-      const isOffline = err instanceof TypeError || msg.toLowerCase().includes("network") || msg.toLowerCase().includes("failed to fetch");
-      Alert.alert("Submit Failed", isOffline ? "No internet connection. Check your network and try again." : msg);
+      Alert.alert("Submit Failed", msg);
       setSubmitStatus("error");
       setTimeout(() => setSubmitStatus("idle"), 3000);
     }
