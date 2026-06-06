@@ -22,6 +22,10 @@ import {
   useInspection,
 } from "@/context/InspectionContext";
 
+const AMBER = "#f59e0b";
+const AMBER_BG = "#fffbeb";
+const AMBER_BORDER = "#fcd34d";
+
 export function UnderclearanceModal() {
   const c = useColors();
   const {
@@ -41,8 +45,10 @@ export function UnderclearanceModal() {
     key: UcMeasureKey;
   } | null>(null);
 
+  const hasImported = d.entries.some((e) => e.isImported);
+  const hasNeedsVerification = d.entries.some((e) => e.needsVerification);
+
   const setHeader = (field: keyof typeof d, value: string) => {
-    // Structure # is globally synced (CIF + header); route through the source of truth.
     if (field === "structureNumber") {
       setStructureNumber(value);
       return;
@@ -57,7 +63,9 @@ export function UnderclearanceModal() {
   const updateEntry = (id: string, patch: Partial<UnderclearanceEntry>) => {
     setUnderclearanceData({
       ...d,
-      entries: d.entries.map((e) => (e.id === id ? { ...e, ...patch } : e)),
+      entries: d.entries.map((e) =>
+        e.id === id ? { ...e, ...patch, needsVerification: false } : e
+      ),
     });
   };
 
@@ -131,6 +139,24 @@ export function UnderclearanceModal() {
           contentContainerStyle={styles.bodyContent}
           scrollEnabled={scrollEnabled}
         >
+          {/* Import verification banner */}
+          {hasImported && hasNeedsVerification && (
+            <View style={styles.importBanner}>
+              <Feather name="alert-triangle" size={14} color="#92400e" />
+              <Text style={styles.importBannerText}>
+                Verify imported values — tap any field to confirm
+              </Text>
+            </View>
+          )}
+          {hasImported && !hasNeedsVerification && (
+            <View style={styles.importBannerDone}>
+              <Feather name="check-circle" size={14} color="#065f46" />
+              <Text style={styles.importBannerDoneText}>
+                All imported values have been verified
+              </Text>
+            </View>
+          )}
+
           {/* Structure header info */}
           <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
             <Text style={[styles.cardTitle, { color: c.foreground }]}>Record Information</Text>
@@ -166,126 +192,156 @@ export function UnderclearanceModal() {
           </View>
 
           {/* Feature-crossed entries */}
-          {d.entries.map((entry, idx) => (
-            <View key={entry.id} style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
-              <View style={styles.entryHeader}>
-                <Text style={[styles.cardTitle, { color: "#0f766e" }]}>
-                  Feature Crossed #{idx + 1}
-                </Text>
-                {d.entries.length > 1 && (
-                  <TouchableOpacity
-                    onPress={() => removeUnderclearanceEntry(entry.id)}
-                    style={styles.removeBtn}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Feather name="trash-2" size={16} color="#dc2626" />
-                  </TouchableOpacity>
-                )}
-              </View>
+          {d.entries.map((entry, idx) => {
+            const isImportedEntry = entry.isImported === true;
+            const needsVerif = entry.needsVerification === true;
+            const cardBg = isImportedEntry ? AMBER_BG : c.card;
+            const cardBorder = isImportedEntry
+              ? needsVerif ? AMBER : AMBER_BORDER
+              : c.border;
 
-              <View style={styles.fieldGroup}>
-                <Text style={[styles.fieldLabel, { color: c.mutedForeground }]}>PSN</Text>
-                <TextInput
-                  style={[styles.input, { backgroundColor: c.secondary, borderColor: c.border, color: c.foreground }]}
-                  value={entry.psn}
-                  onChangeText={(t) => updateEntry(entry.id, { psn: t })}
-                  placeholder="Point/Span number..."
-                  placeholderTextColor={c.mutedForeground}
-                />
-              </View>
-
-              {/* Column header */}
-              <View style={styles.measureHeaderRow}>
-                <Text style={[styles.measureHeadLabel, { color: c.mutedForeground }]}>Measurement</Text>
-                <Text style={[styles.measureHeadData, { color: c.mutedForeground }]}>Field Data</Text>
-                <Text style={[styles.measureHeadRefer, { color: c.mutedForeground }]}>Refer.</Text>
-                <Text style={[styles.measureHeadItem, { color: c.mutedForeground }]}>Item</Text>
-              </View>
-
-              {UC_MEASURE_ROWS.map((row) => {
-                const m = entry[row.key];
-                const pickerOpen = refPicker?.entryId === entry.id && refPicker?.key === row.key;
-                return (
-                  <View key={row.key}>
-                    <View style={[styles.measureRow, { borderColor: c.border }]}>
-                      <Text style={[styles.measureLabel, { color: c.foreground }]} numberOfLines={2}>
-                        {row.label}
-                      </Text>
-                      <TextInput
-                        style={[styles.measureData, { backgroundColor: c.secondary, borderColor: c.border, color: c.foreground }]}
-                        value={m.data}
-                        onChangeText={(t) => updateMeasure(entry.id, row.key, { data: t })}
-                        placeholder="—"
-                        placeholderTextColor={c.mutedForeground}
-                      />
-                      {renderReferCell(entry.id, row.key, m)}
-                      <Text style={[styles.measureItem, { color: c.mutedForeground }]}>{row.itemNo}</Text>
-                    </View>
-                    {pickerOpen && (
-                      <View style={[styles.refDropdown, { backgroundColor: c.card, borderColor: c.border }]}>
-                        <Text style={[styles.refDropdownTitle, { color: c.mutedForeground }]}>
-                          {row.label} — Reference Feature
+            return (
+              <View key={entry.id} style={[styles.card, { backgroundColor: cardBg, borderColor: cardBorder, borderWidth: isImportedEntry ? 1.5 : 1 }]}>
+                <View style={styles.entryHeader}>
+                  <View style={styles.entryTitleRow}>
+                    <Text style={[styles.cardTitle, { color: "#0f766e" }]}>
+                      Feature Crossed #{idx + 1}
+                    </Text>
+                    {isImportedEntry && (
+                      <View style={[styles.importBadge, { backgroundColor: needsVerif ? AMBER : "#d97706" }]}>
+                        <Feather name={needsVerif ? "alert-circle" : "check"} size={10} color="#fff" />
+                        <Text style={styles.importBadgeText}>
+                          {needsVerif ? "Imported — verify" : "Imported"}
                         </Text>
-                        <View style={styles.refOptions}>
-                          {UC_REFERENCE_FEATURES.map((r) => {
-                            const selected = m.refer === r.code;
-                            return (
-                              <TouchableOpacity
-                                key={r.code}
-                                style={[
-                                  styles.refOption,
-                                  {
-                                    backgroundColor: selected ? "#0f766e" : c.secondary,
-                                    borderColor: selected ? "#0f766e" : c.border,
-                                  },
-                                ]}
-                                onPress={() => {
-                                  updateMeasure(entry.id, row.key, { refer: r.code });
-                                  setRefPicker(null);
-                                }}
-                              >
-                                <Text style={[styles.refOptionCode, { color: selected ? "#fff" : "#0f766e" }]}>{r.code}</Text>
-                                <Text style={[styles.refOptionLabel, { color: selected ? "#fff" : c.foreground }]} numberOfLines={1}>
-                                  {r.label}
-                                </Text>
-                              </TouchableOpacity>
-                            );
-                          })}
-                        </View>
                       </View>
                     )}
                   </View>
-                );
-              })}
+                  {d.entries.length > 1 && (
+                    <TouchableOpacity
+                      onPress={() => removeUnderclearanceEntry(entry.id)}
+                      style={styles.removeBtn}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Feather name="trash-2" size={16} color="#dc2626" />
+                    </TouchableOpacity>
+                  )}
+                </View>
 
-              {/* Signed Vertical Clearance + tolerance */}
-              <View style={[styles.signedBox, { borderColor: "#0f766e", backgroundColor: c.secondary }]}>
-                <Text style={[styles.fieldLabel, { color: "#0f766e" }]}>Signed Vertical Clr</Text>
-                <View style={styles.signedRow}>
-                  <View style={styles.signedField}>
-                    <Text style={[styles.fieldSubLabel, { color: c.mutedForeground }]}>Field Data</Text>
-                    <TextInput
-                      style={[styles.input, { backgroundColor: c.card, borderColor: c.border, color: c.foreground }]}
-                      value={entry.signedVertData}
-                      onChangeText={(t) => updateEntry(entry.id, { signedVertData: t })}
-                      placeholder={"17'10\""}
-                      placeholderTextColor={c.mutedForeground}
-                    />
-                  </View>
-                  <View style={styles.signedField}>
-                    <Text style={[styles.fieldSubLabel, { color: c.mutedForeground }]}>Tolerance</Text>
-                    <TextInput
-                      style={[styles.input, { backgroundColor: c.card, borderColor: c.border, color: c.foreground }]}
-                      value={entry.signedVertTolerance}
-                      onChangeText={(t) => updateEntry(entry.id, { signedVertTolerance: t })}
-                      placeholder={"1'4\""}
-                      placeholderTextColor={c.mutedForeground}
-                    />
+                <View style={styles.fieldGroup}>
+                  <Text style={[styles.fieldLabel, { color: c.mutedForeground }]}>PSN</Text>
+                  <TextInput
+                    style={[styles.input, {
+                      backgroundColor: isImportedEntry ? "#fef3c7" : c.secondary,
+                      borderColor: isImportedEntry ? AMBER_BORDER : c.border,
+                      color: c.foreground,
+                    }]}
+                    value={entry.psn}
+                    onChangeText={(t) => updateEntry(entry.id, { psn: t })}
+                    placeholder="Point/Span number..."
+                    placeholderTextColor={c.mutedForeground}
+                  />
+                </View>
+
+                {/* Column header */}
+                <View style={styles.measureHeaderRow}>
+                  <Text style={[styles.measureHeadLabel, { color: c.mutedForeground }]}>Measurement</Text>
+                  <Text style={[styles.measureHeadData, { color: c.mutedForeground }]}>Field Data</Text>
+                  <Text style={[styles.measureHeadRefer, { color: c.mutedForeground }]}>Refer.</Text>
+                  <Text style={[styles.measureHeadItem, { color: c.mutedForeground }]}>Item</Text>
+                </View>
+
+                {UC_MEASURE_ROWS.map((row) => {
+                  const m = entry[row.key];
+                  const pickerOpen = refPicker?.entryId === entry.id && refPicker?.key === row.key;
+                  return (
+                    <View key={row.key}>
+                      <View style={[styles.measureRow, { borderColor: isImportedEntry ? AMBER_BORDER : c.border }]}>
+                        <Text style={[styles.measureLabel, { color: c.foreground }]} numberOfLines={2}>
+                          {row.label}
+                        </Text>
+                        <TextInput
+                          style={[styles.measureData, {
+                            backgroundColor: isImportedEntry ? "#fef3c7" : c.secondary,
+                            borderColor: isImportedEntry ? AMBER_BORDER : c.border,
+                            color: c.foreground,
+                          }]}
+                          value={m.data}
+                          onChangeText={(t) => updateMeasure(entry.id, row.key, { data: t })}
+                          placeholder="—"
+                          placeholderTextColor={c.mutedForeground}
+                        />
+                        {renderReferCell(entry.id, row.key, m)}
+                        <Text style={[styles.measureItem, { color: c.mutedForeground }]}>{row.itemNo}</Text>
+                      </View>
+                      {pickerOpen && (
+                        <View style={[styles.refDropdown, { backgroundColor: c.card, borderColor: c.border }]}>
+                          <Text style={[styles.refDropdownTitle, { color: c.mutedForeground }]}>
+                            {row.label} — Reference Feature
+                          </Text>
+                          <View style={styles.refOptions}>
+                            {UC_REFERENCE_FEATURES.map((r) => {
+                              const selected = m.refer === r.code;
+                              return (
+                                <TouchableOpacity
+                                  key={r.code}
+                                  style={[
+                                    styles.refOption,
+                                    {
+                                      backgroundColor: selected ? "#0f766e" : c.secondary,
+                                      borderColor: selected ? "#0f766e" : c.border,
+                                    },
+                                  ]}
+                                  onPress={() => {
+                                    updateMeasure(entry.id, row.key, { refer: r.code });
+                                    setRefPicker(null);
+                                  }}
+                                >
+                                  <Text style={[styles.refOptionCode, { color: selected ? "#fff" : "#0f766e" }]}>{r.code}</Text>
+                                  <Text style={[styles.refOptionLabel, { color: selected ? "#fff" : c.foreground }]} numberOfLines={1}>
+                                    {r.label}
+                                  </Text>
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </View>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+
+                {/* Signed Vertical Clearance + tolerance */}
+                <View style={[styles.signedBox, {
+                  borderColor: isImportedEntry ? AMBER : "#0f766e",
+                  backgroundColor: isImportedEntry ? "#fef3c7" : c.secondary,
+                }]}>
+                  <Text style={[styles.fieldLabel, { color: isImportedEntry ? AMBER : "#0f766e" }]}>Signed Vertical Clr</Text>
+                  <View style={styles.signedRow}>
+                    <View style={styles.signedField}>
+                      <Text style={[styles.fieldSubLabel, { color: c.mutedForeground }]}>Field Data</Text>
+                      <TextInput
+                        style={[styles.input, { backgroundColor: c.card, borderColor: isImportedEntry ? AMBER_BORDER : c.border, color: c.foreground }]}
+                        value={entry.signedVertData}
+                        onChangeText={(t) => updateEntry(entry.id, { signedVertData: t })}
+                        placeholder={"17'10\""}
+                        placeholderTextColor={c.mutedForeground}
+                      />
+                    </View>
+                    <View style={styles.signedField}>
+                      <Text style={[styles.fieldSubLabel, { color: c.mutedForeground }]}>Tolerance</Text>
+                      <TextInput
+                        style={[styles.input, { backgroundColor: c.card, borderColor: isImportedEntry ? AMBER_BORDER : c.border, color: c.foreground }]}
+                        value={entry.signedVertTolerance}
+                        onChangeText={(t) => updateEntry(entry.id, { signedVertTolerance: t })}
+                        placeholder={"1'4\""}
+                        placeholderTextColor={c.mutedForeground}
+                      />
+                    </View>
                   </View>
                 </View>
               </View>
-            </View>
-          ))}
+            );
+          })}
 
           <TouchableOpacity
             style={[styles.addBtn, { borderColor: "#0f766e" }]}
@@ -340,8 +396,43 @@ const styles = StyleSheet.create({
   closeBtn: { padding: 8, borderRadius: 20, backgroundColor: "rgba(0,0,0,0.2)" },
   body: { flex: 1 },
   bodyContent: { padding: 16, gap: 12 },
+  importBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#fef3c7",
+    borderWidth: 1,
+    borderColor: "#fcd34d",
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  importBannerText: { fontSize: 12, fontWeight: "700", color: "#92400e", flex: 1 },
+  importBannerDone: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#d1fae5",
+    borderWidth: 1,
+    borderColor: "#6ee7b7",
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  importBannerDoneText: { fontSize: 12, fontWeight: "700", color: "#065f46", flex: 1 },
   card: { borderRadius: 16, borderWidth: 1, padding: 16, gap: 12 },
   cardTitle: { fontSize: 13, fontWeight: "900", textTransform: "uppercase", letterSpacing: 0.3 },
+  entryHeader: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" },
+  entryTitleRow: { flexDirection: "row", alignItems: "center", gap: 8, flex: 1, flexWrap: "wrap" },
+  importBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  importBadgeText: { fontSize: 9, fontWeight: "900", color: "#fff", textTransform: "uppercase", letterSpacing: 0.3 },
   headerGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   headerField: { width: "47%" },
   fieldGroup: { gap: 6 },
@@ -353,7 +444,6 @@ const styles = StyleSheet.create({
   legendBadge: { width: 18, height: 18, borderRadius: 4, alignItems: "center", justifyContent: "center" },
   legendBadgeText: { fontSize: 10, fontWeight: "900", color: "#fff" },
   legendLabel: { fontSize: 10, fontWeight: "600", flex: 1 },
-  entryHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   removeBtn: { padding: 4 },
   measureHeaderRow: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 2 },
   measureHeadLabel: { flex: 1, fontSize: 8, fontWeight: "800", textTransform: "uppercase" },

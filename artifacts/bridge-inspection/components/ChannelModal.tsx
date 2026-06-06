@@ -19,6 +19,9 @@ import {
 } from "@/context/InspectionContext";
 
 const ACCENT = "#0369a1";
+const AMBER = "#f59e0b";
+const AMBER_BG = "#fffbeb";
+const AMBER_BORDER = "#fcd34d";
 
 export function ChannelModal() {
   const c = useColors();
@@ -41,8 +44,11 @@ export function ChannelModal() {
     field: "topRef" | "botRef";
   } | null>(null);
 
+  const allMeasurements = [...d.upstream, ...d.downstream];
+  const hasImported = allMeasurements.some((m) => m.isImported);
+  const hasNeedsVerification = allMeasurements.some((m) => m.needsVerification);
+
   const setHeader = (field: keyof typeof d, value: string) => {
-    // Structure # is globally synced (CIF + header); route through the source of truth.
     if (field === "structureNumber") {
       setStructureNumber(value);
       return;
@@ -67,7 +73,6 @@ export function ChannelModal() {
       if (b <= station) preceding = b;
       else break;
     }
-    // No bent at or before this station → distance from last bent is undefined.
     if (preceding === null) return "";
     const dist = station - preceding;
     return Number.isInteger(dist) ? String(dist) : dist.toFixed(2);
@@ -83,8 +88,7 @@ export function ChannelModal() {
       ...d,
       [section]: d[section].map((m) => {
         if (m.id !== id) return m;
-        const merged = { ...m, ...patch };
-        // Auto-calculate Distance From Last Bent when bent stations are provided.
+        const merged = { ...m, ...patch, needsVerification: false };
         if (bents.length && patch.totalHoriz !== undefined) {
           merged.distFromLastBent = distFromLastBent(merged.totalHoriz, bents);
         }
@@ -98,7 +102,6 @@ export function ChannelModal() {
     setChannelData({
       ...d,
       bentStations: { ...d.bentStations, [section]: value },
-      // Recompute all rows in this section against the new bent list.
       [section]: d[section].map((m) => ({
         ...m,
         distFromLastBent: bents.length
@@ -118,13 +121,17 @@ export function ChannelModal() {
   ) => {
     const open =
       refPicker?.section === section && refPicker?.id === m.id && refPicker?.field === field;
+    const isImportedRow = m.isImported === true;
     return (
       <TouchableOpacity
         style={[
           styles.colRef,
           styles.cell,
           styles.refCell,
-          { backgroundColor: c.secondary, borderColor: open ? ACCENT : c.border },
+          {
+            backgroundColor: isImportedRow ? "#fef3c7" : c.secondary,
+            borderColor: open ? ACCENT : isImportedRow ? AMBER_BORDER : c.border,
+          },
         ]}
         onPress={() =>
           setRefPicker(open ? null : { section, id: m.id, field })
@@ -185,14 +192,31 @@ export function ChannelModal() {
 
       {d[section].map((m, idx) => {
         const autoDist = hasBents(section);
+        const isImportedRow = m.isImported === true;
+        const needsVerif = m.needsVerification === true;
+        const rowBg = isImportedRow ? AMBER_BG : undefined;
+        const rowBorderColor = isImportedRow ? (needsVerif ? AMBER : AMBER_BORDER) : c.border;
+
         return (
-        <View key={m.id} style={styles.measureBlock}>
-          <View style={[styles.measureRow, { borderColor: c.border }]}>
+        <View key={m.id} style={[styles.measureBlock, isImportedRow && { backgroundColor: AMBER_BG, borderRadius: 8, padding: 4, borderWidth: 1, borderColor: rowBorderColor }]}>
+          {isImportedRow && (
+            <View style={styles.importRowBadge}>
+              <Feather name={needsVerif ? "alert-circle" : "check-circle"} size={10} color={needsVerif ? "#92400e" : "#065f46"} />
+              <Text style={[styles.importRowBadgeText, { color: needsVerif ? "#92400e" : "#065f46" }]}>
+                {needsVerif ? "Imported — verify" : "Imported"}
+              </Text>
+            </View>
+          )}
+          <View style={[styles.measureRow, { borderColor: isImportedRow ? AMBER_BORDER : c.border }]}>
             <Text style={[styles.colNo, styles.rowNo, { color: c.mutedForeground }]}>{idx + 1}</Text>
             {renderRefCell(section, m, "topRef")}
             {renderRefCell(section, m, "botRef")}
             <TextInput
-              style={[styles.colNum, styles.cell, { backgroundColor: c.secondary, borderColor: c.border, color: c.foreground }]}
+              style={[styles.colNum, styles.cell, {
+                backgroundColor: isImportedRow ? "#fef3c7" : c.secondary,
+                borderColor: isImportedRow ? AMBER_BORDER : c.border,
+                color: c.foreground,
+              }]}
               value={m.totalHoriz}
               onChangeText={(t) => updateMeasure(section, m.id, { totalHoriz: t })}
               placeholder="—"
@@ -203,7 +227,11 @@ export function ChannelModal() {
               style={[
                 styles.colNum,
                 styles.cell,
-                { backgroundColor: autoDist ? c.muted : c.secondary, borderColor: c.border, color: autoDist ? c.mutedForeground : c.foreground },
+                {
+                  backgroundColor: autoDist ? c.muted : (isImportedRow ? "#fef3c7" : c.secondary),
+                  borderColor: isImportedRow ? AMBER_BORDER : c.border,
+                  color: autoDist ? c.mutedForeground : c.foreground,
+                },
               ]}
               value={m.distFromLastBent}
               onChangeText={(t) => updateMeasure(section, m.id, { distFromLastBent: t })}
@@ -213,7 +241,11 @@ export function ChannelModal() {
               editable={!autoDist}
             />
             <TextInput
-              style={[styles.colNum, styles.cell, { backgroundColor: c.secondary, borderColor: c.border, color: c.foreground }]}
+              style={[styles.colNum, styles.cell, {
+                backgroundColor: isImportedRow ? "#fef3c7" : c.secondary,
+                borderColor: isImportedRow ? AMBER_BORDER : c.border,
+                color: c.foreground,
+              }]}
               value={m.vertDist}
               onChangeText={(t) => updateMeasure(section, m.id, { vertDist: t })}
               placeholder="—"
@@ -263,7 +295,11 @@ export function ChannelModal() {
           )}
 
           <TextInput
-            style={[styles.notesInput, { backgroundColor: c.secondary, borderColor: c.border, color: c.foreground }]}
+            style={[styles.notesInput, {
+              backgroundColor: isImportedRow ? "#fef3c7" : c.secondary,
+              borderColor: isImportedRow ? AMBER_BORDER : c.border,
+              color: c.foreground,
+            }]}
             value={m.notes}
             onChangeText={(t) => updateMeasure(section, m.id, { notes: t })}
             placeholder="Notes…"
@@ -309,6 +345,24 @@ export function ChannelModal() {
         </View>
 
         <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
+          {/* Import verification banner */}
+          {hasImported && hasNeedsVerification && (
+            <View style={styles.importBanner}>
+              <Feather name="alert-triangle" size={14} color="#92400e" />
+              <Text style={styles.importBannerText}>
+                Verify imported values — tap any field to confirm
+              </Text>
+            </View>
+          )}
+          {hasImported && !hasNeedsVerification && (
+            <View style={styles.importBannerDone}>
+              <Feather name="check-circle" size={14} color="#065f46" />
+              <Text style={styles.importBannerDoneText}>
+                All imported values have been verified
+              </Text>
+            </View>
+          )}
+
           {/* Record information */}
           <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
             <Text style={[styles.cardTitle, { color: c.foreground }]}>Record Information</Text>
@@ -395,6 +449,30 @@ const styles = StyleSheet.create({
   closeBtn: { padding: 8, borderRadius: 20, backgroundColor: "rgba(0,0,0,0.2)" },
   body: { flex: 1 },
   bodyContent: { padding: 16, gap: 12 },
+  importBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#fef3c7",
+    borderWidth: 1,
+    borderColor: "#fcd34d",
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  importBannerText: { fontSize: 12, fontWeight: "700", color: "#92400e", flex: 1 },
+  importBannerDone: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#d1fae5",
+    borderWidth: 1,
+    borderColor: "#6ee7b7",
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  importBannerDoneText: { fontSize: 12, fontWeight: "700", color: "#065f46", flex: 1 },
   card: { borderRadius: 16, borderWidth: 1, padding: 16, gap: 12 },
   cardTitle: { fontSize: 13, fontWeight: "900", textTransform: "uppercase", letterSpacing: 0.3 },
   headerGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
@@ -426,6 +504,8 @@ const styles = StyleSheet.create({
   refOptionLabel: { fontSize: 10, fontWeight: "600", flex: 1 },
   hintText: { fontSize: 9, fontWeight: "700", marginTop: 4, fontStyle: "italic" },
   notesInput: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 6, fontSize: 11, fontWeight: "600", marginBottom: 4 },
+  importRowBadge: { flexDirection: "row", alignItems: "center", gap: 4, paddingBottom: 2 },
+  importRowBadgeText: { fontSize: 9, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.3 },
   commentsInput: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 12, fontWeight: "600", minHeight: 70 },
   addBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, padding: 12, borderRadius: 12, borderWidth: 2, borderStyle: "dashed" },
   addBtnText: { fontSize: 12, fontWeight: "900", textTransform: "uppercase", letterSpacing: 0.5 },
