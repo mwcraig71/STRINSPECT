@@ -100,7 +100,8 @@ function showUI() {
 }
 
 /* ── Initialise PDF.js from bundled global ── */
-var pdfjsLib = window.pdfjsLib;
+/* globalThis and window can diverge in WKWebView; check both */
+var pdfjsLib = window.pdfjsLib || globalThis.pdfjsLib;
 if (!pdfjsLib) {
   showError('PDF viewer failed to initialise. Please close and try again.');
 } else {
