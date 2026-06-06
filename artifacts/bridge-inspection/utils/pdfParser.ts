@@ -1,6 +1,18 @@
 import * as pdfjsLib from "pdfjs-dist";
+import * as pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.mjs";
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs`;
+// On native (Hermes) there are no Web Workers, so pdf.js uses a "fake worker"
+// that runs synchronously on the main thread.  It expects WorkerMessageHandler
+// to be available on globalThis.pdfjsWorker; importing the worker module above
+// gives Metro a chance to bundle it, and we pin it here so the fake-worker
+// bootstrap can find it.  On web, the real worker URL takes precedence.
+if (typeof (globalThis as Record<string, unknown>).pdfjsWorker === "undefined") {
+  (globalThis as Record<string, unknown>).pdfjsWorker = pdfjsWorker;
+}
+
+// Empty string = always use the in-thread fake worker (works on both web and
+// native without needing a separate worker file URL).
+pdfjsLib.GlobalWorkerOptions.workerSrc = "";
 
 export interface ParsedElementRow {
   elementId: string;
