@@ -1,6 +1,8 @@
 import { Feather } from "@expo/vector-icons";
 import React from "react";
 import {
+  ActivityIndicator,
+  Alert,
   Platform,
   ScrollView,
   StyleSheet,
@@ -30,8 +32,33 @@ export default function SummaryScreen() {
     inspectionType,
     importSummary,
     clearImportSummary,
+    syncSession,
+    structureNumber,
+    hasUnsyncedChanges,
+    lastSynced,
   } = useInspection();
   const [settingsOpen, setSettingsOpen] = React.useState(false);
+  const [submitStatus, setSubmitStatus] = React.useState<"idle" | "syncing" | "success" | "error">("idle");
+
+  const handleSubmit = async () => {
+    if (submitStatus === "syncing") return;
+    if (!structureNumber) {
+      Alert.alert("Missing Info", "Please set a structure number in the Inspection tab before submitting.");
+      return;
+    }
+    setSubmitStatus("syncing");
+    try {
+      await syncSession();
+      setSubmitStatus("success");
+      setTimeout(() => setSubmitStatus("idle"), 4000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Sync failed";
+      const isOffline = err instanceof TypeError || msg.toLowerCase().includes("network") || msg.toLowerCase().includes("failed to fetch");
+      Alert.alert("Submit Failed", isOffline ? "No internet connection. Check your network and try again." : msg);
+      setSubmitStatus("error");
+      setTimeout(() => setSubmitStatus("idle"), 3000);
+    }
+  };
 
   const importedAt = importSummary
     ? new Date(importSummary.timestamp).toLocaleString("en-US")
@@ -43,12 +70,43 @@ export default function SummaryScreen() {
       <View style={[styles.header, { backgroundColor: c.headerBg }]}>
         <View style={styles.headerRow}>
           <View style={styles.headerInner}>
-            <Feather name="layers" size={16} color="#38bdf8" />
-            <Text style={styles.headerTitle}>Summary Tables</Text>
+            <Feather name="list" size={16} color="#38bdf8" />
+            <Text style={styles.headerTitle}>Summary</Text>
           </View>
-          <TouchableOpacity style={[styles.gearBtn, { backgroundColor: "#1e293b" }]} onPress={() => setSettingsOpen(true)}>
-            <Feather name="settings" size={16} color="#94a3b8" />
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            {hasUnsyncedChanges && (
+              <TouchableOpacity
+                style={[
+                  styles.submitBtn,
+                  submitStatus === "syncing" && { opacity: 0.7 },
+                  submitStatus === "success" && { backgroundColor: "#052e16", borderColor: "#10b981" },
+                  submitStatus === "error" && { backgroundColor: "#450a0a", borderColor: "#ef4444" },
+                ]}
+                onPress={handleSubmit}
+                disabled={submitStatus === "syncing"}
+              >
+                {submitStatus === "syncing" ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Feather
+                    name={submitStatus === "success" ? "check" : submitStatus === "error" ? "x" : "upload-cloud"}
+                    size={13}
+                    color={submitStatus === "success" ? "#34d399" : submitStatus === "error" ? "#f87171" : "#fff"}
+                  />
+                )}
+                <Text style={[
+                  styles.submitBtnText,
+                  submitStatus === "success" && { color: "#34d399" },
+                  submitStatus === "error" && { color: "#f87171" },
+                ]}>
+                  {submitStatus === "syncing" ? "…" : submitStatus === "success" ? "Done" : submitStatus === "error" ? "Error" : "Submit"}
+                </Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={[styles.gearBtn, { backgroundColor: "#1e293b" }]} onPress={() => setSettingsOpen(true)}>
+              <Feather name="settings" size={16} color="#94a3b8" />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
       <SettingsModal visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
@@ -351,6 +409,19 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 8 },
   headerInner: { flexDirection: "row", alignItems: "center", gap: 7 },
   headerTitle: { fontSize: 14, fontWeight: "900", color: "#f8fafc", letterSpacing: -0.3, textTransform: "uppercase" },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: 8 },
+  submitBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 9,
+    backgroundColor: "#0284c7",
+    borderWidth: 1,
+    borderColor: "#0369a1",
+  },
+  submitBtnText: { fontSize: 11, fontWeight: "900", color: "#fff", textTransform: "uppercase", letterSpacing: 0.5 },
   modulePill: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
   modulePillText: { fontSize: 9, fontWeight: "900", color: "#fff", textTransform: "uppercase", letterSpacing: 0.5 },
   gearBtn: { padding: 8, borderRadius: 10 },

@@ -99,8 +99,6 @@ export default function InspectionScreen() {
     setShowDailySafetyModal,
     setShowSnbiModal,
     setShowSteelPipePileModal,
-    syncSession,
-    lastSynced,
   } = useInspection();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -114,28 +112,6 @@ export default function InspectionScreen() {
   const [elementPickerOpen, setElementPickerOpen] = useState(false);
   const [defectPickerOpen, setDefectPickerOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [quickSyncStatus, setQuickSyncStatus] = useState<"idle" | "syncing" | "success" | "error">("idle");
-
-  const handleQuickSync = async () => {
-    if (quickSyncStatus === "syncing") return;
-    if (!structureNumber) {
-      Alert.alert("Sync", "Set a structure number before syncing.");
-      return;
-    }
-    setQuickSyncStatus("syncing");
-    try {
-      await syncSession();
-      setQuickSyncStatus("success");
-      setTimeout(() => setQuickSyncStatus("idle"), 3000);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Sync failed";
-      const isOffline = err instanceof TypeError || msg.toLowerCase().includes("network");
-      Alert.alert("Sync Failed", isOffline ? "No internet connection." : msg);
-      setQuickSyncStatus("error");
-      setTimeout(() => setQuickSyncStatus("idle"), 3000);
-    }
-  };
-
   const addPhoto = async () => {
     if (Platform.OS === "web") {
       Alert.alert("Info", "Photo library not supported in web preview. Use camera.");
@@ -217,15 +193,13 @@ export default function InspectionScreen() {
       <View style={[styles.appHeader, { backgroundColor: c.headerBg }]}>
         <View style={styles.headerRow}>
           <View style={styles.headerTitle}>
-            {isTxDot && (
-              <TouchableOpacity
+            <TouchableOpacity
                 style={styles.menuBtn}
                 onPress={() => setModuleMenuOpen((v) => !v)}
                 hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
               >
                 <Feather name="menu" size={18} color="#e2e8f0" />
               </TouchableOpacity>
-            )}
             <Feather name="activity" size={16} color="#38bdf8" />
             <View>
               <Text style={styles.headerTitleText}>Bridge Inspection</Text>
@@ -308,33 +282,6 @@ export default function InspectionScreen() {
                 {inspectionType}
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.gearBtn,
-                {
-                  backgroundColor:
-                    quickSyncStatus === "success" ? "#064e3b"
-                    : quickSyncStatus === "error" ? "#450a0a"
-                    : "#1e293b",
-                },
-              ]}
-              onPress={handleQuickSync}
-              disabled={quickSyncStatus === "syncing"}
-            >
-              <Feather
-                name="cloud"
-                size={16}
-                color={
-                  quickSyncStatus === "syncing" ? "#475569"
-                  : quickSyncStatus === "success" ? "#34d399"
-                  : quickSyncStatus === "error" ? "#f87171"
-                  : lastSynced ? "#64748b" : "#475569"
-                }
-              />
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.gearBtn, { backgroundColor: "#1e293b" }]} onPress={() => setSettingsOpen(true)}>
-              <Feather name="settings" size={16} color="#94a3b8" />
-            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -405,81 +352,103 @@ export default function InspectionScreen() {
       </Modal>
 
       {/* ── TxDOT module menu (hamburger dropdown) ── */}
-      {isTxDot && moduleMenuOpen && (
+      {moduleMenuOpen && (
         <>
           <Pressable
             style={styles.menuBackdrop}
             onPress={() => setModuleMenuOpen(false)}
           />
           <View style={[styles.menuDropdown, { backgroundColor: c.card, borderColor: c.border }]}>
-            <Text style={[styles.menuHeading, { color: c.mutedForeground }]}>TxDOT Forms</Text>
+            <Text style={[styles.menuHeading, { color: c.mutedForeground }]}>General</Text>
             <TouchableOpacity
               style={styles.menuItem}
               onPress={() => {
                 setModuleMenuOpen(false);
-                setShowDailySafetyModal(true);
+                setSettingsOpen(true);
               }}
             >
-              <View style={[styles.menuIcon, { backgroundColor: "#b91c1c" }]}>
-                <Feather name="shield" size={15} color="#fff" />
+              <View style={[styles.menuIcon, { backgroundColor: "#334155" }]}>
+                <Feather name="settings" size={15} color="#94a3b8" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.menuItemTitle, { color: c.foreground }]}>Daily Safety Briefing</Text>
-                <Text style={[styles.menuItemSub, { color: c.mutedForeground }]}>Risk Assessment & Sign-Off</Text>
+                <Text style={[styles.menuItemTitle, { color: c.foreground }]}>Inspection Settings</Text>
+                <Text style={[styles.menuItemSub, { color: c.mutedForeground }]}>Type · Structure · Import PDF</Text>
               </View>
               <Feather name="chevron-right" size={16} color={c.mutedForeground} />
             </TouchableOpacity>
-            <View style={[styles.menuDivider, { backgroundColor: c.border }]} />
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
-                setModuleMenuOpen(false);
-                setShowChannelModal(true);
-              }}
-            >
-              <View style={[styles.menuIcon, { backgroundColor: "#0369a1" }]}>
-                <Feather name="activity" size={15} color="#fff" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.menuItemTitle, { color: c.foreground }]}>Channel Cross-Section</Text>
-                <Text style={[styles.menuItemSub, { color: c.mutedForeground }]}>Form 2600</Text>
-              </View>
-              <Feather name="chevron-right" size={16} color={c.mutedForeground} />
-            </TouchableOpacity>
-            <View style={[styles.menuDivider, { backgroundColor: c.border }]} />
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
-                setModuleMenuOpen(false);
-                setShowUnderclearanceModal(true);
-              }}
-            >
-              <View style={[styles.menuIcon, { backgroundColor: "#0f766e" }]}>
-                <Feather name="minimize-2" size={15} color="#fff" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.menuItemTitle, { color: c.foreground }]}>Underclearance Record</Text>
-                <Text style={[styles.menuItemSub, { color: c.mutedForeground }]}>Form 2601</Text>
-              </View>
-              <Feather name="chevron-right" size={16} color={c.mutedForeground} />
-            </TouchableOpacity>
-            <View style={[styles.menuDivider, { backgroundColor: c.border }]} />
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
-                setModuleMenuOpen(false);
-                setShowSnbiModal(true);
-              }}
-            >
-              <View style={[styles.menuIcon, { backgroundColor: "#6d28d9" }]}>
-                <Feather name="clipboard" size={15} color="#fff" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.menuItemTitle, { color: c.foreground }]}>SNBI</Text>
-                <Text style={[styles.menuItemSub, { color: c.mutedForeground }]}>Field Collection</Text>
-              </View>
-              <Feather name="chevron-right" size={16} color={c.mutedForeground} />
-            </TouchableOpacity>
+            {isTxDot && (
+              <>
+                <View style={[styles.menuDivider, { backgroundColor: c.border }]} />
+                <Text style={[styles.menuHeading, { color: c.mutedForeground }]}>TxDOT Forms</Text>
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => {
+                    setModuleMenuOpen(false);
+                    setShowDailySafetyModal(true);
+                  }}
+                >
+                  <View style={[styles.menuIcon, { backgroundColor: "#b91c1c" }]}>
+                    <Feather name="shield" size={15} color="#fff" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.menuItemTitle, { color: c.foreground }]}>Daily Safety Briefing</Text>
+                    <Text style={[styles.menuItemSub, { color: c.mutedForeground }]}>Risk Assessment & Sign-Off</Text>
+                  </View>
+                  <Feather name="chevron-right" size={16} color={c.mutedForeground} />
+                </TouchableOpacity>
+                <View style={[styles.menuDivider, { backgroundColor: c.border }]} />
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => {
+                    setModuleMenuOpen(false);
+                    setShowChannelModal(true);
+                  }}
+                >
+                  <View style={[styles.menuIcon, { backgroundColor: "#0369a1" }]}>
+                    <Feather name="activity" size={15} color="#fff" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.menuItemTitle, { color: c.foreground }]}>Channel Cross-Section</Text>
+                    <Text style={[styles.menuItemSub, { color: c.mutedForeground }]}>Form 2600</Text>
+                  </View>
+                  <Feather name="chevron-right" size={16} color={c.mutedForeground} />
+                </TouchableOpacity>
+                <View style={[styles.menuDivider, { backgroundColor: c.border }]} />
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => {
+                    setModuleMenuOpen(false);
+                    setShowUnderclearanceModal(true);
+                  }}
+                >
+                  <View style={[styles.menuIcon, { backgroundColor: "#0f766e" }]}>
+                    <Feather name="minimize-2" size={15} color="#fff" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.menuItemTitle, { color: c.foreground }]}>Underclearance Record</Text>
+                    <Text style={[styles.menuItemSub, { color: c.mutedForeground }]}>Form 2601</Text>
+                  </View>
+                  <Feather name="chevron-right" size={16} color={c.mutedForeground} />
+                </TouchableOpacity>
+                <View style={[styles.menuDivider, { backgroundColor: c.border }]} />
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => {
+                    setModuleMenuOpen(false);
+                    setShowSnbiModal(true);
+                  }}
+                >
+                  <View style={[styles.menuIcon, { backgroundColor: "#6d28d9" }]}>
+                    <Feather name="clipboard" size={15} color="#fff" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.menuItemTitle, { color: c.foreground }]}>SNBI</Text>
+                    <Text style={[styles.menuItemSub, { color: c.mutedForeground }]}>Field Collection</Text>
+                  </View>
+                  <Feather name="chevron-right" size={16} color={c.mutedForeground} />
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         </>
       )}

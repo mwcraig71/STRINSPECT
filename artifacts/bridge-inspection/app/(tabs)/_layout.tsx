@@ -15,6 +15,10 @@ import { useAutoSync } from "@/hooks/useAutoSync";
 function NativeTabLayout() {
   return (
     <NativeTabs>
+      <NativeTabs.Trigger name="bridges">
+        <Icon sf={{ default: "square.stack", selected: "square.stack.fill" }} />
+        <Label>Bridges</Label>
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="index">
         <Icon sf={{ default: "doc.text", selected: "doc.text.fill" }} />
         <Label>Inspection</Label>
@@ -63,6 +67,18 @@ function ClassicTabLayout() {
       }}
     >
       <Tabs.Screen
+        name="bridges"
+        options={{
+          title: "Bridges",
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="square.stack" tintColor={color} size={22} />
+            ) : (
+              <Feather name="layers" size={21} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
         name="index"
         options={{
           title: "Inspection",
@@ -94,7 +110,7 @@ function ClassicTabLayout() {
             isIOS ? (
               <SymbolView name="list.bullet.clipboard" tintColor={color} size={22} />
             ) : (
-              <Feather name="layers" size={21} color={color} />
+              <Feather name="list" size={21} color={color} />
             ),
         }}
       />
