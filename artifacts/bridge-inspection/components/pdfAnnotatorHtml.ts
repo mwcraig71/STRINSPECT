@@ -76,7 +76,7 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
 ${PDFJS_INLINE_SCRIPT}
 </script>
 
-<script type="module">
+<script>
 /* ── UI helpers (defined first so they are available throughout) ── */
 function showError(msg) {
   var s = document.querySelector('.spinner');
