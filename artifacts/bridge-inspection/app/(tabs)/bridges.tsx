@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import * as DocumentPicker from "expo-document-picker";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
@@ -43,12 +44,29 @@ export default function BridgesScreen() {
     importedPdfPath,
     pdfAnnotations,
     setPdfAnnotations,
+    importFromPdf,
+    parsingActive,
   } = useInspection();
 
   const [submitStatus, setSubmitStatus] = useState<"idle" | "syncing" | "success" | "error">("idle");
   const [newBridgeVisible, setNewBridgeVisible] = useState(false);
   const [newBridgeDraft, setNewBridgeDraft] = useState("");
   const [annotatorOpen, setAnnotatorOpen] = useState(false);
+
+  const handleImportPdf = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: "application/pdf",
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled || !result.assets?.length) return;
+      const asset = result.assets[0];
+      await importFromPdf({ uri: asset.uri, name: asset.name });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Could not open document picker.";
+      Alert.alert("Error", message);
+    }
+  };
 
   const {
     data: sessions,
@@ -352,11 +370,14 @@ export default function BridgesScreen() {
                 )}
 
                 <TouchableOpacity
-                  style={[styles.newBtn, { backgroundColor: "#1e293b", borderColor: "#334155" }]}
-                  onPress={openNewBridgeFlow}
+                  style={[styles.newBtn, { backgroundColor: parsingActive ? "#1e293b" : "#0c1a2e", borderColor: parsingActive ? "#334155" : "#0369a1" }]}
+                  onPress={handleImportPdf}
+                  disabled={parsingActive}
                 >
-                  <Feather name="plus" size={13} color="#94a3b8" />
-                  <Text style={[styles.newBtnText, { color: "#94a3b8" }]}>New Bridge</Text>
+                  <Feather name={parsingActive ? "loader" : "file-text"} size={13} color={parsingActive ? "#475569" : "#38bdf8"} />
+                  <Text style={[styles.newBtnText, { color: parsingActive ? "#475569" : "#38bdf8" }]}>
+                    {parsingActive ? "Parsing PDF…" : "Import Previous Report"}
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
