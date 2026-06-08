@@ -28,7 +28,8 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
 #tool-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .zoom-group{display:flex;gap:6px;align-items:center;margin-left:auto;flex-shrink:0}
 #zoom-label{color:#94a3b8;font-size:12px;font-weight:700;padding:0 2px;min-width:38px;text-align:center;flex-shrink:0}
-#opt-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-height:32px}
+#opt-row{display:flex;flex-wrap:nowrap;gap:6px;align-items:center;min-height:32px}
+#opt-dynamic{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .tbtn{background:#1e293b;border:1.5px solid #334155;border-radius:10px;color:#94a3b8;padding:7px 10px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap;flex-shrink:0;-webkit-user-select:none;user-select:none}
 .tbtn.active{border-color:#38bdf8;color:#38bdf8;background:rgba(56,189,248,.1)}
 .clr-dot{width:26px;height:26px;border-radius:50%;cursor:pointer;border:2px solid transparent;flex-shrink:0;transition:transform .1s}
@@ -71,13 +72,15 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
     <button class="tbtn" id="btn-highlight">&#128397; HL</button>
     <button class="tbtn" id="btn-text">T&nbsp;Text</button>
     <button class="tbtn" id="btn-undo">&#8617; Undo</button>
+  </div>
+  <div id="opt-row">
+    <div id="opt-dynamic"></div>
     <div class="zoom-group">
       <button class="tbtn" id="btn-zoom-out">&#8722;</button>
       <span id="zoom-label">100%</span>
       <button class="tbtn" id="btn-zoom-in">&#43;</button>
     </div>
   </div>
-  <div id="opt-row"></div>
 </div>
 
 <div id="text-input-wrap">
@@ -520,7 +523,7 @@ function setTool(t) {
 
 /* ── Options row ── */
 function renderOptRow() {
-  var row = document.getElementById('opt-row');
+  var row = document.getElementById('opt-dynamic');
   row.innerHTML = '';
   if (tool === 'pan') return;
 
