@@ -37,4 +37,4 @@ and Android WebView 60+ both support blob URL workers. Eval fallback registers
 `globalThis.pdfjsWorker.WorkerMessageHandler` for old engines.
 
 **How to apply:** Any WebView that runs pdf.js must use this pattern. The same
-blob URL approach should be used for the future extraction WebView (Task #40).
+blob URL approach should be used for the future extraction WebView.

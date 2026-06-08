@@ -26,10 +26,16 @@ export default function PDFAnnotatorModal({ visible, pdfPath, annotations, onSav
   const webViewRef = useRef<WebView>(null);
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [sessionKey, setSessionKey] = useState(0);
   const injectedRef = useRef(false);
 
   useEffect(() => {
-    if (!visible) {
+    if (visible) {
+      // Force a fresh WebView document on every open so the annotator's
+      // one-shot init guard starts clean (otherwise reopening with a
+      // different PDF would be ignored).
+      setSessionKey((k) => k + 1);
+    } else {
       setReady(false);
       setLoadError(null);
       injectedRef.current = false;
@@ -134,6 +140,7 @@ export default function PDFAnnotatorModal({ visible, pdfPath, annotations, onSav
               </View>
             )}
             <WebView
+              key={sessionKey}
               ref={webViewRef}
               style={styles.webview}
               source={{ html: HTML }}

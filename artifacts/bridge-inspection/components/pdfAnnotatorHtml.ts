@@ -148,6 +148,7 @@ var pageCanvases = {};
 var pageDimensions = {}; // keyed by page number → {w, h} canvas pixel dimensions
 var isDrawing = false;
 var activeCv = null;
+var pdfInitStarted = false;
 var textPendingPage = 0;
 var textPendingX = 0;
 var textPendingY = 0;
@@ -192,6 +193,8 @@ function onMsg(e) {
   var data;
   try { data = JSON.parse(raw); } catch(err) { return; }
   if (data && data.type === 'init') {
+    if (pdfInitStarted) return;
+    pdfInitStarted = true;
     if (Array.isArray(data.annotations) && data.annotations.length > 0) {
       annotations = data.annotations;
       initialAnnotationCount = annotations.length;
