@@ -375,7 +375,8 @@ function onDown(e, cv, pn) {
     type: tool === 'highlight' ? 'highlight' : 'stroke',
     page: pn,
     color: tool === 'highlight' ? '#facc15' : penColor,
-    width: penSize,
+    // Redline strokes are drawn 75% thinner than the selected S/M/L weight.
+    width: penSize * 0.25,
     points: [pt]
   };
 }
