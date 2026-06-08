@@ -1,4 +1,4 @@
-import { PDFJS_INLINE_SCRIPT } from "./pdfAnnotatorPdfjsBundled";
+import { PDFJS_INLINE_SCRIPT, PDFJS_WORKER_INLINE_SCRIPT } from "./pdfAnnotatorPdfjsBundled";
 
 export function getPdfAnnotatorHtml(): string {
   return `<!DOCTYPE html>
@@ -72,10 +72,16 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
 </div>
 
 <!-- PDF.js bundled locally — no network dependency.
-     This is the ESM build with its trailing export statement stripped at embed
-     time (see scripts/embed-pdfjs.mjs); it exposes the API via globalThis.pdfjsLib. -->
+     ESM builds with their trailing export statements stripped at embed time
+     (see scripts/embed-pdfjs.mjs). The first script exposes the API via
+     globalThis.pdfjsLib; the second self-registers
+     globalThis.pdfjsWorker.WorkerMessageHandler so pdf.js can run its in-thread
+     "fake worker" with workerSrc = '' (no separate worker file needed). -->
 <script>
 ${PDFJS_INLINE_SCRIPT}
+</script>
+<script>
+${PDFJS_WORKER_INLINE_SCRIPT}
 </script>
 
 <script>
@@ -107,7 +113,10 @@ var pdfjsLib = window.pdfjsLib || globalThis.pdfjsLib;
 if (!pdfjsLib) {
   showError('PDF viewer failed to initialise. Please close and try again.');
 } else {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = ''; // run in main thread (offline-safe)
+  // Empty workerSrc = use pdf.js's in-thread "fake worker". It requires
+  // globalThis.pdfjsWorker.WorkerMessageHandler, which the worker <script> above
+  // self-registers. Offline-safe; no Web Worker is spawned.
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '';
 }
 
 /* ── State ── */

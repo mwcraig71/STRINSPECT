@@ -32,6 +32,18 @@ keep both rules. Verify with `grep -c 'export[[:space:]]*{'` on the generated
 string — must be 0. The annotator reads `window.pdfjsLib || globalThis.pdfjsLib`
 (WKWebView: they're the same object, but keep both for safety).
 
+## Rule 3 — embed the WORKER too, for the in-thread fake worker
+Even with `pdfjsLib` loaded, `getDocument()` throws `No "GlobalWorkerOptions.workerSrc"
+specified` if `workerSrc=''` and no worker handler exists. pdf.js's in-thread
+"fake worker" needs `globalThis.pdfjsWorker.WorkerMessageHandler`. So the embed
+script ALSO embeds `pdf.worker.min.mjs` (same export-strip + guard for
+`globalThis.pdfjsWorker`) and the annotator HTML runs it in a *second* classic
+`<script>`; the worker module self-registers the global. Keep `workerSrc=''`.
+This mirrors the native parser (`utils/pdfParser.ts`). No Web Worker is spawned —
+fully offline. The worker's trailing `initializeFromPort(self)` is guarded by
+`typeof window === "undefined"`, so it no-ops in the WebView (self===window) and
+does NOT interfere with the annotator's window/document `message` listeners.
+
 ## Gotcha — backticks inside the HTML template literal
 `getPdfAnnotatorHtml()` returns one big template literal. Any backtick in added
 HTML comments/text terminates it and breaks the Metro/babel parse with a
