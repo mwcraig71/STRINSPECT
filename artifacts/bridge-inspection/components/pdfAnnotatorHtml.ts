@@ -1,6 +1,11 @@
 import { PDFJS_INLINE_SCRIPT, PDFJS_WORKER_INLINE_SCRIPT } from "./pdfAnnotatorPdfjsBundled";
 
 export function getPdfAnnotatorHtml(): string {
+  // JSON-encode the worker script so it can be embedded safely inside a
+  // <script> tag as a JS string variable.  Replace '</' with '<\/' so the
+  // HTML parser never sees '</script>' and closes the tag prematurely.
+  const workerJson = JSON.stringify(PDFJS_WORKER_INLINE_SCRIPT).replace(/<\//g, "<\\/");
+
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -72,17 +77,14 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
 </div>
 
 <!-- PDF.js bundled locally — no network dependency.
-     ESM builds with their trailing export statements stripped at embed time
-     (see scripts/embed-pdfjs.mjs). The first script exposes the API via
-     globalThis.pdfjsLib; the second self-registers
-     globalThis.pdfjsWorker.WorkerMessageHandler so pdf.js can run its in-thread
-     "fake worker" with workerSrc = '' (no separate worker file needed). -->
+     The first <script> sets up globalThis.pdfjsLib (main pdf.js API).
+     The second stores the worker script as a JS string (__pdfWorkerSrc__);
+     the main init block then creates a Blob URL from it so pdf.js spawns a
+     real Web Worker without needing any network fetch. -->
 <script>
 ${PDFJS_INLINE_SCRIPT}
 </script>
-<script>
-${PDFJS_WORKER_INLINE_SCRIPT}
-</script>
+<script>var __pdfWorkerSrc__=${workerJson};</script>
 
 <script>
 /* ── UI helpers (defined first so they are available throughout) ── */
@@ -113,10 +115,19 @@ var pdfjsLib = window.pdfjsLib || globalThis.pdfjsLib;
 if (!pdfjsLib) {
   showError('PDF viewer failed to initialise. Please close and try again.');
 } else {
-  // Empty workerSrc = use pdf.js's in-thread "fake worker". It requires
-  // globalThis.pdfjsWorker.WorkerMessageHandler, which the worker <script> above
-  // self-registers. Offline-safe; no Web Worker is spawned.
-  pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+  // pdf.js throws "No workerSrc specified" for any falsy value, including ''.
+  // Create a blob URL from the embedded worker script so pdf.js gets a real,
+  // non-empty URL and spins a proper Web Worker (WKWebView iOS 16+ supports
+  // blob worker URLs; Android WebView has supported them since v60).
+  try {
+    var _wBlob = new Blob([__pdfWorkerSrc__], { type: 'application/javascript' });
+    pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(_wBlob);
+  } catch (_wErr) {
+    // Blob URL unavailable — execute worker inline so WorkerMessageHandler is
+    // registered on globalThis.pdfjsWorker, then satisfy the non-empty check.
+    try { (0, eval)(__pdfWorkerSrc__); } catch (_) {}
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'worker.js';
+  }
 }
 
 /* ── State ── */
