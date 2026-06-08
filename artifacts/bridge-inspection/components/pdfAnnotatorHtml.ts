@@ -18,7 +18,7 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
 #page-info{color:#94a3b8;font-size:12px;font-weight:700;flex:1}
 .top-btn{background:#1e293b;border:1.5px solid #334155;border-radius:8px;color:#94a3b8;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap}
 .top-btn.save{background:#0284c7;border-color:#0369a1;color:#fff}
-#scroll-area{position:absolute;top:calc(48px + env(safe-area-inset-top));bottom:100px;left:0;right:0;overflow-y:auto;overflow-x:hidden;background:#1e293b}
+#scroll-area{position:absolute;top:calc(48px + env(safe-area-inset-top));bottom:100px;left:0;right:0;overflow-y:auto;overflow-x:auto;-webkit-overflow-scrolling:auto;background:#1e293b}
 #scroll-area.drawing{overflow:hidden}
 .page-wrap{position:relative;margin:12px auto;display:block;box-shadow:0 4px 24px rgba(0,0,0,.6)}
 .pdf-canvas{display:block;width:100%}
@@ -270,12 +270,17 @@ async function renderAllPages() {
   var zoomWrap = document.getElementById('zoom-wrap');
   zoomWrap.innerHTML = '';
   var vw = area.clientWidth || window.innerWidth;
+  // Render the PDF bitmap at a higher pixel density than its on-screen size so
+  // text stays sharp when magnified with CSS zoom (max 3x). Fewer pages can
+  // afford a higher factor; cap memory on long documents.
+  var RENDER_SCALE = pageCount > 6 ? 2 : 3;
   for (var pn = 1; pn <= pageCount; pn++) {
     setLoadTxt('Rendering page ' + pn + ' of ' + pageCount + '\u2026');
     var page = await pdfDoc.getPage(pn);
     var baseVp = page.getViewport({ scale: 1 });
     var scale = (vw - 4) / baseVp.width;
-    var vp = page.getViewport({ scale: scale });
+    var vp = page.getViewport({ scale: scale });        // on-screen (CSS) size
+    var rvp = page.getViewport({ scale: scale * RENDER_SCALE }); // hi-res bitmap
 
     var wrap = document.createElement('div');
     wrap.className = 'page-wrap';
@@ -285,8 +290,8 @@ async function renderAllPages() {
 
     var pdfCv = document.createElement('canvas');
     pdfCv.className = 'pdf-canvas';
-    pdfCv.width = vp.width;
-    pdfCv.height = vp.height;
+    pdfCv.width = rvp.width;
+    pdfCv.height = rvp.height;
 
     var annCv = document.createElement('canvas');
     annCv.className = 'ann-canvas';
@@ -306,7 +311,7 @@ async function renderAllPages() {
     pageLayout[pn] = { top: wrap.offsetTop, left: wrap.offsetLeft, w: wrap.offsetWidth, h: wrap.offsetHeight };
 
     var ctx = pdfCv.getContext('2d');
-    await page.render({ canvasContext: ctx, viewport: vp }).promise;
+    await page.render({ canvasContext: ctx, viewport: rvp }).promise;
     wireCanvas(annCv, pn);
   }
 }
