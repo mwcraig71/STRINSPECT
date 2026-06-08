@@ -18,7 +18,7 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
 #page-info{color:#94a3b8;font-size:12px;font-weight:700;flex:1}
 .top-btn{background:#1e293b;border:1.5px solid #334155;border-radius:8px;color:#94a3b8;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap}
 .top-btn.save{background:#0284c7;border-color:#0369a1;color:#fff}
-#scroll-area{position:absolute;top:calc(48px + env(safe-area-inset-top));bottom:100px;left:0;right:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;background:#1e293b}
+#scroll-area{position:absolute;top:calc(48px + env(safe-area-inset-top));bottom:100px;left:0;right:0;overflow-y:auto;overflow-x:hidden;background:#1e293b}
 #scroll-area.drawing{overflow:hidden}
 .page-wrap{position:relative;margin:12px auto;display:block;box-shadow:0 4px 24px rgba(0,0,0,.6)}
 .pdf-canvas{display:block;width:100%}
@@ -274,6 +274,22 @@ function wireCanvas(cv, pn) {
 }
 
 function canvasPoint(e, cv) {
+  // Default (un-zoomed) path: derive coordinates from the stable scroll
+  // container rect + scrollTop + the page's layout offset, never from the
+  // scrolled child's own getBoundingClientRect (which can report a stale,
+  // unscrolled top inside an iOS WKWebView scroll layer and offset the stroke
+  // by the scroll distance). The page-wrap is laid out 1:1 with the canvas
+  // buffer, so no extra scaling is needed.
+  if (Math.abs(zoomLevel - 1) < 0.001) {
+    var area = document.getElementById('scroll-area');
+    var wrap = cv.parentNode; // .page-wrap
+    if (area && wrap && wrap.offsetWidth > 0 && wrap.offsetHeight > 0) {
+      var ar = area.getBoundingClientRect();
+      var xc = (e.clientX - ar.left) - wrap.offsetLeft;
+      var yc = (e.clientY - ar.top) + area.scrollTop - wrap.offsetTop;
+      return [xc * (cv.width / wrap.offsetWidth), yc * (cv.height / wrap.offsetHeight)];
+    }
+  }
   var r = cv.getBoundingClientRect();
   var sx = cv.width / r.width;
   var sy = cv.height / r.height;

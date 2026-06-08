@@ -13,5 +13,6 @@
 - [TS project references stale dist](ts-project-refs-stale.md) — after editing a workspace lib's source, run `tsc -p tsconfig.json` in that lib to regenerate dist/ d.ts or downstream packages see stale types.
 - [Orval zod codegen barrel conflict](orval-zod-codegen.md) — orval overwrites workspace-root index.ts in split mode; use mode:"single" + absolute target path to avoid it.
 - [WebView init message fires twice](webview-double-message.md) — RN dispatches init to window+document, both handlers fire; guard async setup or interleaved renders cause "every other page" canvas bugs.
+- [iOS WebView canvas touch offset](webview-scroll-coordinate-offset.md) — `-webkit-overflow-scrolling:touch` makes getBoundingClientRect ignore scroll; canvas draw lands offset by scroll distance. Remove the property.
 - [pdf.js inline bundle in WKWebView](pdfjs-webview-esm-classic-script.md) — embed as classic <script>, strip trailing ESM export{} or whole script is discarded; no backticks in the HTML template literal.
 - [Offline-first sync architecture](offline-sync-arch.md) — persistent queue (offlineQueue.ts), photo upload to session_photos table, syncSession returns "synced"|"queued" (never throws when offline).
