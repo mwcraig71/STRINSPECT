@@ -147,6 +147,7 @@ var pageCount = 0;
 var pageCanvases = {};
 var pageDimensions = {}; // keyed by page number → {w, h} canvas pixel dimensions
 var isDrawing = false;
+var activeCv = null;
 var textPendingPage = 0;
 var textPendingX = 0;
 var textPendingY = 0;
@@ -266,7 +267,7 @@ function wireCanvas(cv, pn) {
   cv.addEventListener('pointerdown', function(e) { onDown(e, cv, pn); });
   cv.addEventListener('pointermove', function(e) { onMove(e, cv, pn); });
   cv.addEventListener('pointerup', function(e) { onUp(e, cv, pn); });
-  cv.addEventListener('pointercancel', function() { isDrawing = false; currentStroke = null; });
+  cv.addEventListener('pointercancel', function() { isDrawing = false; currentStroke = null; activeCv = null; });
 }
 
 function canvasPoint(e, cv) {
@@ -281,6 +282,7 @@ function onDown(e, cv, pn) {
   e.preventDefault();
   cv.setPointerCapture(e.pointerId);
   isDrawing = true;
+  activeCv = cv;
   var pt = canvasPoint(e, cv);
 
   if (tool === 'text') {
@@ -304,21 +306,25 @@ function onDown(e, cv, pn) {
 function onMove(e, cv, pn) {
   if (!isDrawing || !currentStroke || tool === 'pan') return;
   e.preventDefault();
-  var pt = canvasPoint(e, cv);
+  var targetPn = currentStroke.page;
+  var targetCv = activeCv || cv;
+  var pt = canvasPoint(e, targetCv);
   currentStroke.points.push(pt);
-  redrawPage(pn);
-  drawStroke(pageCanvases[pn].ann.getContext('2d'), currentStroke);
+  redrawPage(targetPn);
+  drawStroke(pageCanvases[targetPn].ann.getContext('2d'), currentStroke);
 }
 
 function onUp(e, cv, pn) {
-  if (!isDrawing || !currentStroke) { isDrawing = false; return; }
+  if (!isDrawing || !currentStroke) { isDrawing = false; activeCv = null; return; }
   isDrawing = false;
+  var targetPn = currentStroke.page;
   if (currentStroke.points.length > 0) {
     annotations.push(Object.assign({}, currentStroke, { points: currentStroke.points.slice() }));
     isDirty = true;
   }
   currentStroke = null;
-  redrawPage(pn);
+  activeCv = null;
+  redrawPage(targetPn);
 }
 
 /* ── Text input overlay ── */
