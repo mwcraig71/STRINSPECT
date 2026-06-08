@@ -287,7 +287,7 @@ function canvasPoint(e, cv) {
   //   - area.scrollTop / scrollLeft (always in visual px)
   //   - the page's layout offset captured at render time while un-zoomed
   //   - zoomLevel, which we control directly
-  // CSS `zoom: z` scales the whole content uniformly, so a page captured at
+  // CSS zoom scales the whole content uniformly, so a page captured at
   // un-zoomed top T sits at visual top (T * z) within the scroll content. We
   // never read the scrolled/zoomed child's getBoundingClientRect, which is what
   // produced wrong coordinates (stroke offset below the finger; wrong place when
