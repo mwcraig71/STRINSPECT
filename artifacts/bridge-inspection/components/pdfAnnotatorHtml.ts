@@ -146,6 +146,7 @@ var pdfDoc = null;
 var pageCount = 0;
 var pageCanvases = {};
 var pageDimensions = {}; // keyed by page number → {w, h} canvas pixel dimensions
+var pageLayout = {}; // keyed by page number → un-zoomed {top, left, w, h} layout offsets within #scroll-area
 var isDrawing = false;
 var activeCv = null;
 var pdfInitStarted = false;
@@ -258,6 +259,11 @@ async function renderAllPages() {
     zoomWrap.appendChild(wrap);
     pageCanvases[pn] = { pdf: pdfCv, ann: annCv };
     pageDimensions[pn] = { w: vp.width, h: vp.height };
+    // Capture the page's layout offsets while un-zoomed (zoomLevel is 1.0 during
+    // initial render). These stable, reliable values let canvasPoint() compute
+    // touch coordinates without ever reading the scrolled/zoomed child's own
+    // getBoundingClientRect, which is unreliable on iOS WKWebView under CSS zoom.
+    pageLayout[pn] = { top: wrap.offsetTop, left: wrap.offsetLeft, w: wrap.offsetWidth, h: wrap.offsetHeight };
 
     var ctx = pdfCv.getContext('2d');
     await page.render({ canvasContext: ctx, viewport: vp }).promise;
@@ -274,22 +280,29 @@ function wireCanvas(cv, pn) {
 }
 
 function canvasPoint(e, cv) {
-  // Default (un-zoomed) path: derive coordinates from the stable scroll
-  // container rect + scrollTop + the page's layout offset, never from the
-  // scrolled child's own getBoundingClientRect (which can report a stale,
-  // unscrolled top inside an iOS WKWebView scroll layer and offset the stroke
-  // by the scroll distance). The page-wrap is laid out 1:1 with the canvas
-  // buffer, so no extra scaling is needed.
-  if (Math.abs(zoomLevel - 1) < 0.001) {
-    var area = document.getElementById('scroll-area');
-    var wrap = cv.parentNode; // .page-wrap
-    if (area && wrap && wrap.offsetWidth > 0 && wrap.offsetHeight > 0) {
-      var ar = area.getBoundingClientRect();
-      var xc = (e.clientX - ar.left) - wrap.offsetLeft;
-      var yc = (e.clientY - ar.top) + area.scrollTop - wrap.offsetTop;
-      return [xc * (cv.width / wrap.offsetWidth), yc * (cv.height / wrap.offsetHeight)];
-    }
+  // Compute the canvas-buffer point purely from values that are reliable on iOS
+  // WKWebView at ANY zoom level:
+  //   - #scroll-area's own bounding rect (the container is never zoomed/scrolled
+  //     in a composited layer, so its rect is accurate)
+  //   - area.scrollTop / scrollLeft (always in visual px)
+  //   - the page's layout offset captured at render time while un-zoomed
+  //   - zoomLevel, which we control directly
+  // CSS `zoom: z` scales the whole content uniformly, so a page captured at
+  // un-zoomed top T sits at visual top (T * z) within the scroll content. We
+  // never read the scrolled/zoomed child's getBoundingClientRect, which is what
+  // produced wrong coordinates (stroke offset below the finger; wrong place when
+  // zoomed) on iOS WKWebView.
+  var area = document.getElementById('scroll-area');
+  var pn = parseInt(cv.dataset.page, 10);
+  var L = pageLayout[pn];
+  if (area && L && L.w > 0 && L.h > 0) {
+    var ar = area.getBoundingClientRect();
+    var z = zoomLevel || 1;
+    var vx = (e.clientX - ar.left) + area.scrollLeft - L.left * z; // visual px from canvas left
+    var vy = (e.clientY - ar.top) + area.scrollTop - L.top * z;    // visual px from canvas top
+    return [(vx / z) * (cv.width / L.w), (vy / z) * (cv.height / L.h)];
   }
+  // Fallback (layout not captured yet): rect-based mapping.
   var r = cv.getBoundingClientRect();
   var sx = cv.width / r.width;
   var sy = cv.height / r.height;
@@ -364,7 +377,7 @@ function showTextInput(clientX, clientY, pn) {
     inp.removeEventListener('keydown', onKey);
     inp.removeEventListener('blur', onBlur);
     if (txt) {
-      annotations.push({ type:'text', page: textPendingPage, x: textPendingX, y: textPendingY, text: txt, fontSize: penSize * 4 + 10, color: penColor });
+      annotations.push({ type:'text', page: textPendingPage, x: textPendingX, y: textPendingY, text: txt, fontSize: (penSize * 4 + 10) * 0.25, color: penColor });
       isDirty = true;
       redrawPage(textPendingPage);
     }
