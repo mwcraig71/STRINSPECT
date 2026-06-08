@@ -16,6 +16,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useInspection } from "@/context/InspectionContext";
 import { useListSessions, getListSessionsQueryKey } from "@workspace/api-client-react";
@@ -33,6 +34,7 @@ function formatRelativeTime(iso: string): string {
 
 export default function BridgesScreen() {
   const c = useColors();
+  const insets = useSafeAreaInsets();
   const {
     structureNumber,
     setStructureNumber,
@@ -282,7 +284,7 @@ export default function BridgesScreen() {
         />
       )}
 
-      <View style={[styles.header, { backgroundColor: c.headerBg }]}>
+      <View style={[styles.header, { backgroundColor: c.headerBg, paddingTop: Platform.OS === "web" ? 67 : insets.top }]}>
         <View style={styles.headerRow}>
           <View style={styles.headerLeft}>
             <Feather name="layers" size={16} color="#38bdf8" />

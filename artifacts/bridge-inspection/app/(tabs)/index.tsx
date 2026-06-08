@@ -18,6 +18,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { lookupCS } from "@/data/csDescriptions";
 
 import { useColors } from "@/hooks/useColors";
@@ -49,6 +50,7 @@ const CS_COLORS: Record<string, string> = {
 
 export default function InspectionScreen() {
   const c = useColors();
+  const insets = useSafeAreaInsets();
   const {
     inspectionType,
     setInspectionType,
@@ -197,7 +199,7 @@ export default function InspectionScreen() {
   return (
     <View style={[styles.container, { backgroundColor: c.background }]}>
       {/* ── App Header ── */}
-      <View style={[styles.appHeader, { backgroundColor: c.headerBg }]}>
+      <View style={[styles.appHeader, { backgroundColor: c.headerBg, paddingTop: Platform.OS === "web" ? 67 : insets.top }]}>
         <View style={styles.headerRow}>
           <View style={styles.headerTitle}>
             <TouchableOpacity

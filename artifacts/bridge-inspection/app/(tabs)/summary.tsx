@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
 import { useInspection, INSPECTION_TYPES } from "@/context/InspectionContext";
@@ -25,6 +26,7 @@ const CS_COLORS = {
 
 export default function SummaryScreen() {
   const c = useColors();
+  const insets = useSafeAreaInsets();
   const {
     elementSummary,
     maintenanceSummary,
@@ -67,7 +69,7 @@ export default function SummaryScreen() {
   return (
     <View style={[styles.container, { backgroundColor: c.background }]}>
       {/* Slim Header */}
-      <View style={[styles.header, { backgroundColor: c.headerBg }]}>
+      <View style={[styles.header, { backgroundColor: c.headerBg, paddingTop: Platform.OS === "web" ? 67 : insets.top }]}>
         <View style={styles.headerRow}>
           <View style={styles.headerInner}>
             <Feather name="list" size={16} color="#38bdf8" />

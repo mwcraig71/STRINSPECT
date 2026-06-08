@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
 import { useInspection, ENVIRONMENTS, INSPECTION_TYPES } from "@/context/InspectionContext";
@@ -27,6 +28,7 @@ const RATING_COLOR = (rating: string): string => {
 
 export default function NBIScreen() {
   const c = useColors();
+  const insets = useSafeAreaInsets();
   const {
     nbiRatings,
     updateSubComponent,
@@ -60,7 +62,7 @@ export default function NBIScreen() {
   return (
     <View style={[styles.container, { backgroundColor: c.background }]}>
       {/* Slim Header */}
-      <View style={[styles.header, { backgroundColor: c.headerBg }]}>
+      <View style={[styles.header, { backgroundColor: c.headerBg, paddingTop: Platform.OS === "web" ? 67 : insets.top }]}>
         <View style={styles.headerRow}>
           <View style={styles.headerTitle}>
             <Feather name="bar-chart-2" size={16} color="#38bdf8" />
