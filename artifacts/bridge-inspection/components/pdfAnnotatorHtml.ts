@@ -10,21 +10,21 @@ export function getPdfAnnotatorHtml(): string {
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=4.0, user-scalable=yes">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=4.0, user-scalable=yes, viewport-fit=cover">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;overflow:hidden;height:100vh}
-#topbar{position:fixed;top:0;left:0;right:0;z-index:200;height:48px;background:#0f172a;border-bottom:1px solid #334155;display:flex;align-items:center;justify-content:space-between;padding:0 12px;gap:8px}
+#topbar{position:fixed;top:0;left:0;right:0;z-index:200;height:calc(48px + env(safe-area-inset-top));background:#0f172a;border-bottom:1px solid #334155;display:flex;align-items:center;justify-content:space-between;padding:env(safe-area-inset-top) 12px 0;gap:8px}
 #page-info{color:#94a3b8;font-size:12px;font-weight:700;flex:1}
 .top-btn{background:#1e293b;border:1.5px solid #334155;border-radius:8px;color:#94a3b8;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap}
 .top-btn.save{background:#0284c7;border-color:#0369a1;color:#fff}
-#scroll-area{position:absolute;top:48px;bottom:100px;left:0;right:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;background:#1e293b}
+#scroll-area{position:absolute;top:calc(48px + env(safe-area-inset-top));bottom:100px;left:0;right:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;background:#1e293b}
 #scroll-area.drawing{overflow:hidden}
 .page-wrap{position:relative;margin:12px auto;display:block;box-shadow:0 4px 24px rgba(0,0,0,.6)}
 .pdf-canvas{display:block;width:100%}
-.ann-canvas{position:absolute;top:0;left:0;width:100%;height:100%;touch-action:none}
-.ann-canvas.draw-active{cursor:crosshair}
-#toolbar{position:fixed;bottom:0;left:0;right:0;z-index:200;background:#0f172a;border-top:1px solid #334155;padding:8px 10px 12px;display:flex;flex-direction:column;gap:7px}
+.ann-canvas{position:absolute;top:0;left:0;width:100%;height:100%}
+.ann-canvas.draw-active{cursor:crosshair;touch-action:none}
+#toolbar{position:fixed;bottom:0;left:0;right:0;z-index:200;background:#0f172a;border-top:1px solid #334155;padding:8px 10px calc(12px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:7px}
 #tool-row{display:flex;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch}
 #opt-row{display:flex;gap:6px;align-items:center;overflow-x:auto;-webkit-overflow-scrolling:touch;min-height:32px}
 .tbtn{background:#1e293b;border:1.5px solid #334155;border-radius:10px;color:#94a3b8;padding:7px 11px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap;flex-shrink:0;-webkit-user-select:none;user-select:none}
