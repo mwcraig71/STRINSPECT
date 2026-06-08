@@ -22,8 +22,8 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
 #scroll-area.drawing{overflow:hidden}
 .page-wrap{position:relative;margin:12px auto;display:block;box-shadow:0 4px 24px rgba(0,0,0,.6)}
 .pdf-canvas{display:block;width:100%}
-.ann-canvas{position:absolute;top:0;left:0;width:100%;height:100%}
-.ann-canvas.draw-active{cursor:crosshair;touch-action:none}
+.ann-canvas{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
+.ann-canvas.draw-active{cursor:crosshair;touch-action:none;pointer-events:auto}
 #toolbar{position:fixed;bottom:0;left:0;right:0;z-index:200;background:#0f172a;border-top:1px solid #334155;padding:8px 10px calc(12px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:7px}
 #tool-row{display:flex;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch}
 #opt-row{display:flex;gap:6px;align-items:center;overflow-x:auto;-webkit-overflow-scrolling:touch;min-height:32px}
@@ -59,7 +59,7 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
   </div>
 </div>
 
-<div id="scroll-area"></div>
+<div id="scroll-area"><div id="zoom-wrap"></div></div>
 
 <div id="toolbar" style="display:none">
   <div id="tool-row">
@@ -68,6 +68,10 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
     <button class="tbtn" id="btn-highlight">&#128397; Highlight</button>
     <button class="tbtn" id="btn-text">T&nbsp;Text</button>
     <button class="tbtn" id="btn-undo">&#8617; Undo</button>
+    <div style="flex:1"></div>
+    <button class="tbtn" id="btn-zoom-out">&#8722;</button>
+    <span id="zoom-label" style="color:#94a3b8;font-size:12px;font-weight:700;padding:0 4px;min-width:38px;text-align:center;flex-shrink:0">100%</span>
+    <button class="tbtn" id="btn-zoom-in">&#43;</button>
   </div>
   <div id="opt-row"></div>
 </div>
@@ -149,6 +153,8 @@ var textPendingY = 0;
 
 var COLORS_PEN = ['#ef4444','#0f172a','#2563eb'];
 var SIZES = [2,4,8];
+var zoomLevel = 1.0;
+var ZOOM_STEPS = [0.5,0.75,1.0,1.25,1.5,2.0,2.5,3.0];
 
 /* ── RN bridge ── */
 function postRN(msg) {
@@ -175,6 +181,8 @@ document.getElementById('btn-pen').onclick = function() { setTool('pen'); };
 document.getElementById('btn-highlight').onclick = function() { setTool('highlight'); };
 document.getElementById('btn-text').onclick = function() { setTool('text'); };
 document.getElementById('btn-undo').onclick = undoLast;
+document.getElementById('btn-zoom-in').onclick = zoomIn;
+document.getElementById('btn-zoom-out').onclick = zoomOut;
 
 /* ── Receive init message ── */
 function onMsg(e) {
@@ -214,7 +222,8 @@ async function loadPdf(base64Uri) {
 
 async function renderAllPages() {
   var area = document.getElementById('scroll-area');
-  area.innerHTML = '';
+  var zoomWrap = document.getElementById('zoom-wrap');
+  zoomWrap.innerHTML = '';
   var vw = area.clientWidth || window.innerWidth;
   for (var pn = 1; pn <= pageCount; pn++) {
     setLoadTxt('Rendering page ' + pn + ' of ' + pageCount + '\u2026');
@@ -242,7 +251,7 @@ async function renderAllPages() {
 
     wrap.appendChild(pdfCv);
     wrap.appendChild(annCv);
-    area.appendChild(wrap);
+    zoomWrap.appendChild(wrap);
     pageCanvases[pn] = { pdf: pdfCv, ann: annCv };
     pageDimensions[pn] = { w: vp.width, h: vp.height };
 
@@ -389,6 +398,22 @@ function replayAnnotations() {
   var pages = {};
   for (var i = 0; i < annotations.length; i++) pages[annotations[i].page] = true;
   Object.keys(pages).forEach(function(p) { redrawPage(parseInt(p,10)); });
+}
+
+/* ── Zoom ── */
+function applyZoom() {
+  document.getElementById('zoom-wrap').style.zoom = zoomLevel;
+  document.getElementById('zoom-label').textContent = Math.round(zoomLevel * 100) + '%';
+}
+function zoomIn() {
+  for (var i = 0; i < ZOOM_STEPS.length; i++) {
+    if (ZOOM_STEPS[i] > zoomLevel + 0.01) { zoomLevel = ZOOM_STEPS[i]; applyZoom(); return; }
+  }
+}
+function zoomOut() {
+  for (var i = ZOOM_STEPS.length - 1; i >= 0; i--) {
+    if (ZOOM_STEPS[i] < zoomLevel - 0.01) { zoomLevel = ZOOM_STEPS[i]; applyZoom(); return; }
+  }
 }
 
 /* ── Undo ── */
