@@ -135,11 +135,13 @@ router.put(
   },
 );
 
-// GET is intentionally public (read-only; web dashboard fetches through Vite proxy
-// which adds auth in dev; making it readable is explicit policy for this endpoint).
+// Auth parity with the write routes: inspection PDFs are sensitive and addressed
+// by a guessable structure number, so the download requires the API key too.
+// `requireApiKey` no-ops when API_KEY is unset (same posture as POST/PUT). The web
+// dashboard fetches through the Vite proxy, which injects the Bearer token.
 // NOTE: endpoint uses PUT /sessions/pdf/:structureNumber (raw body) rather than the
 // originally specified multipart POST — mobile and server are internally consistent.
-router.get("/sessions/pdf/:structureNumber", async (req, res) => {
+router.get("/sessions/pdf/:structureNumber", requireApiKey, async (req, res) => {
   const structureNumber = String(req.params["structureNumber"] ?? "");
   if (!structureNumber) {
     res.status(400).json({ error: "structureNumber is required" });
@@ -204,7 +206,9 @@ router.put(
   },
 );
 
-router.get("/sessions/photos/:structureNumber/:photoId", async (req, res) => {
+// Auth parity with the write routes (same posture as the PDF download above):
+// inspection photos are sensitive and addressed by guessable identifiers.
+router.get("/sessions/photos/:structureNumber/:photoId", requireApiKey, async (req, res) => {
   const structureNumber = String(req.params["structureNumber"] ?? "");
   const photoId = String(req.params["photoId"] ?? "");
   if (!structureNumber || !photoId) {
