@@ -165,6 +165,7 @@ var COLORS_PEN = ['#ef4444','#2563eb'];
 var SIZES = [2,4,8];
 var zoomLevel = 1.0;
 var ZOOM_STEPS = [0.5,0.75,1.0,1.25,1.5,2.0,2.5,3.0];
+var annScale = 1; // hi-res supersample factor for the annotation canvas (matches RENDER_SCALE)
 
 /* ── RN bridge ── */
 function postRN(msg) {
@@ -274,6 +275,7 @@ async function renderAllPages() {
   // text stays sharp when magnified with CSS zoom (max 3x). Fewer pages can
   // afford a higher factor; cap memory on long documents.
   var RENDER_SCALE = pageCount > 6 ? 2 : 3;
+  annScale = RENDER_SCALE;
   for (var pn = 1; pn <= pageCount; pn++) {
     setLoadTxt('Rendering page ' + pn + ' of ' + pageCount + '\u2026');
     var page = await pdfDoc.getPage(pn);
@@ -295,8 +297,12 @@ async function renderAllPages() {
 
     var annCv = document.createElement('canvas');
     annCv.className = 'ann-canvas';
-    annCv.width = vp.width;
-    annCv.height = vp.height;
+    // Hi-res backing (same density as the PDF bitmap) keeps drawn ink and text
+    // crisp under CSS zoom; CSS width/height:100% displays it at the page's
+    // on-screen size. Drawing coordinates stay in CSS (vp) space — the context
+    // is scaled by annScale at draw time (see redrawPage).
+    annCv.width = rvp.width;
+    annCv.height = rvp.height;
     annCv.dataset.page = pn;
 
     wrap.appendChild(pdfCv);
@@ -345,12 +351,15 @@ function canvasPoint(e, cv) {
     var z = zoomLevel || 1;
     var vx = (e.clientX - ar.left) + area.scrollLeft - L.left * z; // visual px from canvas left
     var vy = (e.clientY - ar.top) + area.scrollTop - L.top * z;    // visual px from canvas top
-    return [(vx / z) * (cv.width / L.w), (vy / z) * (cv.height / L.h)];
+    // Return CSS (vp) logical coordinates; the annotation context is scaled by
+    // annScale at draw time, so coords stay independent of the hi-res backing.
+    return [vx / z, vy / z];
   }
-  // Fallback (layout not captured yet): rect-based mapping.
+  // Fallback (layout not captured yet): rect-based mapping to CSS (vp) space.
   var r = cv.getBoundingClientRect();
-  var sx = cv.width / r.width;
-  var sy = cv.height / r.height;
+  var pd = pageDimensions[parseInt(cv.dataset.page, 10)] || { w: r.width, h: r.height };
+  var sx = pd.w / r.width;
+  var sy = pd.h / r.height;
   return [(e.clientX - r.left) * sx, (e.clientY - r.top) * sy];
 }
 
@@ -469,7 +478,12 @@ function redrawPage(pn) {
   var cs = pageCanvases[pn];
   if (!cs) return;
   var ctx = cs.ann.getContext('2d');
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, cs.ann.width, cs.ann.height);
+  // Scale the context so annotations authored in CSS (vp) coordinates render at
+  // the hi-res backing resolution. Transform persists for the live-draw path in
+  // onMove, which draws onto this same context right after redrawPage.
+  ctx.setTransform(annScale, 0, 0, annScale, 0, 0);
   for (var i = 0; i < annotations.length; i++) {
     var ann = annotations[i];
     if (ann.page !== pn) continue;
@@ -485,18 +499,28 @@ function replayAnnotations() {
 }
 
 /* ── Zoom ── */
-function applyZoom() {
+// Keep the content under the viewport center fixed across a zoom change so the
+// view does not jump to a different page. CSS zoom scales the scroll content
+// uniformly, so a point at un-zoomed offset O sits at visual offset O*z.
+function applyZoom(prevZoom) {
+  var area = document.getElementById('scroll-area');
+  var pz = prevZoom || zoomLevel || 1;
+  var vh = area.clientHeight, vw = area.clientWidth;
+  var cy = (area.scrollTop + vh / 2) / pz;  // un-zoomed content offset at viewport center
+  var cx = (area.scrollLeft + vw / 2) / pz;
   document.getElementById('zoom-wrap').style.zoom = zoomLevel;
   document.getElementById('zoom-label').textContent = Math.round(zoomLevel * 100) + '%';
+  area.scrollTop = cy * zoomLevel - vh / 2;
+  area.scrollLeft = cx * zoomLevel - vw / 2;
 }
 function zoomIn() {
   for (var i = 0; i < ZOOM_STEPS.length; i++) {
-    if (ZOOM_STEPS[i] > zoomLevel + 0.01) { zoomLevel = ZOOM_STEPS[i]; applyZoom(); return; }
+    if (ZOOM_STEPS[i] > zoomLevel + 0.01) { var p = zoomLevel; zoomLevel = ZOOM_STEPS[i]; applyZoom(p); return; }
   }
 }
 function zoomOut() {
   for (var i = ZOOM_STEPS.length - 1; i >= 0; i--) {
-    if (ZOOM_STEPS[i] < zoomLevel - 0.01) { zoomLevel = ZOOM_STEPS[i]; applyZoom(); return; }
+    if (ZOOM_STEPS[i] < zoomLevel - 0.01) { var p = zoomLevel; zoomLevel = ZOOM_STEPS[i]; applyZoom(p); return; }
   }
 }
 
