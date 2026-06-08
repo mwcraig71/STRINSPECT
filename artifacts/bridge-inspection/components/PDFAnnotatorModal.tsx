@@ -88,12 +88,43 @@ export default function PDFAnnotatorModal({ visible, pdfPath, annotations, onSav
     injectPdf();
   }, [injectPdf]);
 
+  const exportText = useCallback(async (text: string) => {
+    try {
+      const FileSystem = await import("expo-file-system/legacy");
+      const Sharing = await import("expo-sharing");
+      const dir = FileSystem.cacheDirectory ?? FileSystem.documentDirectory;
+      if (!dir) {
+        Alert.alert("Export Failed", "No writable storage location is available.");
+        return;
+      }
+      const fileUri = `${dir}annotations-${Date.now()}.txt`;
+      await FileSystem.writeAsStringAsync(fileUri, text, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: "text/plain",
+          UTI: "public.plain-text",
+          dialogTitle: "Export Annotation Text",
+        });
+      } else {
+        Alert.alert("Exported", `Text saved to:\n${fileUri}`);
+      }
+    } catch (err) {
+      Alert.alert(
+        "Export Failed",
+        err instanceof Error ? err.message : "Could not export text.",
+      );
+    }
+  }, []);
+
   const onMessage = useCallback((e: { nativeEvent: { data: string } }) => {
     try {
       const data = JSON.parse(e.nativeEvent.data) as {
         type: string;
         annotations?: unknown[];
         pageDimensions?: Record<string, { w: number; h: number }>;
+        text?: string;
       };
       if (data.type === "save") {
         const saved = Array.isArray(data.annotations) ? data.annotations : [];
@@ -112,9 +143,13 @@ export default function PDFAnnotatorModal({ visible, pdfPath, annotations, onSav
             { text: "Discard", style: "destructive", onPress: onClose },
           ],
         );
+      } else if (data.type === "export-text") {
+        exportText(data.text ?? "");
+      } else if (data.type === "export-empty") {
+        Alert.alert("Nothing to Export", "There is no typed text to export yet.");
       }
     } catch {}
-  }, [onSave, onClose]);
+  }, [onSave, onClose, exportText]);
 
   if (Platform.OS === "web") {
     return null;

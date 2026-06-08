@@ -25,9 +25,11 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
 .ann-canvas{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
 .ann-canvas.draw-active{cursor:crosshair;touch-action:none;pointer-events:auto}
 #toolbar{position:fixed;bottom:0;left:0;right:0;z-index:200;background:#0f172a;border-top:1px solid #334155;padding:8px 10px calc(12px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:7px}
-#tool-row{display:flex;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch}
-#opt-row{display:flex;gap:6px;align-items:center;overflow-x:auto;-webkit-overflow-scrolling:touch;min-height:32px}
-.tbtn{background:#1e293b;border:1.5px solid #334155;border-radius:10px;color:#94a3b8;padding:7px 11px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap;flex-shrink:0;-webkit-user-select:none;user-select:none}
+#tool-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.zoom-group{display:flex;gap:6px;align-items:center;margin-left:auto;flex-shrink:0}
+#zoom-label{color:#94a3b8;font-size:12px;font-weight:700;padding:0 2px;min-width:38px;text-align:center;flex-shrink:0}
+#opt-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-height:32px}
+.tbtn{background:#1e293b;border:1.5px solid #334155;border-radius:10px;color:#94a3b8;padding:7px 10px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap;flex-shrink:0;-webkit-user-select:none;user-select:none}
 .tbtn.active{border-color:#38bdf8;color:#38bdf8;background:rgba(56,189,248,.1)}
 .clr-dot{width:26px;height:26px;border-radius:50%;cursor:pointer;border:2px solid transparent;flex-shrink:0;transition:transform .1s}
 .clr-dot.active{border-color:#fff;transform:scale(1.25)}
@@ -54,6 +56,7 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
 <div id="topbar" style="display:none">
   <span id="page-info">Page 1 of ?</span>
   <div style="display:flex;gap:6px">
+    <button class="top-btn" id="btn-export">&#128196; Export</button>
     <button class="top-btn save" id="btn-save">&#128190; Save</button>
     <button class="top-btn" id="btn-close">&#10005; Close</button>
   </div>
@@ -65,13 +68,14 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
   <div id="tool-row">
     <button class="tbtn active" id="btn-pan">&#9997; Pan</button>
     <button class="tbtn" id="btn-pen">&#9998; Pen</button>
-    <button class="tbtn" id="btn-highlight">&#128397; Highlight</button>
+    <button class="tbtn" id="btn-highlight">&#128397; HL</button>
     <button class="tbtn" id="btn-text">T&nbsp;Text</button>
     <button class="tbtn" id="btn-undo">&#8617; Undo</button>
-    <div style="flex:1"></div>
-    <button class="tbtn" id="btn-zoom-out">&#8722;</button>
-    <span id="zoom-label" style="color:#94a3b8;font-size:12px;font-weight:700;padding:0 4px;min-width:38px;text-align:center;flex-shrink:0">100%</span>
-    <button class="tbtn" id="btn-zoom-in">&#43;</button>
+    <div class="zoom-group">
+      <button class="tbtn" id="btn-zoom-out">&#8722;</button>
+      <span id="zoom-label">100%</span>
+      <button class="tbtn" id="btn-zoom-in">&#43;</button>
+    </div>
   </div>
   <div id="opt-row"></div>
 </div>
@@ -154,7 +158,7 @@ var textPendingPage = 0;
 var textPendingX = 0;
 var textPendingY = 0;
 
-var COLORS_PEN = ['#ef4444','#0f172a','#2563eb'];
+var COLORS_PEN = ['#ef4444','#2563eb'];
 var SIZES = [2,4,8];
 var zoomLevel = 1.0;
 var ZOOM_STEPS = [0.5,0.75,1.0,1.25,1.5,2.0,2.5,3.0];
@@ -177,6 +181,39 @@ document.getElementById('btn-close').onclick = function() {
   } else {
     postRN({ type:'close' });
   }
+};
+
+function doExportText() {
+  var byPage = {};
+  for (var i = 0; i < annotations.length; i++) {
+    var a = annotations[i];
+    if (a.type === 'text' && a.text) {
+      if (!byPage[a.page]) byPage[a.page] = [];
+      byPage[a.page].push(a);
+    }
+  }
+  var pages = Object.keys(byPage).map(function(p){ return parseInt(p,10); }).sort(function(x,y){ return x - y; });
+  if (pages.length === 0) { postRN({ type:'export-empty' }); return; }
+  var lines = [];
+  pages.forEach(function(p) {
+    lines.push('Page ' + p + ':');
+    byPage[p].sort(function(a,b){ return (a.y - b.y) || (a.x - b.x); });
+    byPage[p].forEach(function(a){ lines.push('  ' + a.text); });
+    lines.push('');
+  });
+  postRN({ type:'export-text', text: lines.join('\\n') });
+}
+
+document.getElementById('btn-export').onclick = function() {
+  // If a text annotation is mid-edit, its value is only committed on blur
+  // (deferred 100ms). Blur first and wait so the latest text is included.
+  var wrap = document.getElementById('text-input-wrap');
+  if (wrap && wrap.style.display === 'block') {
+    document.getElementById('text-input').blur();
+    setTimeout(doExportText, 180);
+    return;
+  }
+  doExportText();
 };
 
 document.getElementById('btn-pan').onclick = function() { setTool('pan'); };
@@ -465,6 +502,8 @@ function undoLast() {
 /* ── Tool switching ── */
 function setTool(t) {
   tool = t;
+  // Text supports only Medium/Large; bump up if a thinner pen size was active.
+  if (t === 'text' && penSize < 4) penSize = 4;
   var ids = ['pan','pen','highlight','text'];
   for (var i = 0; i < ids.length; i++) {
     var b = document.getElementById('btn-' + ids[i]);
@@ -495,7 +534,7 @@ function renderOptRow() {
     COLORS_PEN.forEach(function(c) {
       var d = document.createElement('div');
       d.className = 'clr-dot' + (c === penColor ? ' active' : '');
-      d.style.background = c === '#0f172a' ? '#334155' : c;
+      d.style.background = c;
       d.style.border = '2px solid ' + (c === penColor ? '#fff' : 'transparent');
       d.onclick = function() { penColor = c; renderOptRow(); };
       row.appendChild(d);
@@ -506,13 +545,16 @@ function renderOptRow() {
   sep.className = 'sep';
   row.appendChild(sep);
 
-  var sizeLabels = ['S','M','L'];
-  SIZES.forEach(function(s,i) {
+  // Text offers only Medium and Large; pen/highlight keep Thin/Medium/Thick.
+  var sizeDefs = (tool === 'text')
+    ? [{ s:4, label:'M', title:'Medium font' }, { s:8, label:'L', title:'Large font' }]
+    : [{ s:2, label:'S', title:'Thin line' }, { s:4, label:'M', title:'Medium line' }, { s:8, label:'L', title:'Thick line' }];
+  sizeDefs.forEach(function(def) {
     var b = document.createElement('button');
-    b.className = 'sz-btn' + (s === penSize ? ' active' : '');
-    b.textContent = sizeLabels[i];
-    b.title = tool === 'text' ? ['Small','Medium','Large'][i] + ' font' : ['Thin','Medium','Thick'][i] + ' line';
-    b.onclick = function() { penSize = s; renderOptRow(); };
+    b.className = 'sz-btn' + (def.s === penSize ? ' active' : '');
+    b.textContent = def.label;
+    b.title = def.title;
+    b.onclick = function() { penSize = def.s; renderOptRow(); };
     row.appendChild(b);
   });
 }

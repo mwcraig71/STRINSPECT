@@ -61,6 +61,7 @@
     "expo-file-system": "^19.0.23",
     "expo-image-manipulator": "^14.0.8",
     "expo-network": "^56.0.4",
+    "expo-sharing": "~14.0.8",
     "pdfjs-dist": "4.4.168",
     "react-native-webview": "^13.16.1"
   }

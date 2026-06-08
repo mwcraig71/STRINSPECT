@@ -12,6 +12,7 @@
 - [Bridge API auth model](bridge-api-auth.md) — requireApiKey no-ops without API_KEY; binary PDF/photo GETs need auth parity; web authenticates via Vite proxy Bearer injection.
 - [TS project references stale dist](ts-project-refs-stale.md) — after editing a workspace lib's source, run `tsc -p tsconfig.json` in that lib to regenerate dist/ d.ts or downstream packages see stale types.
 - [Orval zod codegen barrel conflict](orval-zod-codegen.md) — orval overwrites workspace-root index.ts in split mode; use mode:"single" + absolute target path to avoid it.
+- [Metro stale-cache phantom errors](metro-stale-cache.md) — if Metro reports a SyntaxError that tsc/@babel/parser accept, it's stale cache at /tmp/metro-cache + /tmp/metro-file-map-*, not node_modules/.cache.
 - [pdfAnnotatorHtml template literal](pdfannotator-template-literal.md) — the whole annotator file is one backtick string; never put a backtick or `${` in its comments/HTML or the Expo bundle breaks.
 - [WebView init message fires twice](webview-double-message.md) — RN dispatches init to window+document, both handlers fire; guard async setup or interleaved renders cause "every other page" canvas bugs.
 - [iOS WebView canvas touch offset](webview-scroll-coordinate-offset.md) — `-webkit-overflow-scrolling:touch` makes getBoundingClientRect ignore scroll; canvas draw lands offset by scroll distance. Remove the property.
