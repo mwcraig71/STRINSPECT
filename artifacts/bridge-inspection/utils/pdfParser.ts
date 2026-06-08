@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import * as pdfjsLib from "pdfjs-dist";
 import * as pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.mjs";
 
@@ -99,15 +100,37 @@ export interface ParsedChannelCrossSection {
 
 type PdfSource = File | { uri: string };
 
-async function loadPdfText(source: PdfSource): Promise<string[][]> {
-  let data: ArrayBuffer;
+// Read the raw PDF bytes from a source. Reading a LOCAL file is the part that
+// differs by platform: on React Native (Android/iOS) `fetch(fileUri)` does NOT
+// reliably return the file's bytes — it silently yields corrupt/empty data,
+// which pdf.js then reports as "Invalid PDF structure". So on native we read via
+// expo-file-system and decode the base64 ourselves (atob is available in the
+// Expo runtime). On web, fetch() reads file/blob/http URLs correctly.
+async function readPdfBytes(source: PdfSource): Promise<ArrayBuffer | Uint8Array> {
   if (typeof File !== "undefined" && source instanceof File) {
-    data = await source.arrayBuffer();
-  } else {
-    const s = source as { uri: string };
-    const response = await fetch(s.uri);
-    data = await response.arrayBuffer();
+    return source.arrayBuffer();
   }
+
+  const { uri } = source as { uri: string };
+
+  // Inline data: URIs carry the bytes directly — decode regardless of platform.
+  if (uri.startsWith("data:")) {
+    const b64 = uri.slice(uri.indexOf(",") + 1);
+    return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  }
+
+  if (Platform.OS === "web") {
+    const response = await fetch(uri);
+    return response.arrayBuffer();
+  }
+
+  const FS = await import("expo-file-system/legacy");
+  const b64 = await FS.readAsStringAsync(uri, { encoding: FS.EncodingType.Base64 });
+  return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+}
+
+async function loadPdfText(source: PdfSource): Promise<string[][]> {
+  const data = await readPdfBytes(source);
 
   const pdf = await pdfjsLib.getDocument({ data }).promise;
   const allPages: string[][] = [];
