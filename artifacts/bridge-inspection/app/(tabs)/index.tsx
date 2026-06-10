@@ -18,6 +18,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { lookupCS } from "@/data/csDescriptions";
@@ -52,6 +53,8 @@ const CS_COLORS: Record<string, string> = {
 export default function InspectionScreen() {
   const c = useColors();
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
+  const isTabletLayout = screenWidth >= 768;
   const {
     inspectionType,
     setInspectionType,
@@ -325,13 +328,18 @@ export default function InspectionScreen() {
       </Modal>
 
       {/* ── TxDOT module menu (hamburger dropdown) ── */}
-      {moduleMenuOpen && (
-        <>
-          <Pressable
-            style={styles.menuBackdrop}
-            onPress={() => setModuleMenuOpen(false)}
-          />
-          <View style={[styles.menuDropdown, { backgroundColor: c.card, borderColor: c.border }]}>
+      <Modal
+        visible={moduleMenuOpen}
+        transparent
+        animationType="none"
+        statusBarTranslucent
+        onRequestClose={() => setModuleMenuOpen(false)}
+      >
+        <Pressable
+          style={styles.menuBackdrop}
+          onPress={() => setModuleMenuOpen(false)}
+        />
+          <View style={[styles.menuDropdown, { backgroundColor: c.card, borderColor: c.border, left: isTabletLayout ? Math.round(screenWidth / 2) + 12 : 12 }]}>
             <Text style={[styles.menuHeading, { color: c.mutedForeground }]}>General</Text>
             <TouchableOpacity
               style={styles.menuItem}
@@ -423,8 +431,7 @@ export default function InspectionScreen() {
               </>
             )}
           </View>
-        </>
-      )}
+      </Modal>
 
       <KeyboardAwareScrollViewCompat
         style={styles.scroll}

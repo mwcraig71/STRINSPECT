@@ -1,10 +1,11 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   Platform,
+  PanResponder,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
@@ -17,10 +18,49 @@ interface Props {
   children: React.ReactNode;
 }
 
+const MIN_RATIO = 0.15;
+const MAX_RATIO = 0.82;
+const DEFAULT_RATIO = 0.45;
+
 export function TabletSplitLayout({ children }: Props) {
   const isTablet = useIsTablet();
   const { importedPdfPath, importFromPdf, pdfAnnotations, setPdfAnnotations } = useInspection();
   const [pdfExpanded, setPdfExpanded] = useState(false);
+  const [splitRatio, setSplitRatioState] = useState(DEFAULT_RATIO);
+  const splitRatioRef = useRef(DEFAULT_RATIO);
+  const totalWidthRef = useRef(0);
+  const dragStartRatioRef = useRef(DEFAULT_RATIO);
+
+  const setSplitRatio = (v: number) => {
+    splitRatioRef.current = v;
+    setSplitRatioState(v);
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        dragStartRatioRef.current = splitRatioRef.current;
+      },
+      onPanResponderMove: (_, gs) => {
+        if (totalWidthRef.current === 0) return;
+        const next = Math.max(MIN_RATIO, Math.min(MAX_RATIO,
+          dragStartRatioRef.current + gs.dx / totalWidthRef.current,
+        ));
+        splitRatioRef.current = next;
+        setSplitRatioState(next);
+      },
+      onPanResponderRelease: (_, gs) => {
+        if (totalWidthRef.current === 0) return;
+        const next = Math.max(MIN_RATIO, Math.min(MAX_RATIO,
+          dragStartRatioRef.current + gs.dx / totalWidthRef.current,
+        ));
+        splitRatioRef.current = next;
+        setSplitRatioState(next);
+      },
+    }),
+  ).current;
 
   const handleImportPress = useCallback(async () => {
     try {
@@ -39,15 +79,21 @@ export function TabletSplitLayout({ children }: Props) {
     return <>{children}</>;
   }
 
+  const pdfFlex = pdfExpanded ? 1 : splitRatio;
+  const inspFlex = pdfExpanded ? 0 : 1 - splitRatio;
+
   return (
-    <View style={styles.root}>
+    <View
+      style={styles.root}
+      onLayout={(e) => { totalWidthRef.current = e.nativeEvent.layout.width; }}
+    >
       {/* ── PDF panel ── */}
-      <View style={[styles.pdfPanel, pdfExpanded && styles.pdfPanelExpanded]}>
+      <View style={[styles.pdfPanel, { flex: pdfFlex }]}>
         {/* Panel header */}
         <View style={styles.panelHeader}>
           <Feather name="file-text" size={13} color="#94a3b8" />
           <Text style={styles.panelTitle} numberOfLines={1}>
-            {importedPdfPath ? "Previous Report" : "Previous Report"}
+            Previous Report
           </Text>
           <TouchableOpacity
             style={styles.expandBtn}
@@ -71,13 +117,32 @@ export function TabletSplitLayout({ children }: Props) {
         />
       </View>
 
-      {/* ── Divider ── */}
-      {!pdfExpanded && <View style={styles.divider} />}
+      {/* ── Draggable divider ── */}
+      {!pdfExpanded && (
+        <View
+          style={[
+            styles.dividerContainer,
+            Platform.OS === "web" && ({ cursor: "col-resize" } as never),
+          ]}
+          {...panResponder.panHandlers}
+        >
+          <View style={styles.dividerTrack} />
+          <View style={styles.dividerGrip}>
+            <View style={styles.gripDot} />
+            <View style={styles.gripDot} />
+            <View style={styles.gripDot} />
+            <View style={styles.gripDot} />
+            <View style={styles.gripDot} />
+          </View>
+          <View style={styles.dividerTrack} />
+        </View>
+      )}
 
       {/* ── Inspection panel ── */}
       <View
         style={[
           styles.inspectionPanel,
+          { flex: inspFlex },
           pdfExpanded && styles.inspectionPanelHidden,
         ]}
         pointerEvents={pdfExpanded ? "none" : "auto"}
@@ -95,12 +160,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#0f172a",
   },
   pdfPanel: {
-    flex: 0.5,
     minWidth: 0,
     backgroundColor: "#0f172a",
-  },
-  pdfPanelExpanded: {
-    flex: 1,
   },
   panelHeader: {
     height: 40,
@@ -126,14 +187,36 @@ const styles = StyleSheet.create({
   pdfViewer: {
     flex: 1,
   },
-  divider: {
-    width: 1,
+  dividerContainer: {
+    width: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#0f172a",
+    zIndex: 10,
+  },
+  dividerTrack: {
+    flex: 1,
+    width: 2,
     backgroundColor: "#1e293b",
+    borderRadius: 1,
+  },
+  dividerGrip: {
+    paddingVertical: 10,
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "#1e293b",
+    borderRadius: 6,
+    paddingHorizontal: 5,
+    marginVertical: 2,
+  },
+  gripDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#475569",
   },
   inspectionPanel: {
-    flex: 0.5,
     minWidth: 0,
-    overflow: "hidden",
   },
   inspectionPanelHidden: {
     flex: 0,
