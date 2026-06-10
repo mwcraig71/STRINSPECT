@@ -5,7 +5,7 @@ import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import { SymbolView } from "expo-symbols";
 import { Feather } from "@expo/vector-icons";
 import React from "react";
-import { Platform, StyleSheet, View, useColorScheme } from "react-native";
+import { Platform, StyleSheet, Text, View, useColorScheme } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
 import { InspectionProvider, useInspection } from "@/context/InspectionContext";
@@ -13,7 +13,7 @@ import { SyncToast } from "@/components/SyncToast";
 import { useAutoSync } from "@/hooks/useAutoSync";
 import { TabletSplitLayout } from "@/components/TabletSplitLayout";
 
-function NativeTabLayout() {
+function NativeTabLayout({ missingPhotoCount }: { missingPhotoCount: number }) {
   return (
     <NativeTabs>
       <NativeTabs.Trigger name="bridges">
@@ -33,12 +33,38 @@ function NativeTabLayout() {
         <Label>Summary</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="photos">
-        <Icon sf={{ default: "camera", selected: "camera.fill" }} />
+        <View style={nativeBadgeStyles.iconWrap}>
+          <Icon sf={{ default: "camera", selected: "camera.fill" }} />
+          {missingPhotoCount > 0 && (
+            <View style={nativeBadgeStyles.badge}>
+              <Text style={nativeBadgeStyles.badgeText}>
+                {missingPhotoCount > 99 ? "99+" : missingPhotoCount}
+              </Text>
+            </View>
+          )}
+        </View>
         <Label>Photos</Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );
 }
+
+const nativeBadgeStyles = StyleSheet.create({
+  iconWrap: { position: "relative", alignItems: "center", justifyContent: "center" },
+  badge: {
+    position: "absolute",
+    top: -4,
+    right: -8,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: "#f59e0b",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 3,
+  },
+  badgeText: { color: "#fff", fontSize: 9, fontWeight: "700", lineHeight: 13 },
+});
 
 
 function ClassicTabLayoutWithSync({ pendingCount, missingPhotoCount }: { pendingCount: number; missingPhotoCount: number }) {
@@ -145,7 +171,7 @@ function TabContent() {
   const { standardPhotos } = useInspection();
   const missingPhotoCount = standardPhotos.filter((s) => !s.photoUri).length;
   const tabNav = isLiquidGlassAvailable()
-    ? <NativeTabLayout />
+    ? <NativeTabLayout missingPhotoCount={missingPhotoCount} />
     : <ClassicTabLayoutWithSync pendingCount={pendingCount} missingPhotoCount={missingPhotoCount} />;
   return (
     <TabletSplitLayout>
