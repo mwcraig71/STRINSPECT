@@ -2606,6 +2606,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
 
   const importFromPdf = useCallback(
     async (source: File | { uri: string; name?: string }) => {
+      // Wipe previous session immediately so the screen is blank while parsing
+      clearInspection();
       setParsingActive(true);
       try {
         const {
@@ -2619,36 +2621,6 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         if (parsedNum) {
           setStructureNumber(parsedNum);
         }
-
-        // ── Clear previous session so the new bridge starts with a clean slate ──
-        setNbiRatingsState(INITIAL_NBI_RATINGS);
-        AsyncStorage.setItem(STORAGE_KEYS.NBI_RATINGS, JSON.stringify(INITIAL_NBI_RATINGS)).catch(() => {});
-        setCifData(INITIAL_CIF);
-        setUnderclearanceDataState(INITIAL_UNDERCLEARANCE);
-        AsyncStorage.setItem(STORAGE_KEYS.UNDERCLEARANCE, JSON.stringify(INITIAL_UNDERCLEARANCE)).catch(() => {});
-        setChannelDataState(INITIAL_CHANNEL);
-        AsyncStorage.setItem(STORAGE_KEYS.CHANNEL, JSON.stringify(INITIAL_CHANNEL)).catch(() => {});
-        setSnbiDataState(INITIAL_SNBI);
-        AsyncStorage.removeItem(STORAGE_KEYS.SNBI).catch(() => {});
-        setSteelPipePileDataState(INITIAL_STEEL_PIPE_PILE);
-        AsyncStorage.removeItem(STORAGE_KEYS.STEEL_PIPE_PILE).catch(() => {});
-        AsyncStorage.removeItem(STORAGE_KEYS.SAFETY_BRIEFING).catch(() => {});
-        setLastSynced(null);
-        AsyncStorage.removeItem(STORAGE_KEYS.LAST_SYNCED).catch(() => {});
-        setStandardPhotosState(TXDOT_REQUIRED_SLOTS);
-        AsyncStorage.removeItem(STORAGE_KEYS.STANDARD_PHOTOS).catch(() => {});
-        setImportedPdfPathState(null);
-        setPdfAnnotationsState(null);
-        setPdfUploadedState(false);
-        AsyncStorage.removeItem(STORAGE_KEYS.IMPORTED_PDF_PATH).catch(() => {});
-        AsyncStorage.removeItem(STORAGE_KEYS.PDF_ANNOTATIONS).catch(() => {});
-        AsyncStorage.removeItem(STORAGE_KEYS.PDF_UPLOADED).catch(() => {});
-        setFinalizedAtState(null);
-        AsyncStorage.removeItem(STORAGE_KEYS.FINALIZED_AT).catch(() => {});
-        setImportAuditAcknowledgedState(false);
-        AsyncStorage.removeItem(STORAGE_KEYS.IMPORT_AUDIT_ACK).catch(() => {});
-        setCriticalFindingsAcknowledgedState(false);
-        AsyncStorage.removeItem(STORAGE_KEYS.CRITICAL_FINDINGS_ACK).catch(() => {});
 
         const ts = Date.now();
         const newDefects: DefectRecord[] = [];
@@ -3037,7 +3009,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         setParsingActive(false);
       }
     },
-    [setSavedDefectsState, setNbiRatingsState, setUnderclearanceDataState, setChannelDataState, setStructureNumber, nbiRatings, setImportSummary, bumpLastModified]
+    [clearInspection, setSavedDefectsState, setNbiRatingsState, setUnderclearanceDataState, setChannelDataState, setStructureNumber, nbiRatings, setImportSummary, bumpLastModified]
   );
 
   // Retained fallback hook. The UI always triggers a real PDF import via
