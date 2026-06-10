@@ -90,19 +90,23 @@ export function PdfReadOnlyPanel({ pdfPath, style, onImportPress }: Props) {
   if (Platform.OS === "web") {
     if (!pdfPath) {
       return (
-        <View style={[styles.placeholder, style]}>
-          <Feather name="file-text" size={32} color="#475569" />
-          <Text style={styles.placeholderTitle}>No Report Imported</Text>
-          <Text style={styles.placeholderBody}>
-            Import a previous inspection report to compare it side-by-side with
-            the current inspection.
-          </Text>
-          {onImportPress && (
-            <TouchableOpacity style={styles.importBtn} onPress={onImportPress}>
-              <Feather name="upload" size={14} color="#0f172a" />
-              <Text style={styles.importBtnText}>Import Previous Report</Text>
-            </TouchableOpacity>
-          )}
+        <View style={[styles.emptyPanel, style]}>
+          <View style={styles.emptyCard}>
+            <View style={styles.emptyIconWrap}>
+              <Feather name="file-text" size={40} color="#38bdf8" />
+            </View>
+            <Text style={styles.emptyTitle}>Previous Report</Text>
+            <Text style={styles.emptyBody}>
+              Import a prior inspection PDF to compare it side-by-side with the
+              current inspection.
+            </Text>
+            {onImportPress && (
+              <TouchableOpacity style={styles.importBtnLarge} onPress={onImportPress}>
+                <Feather name="upload-cloud" size={18} color="#fff" />
+                <Text style={styles.importBtnLargeText}>Import Previous Report</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       );
     }
@@ -267,5 +271,64 @@ const styles = StyleSheet.create({
     color: "#0f172a",
     fontSize: 13,
     fontWeight: "700",
+  },
+  emptyPanel: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#0f172a",
+    padding: 24,
+  },
+  emptyCard: {
+    alignItems: "center",
+    gap: 16,
+    backgroundColor: "#1e293b",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#334155",
+    padding: 36,
+    maxWidth: 340,
+    width: "100%" as never,
+  },
+  emptyIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: "#0f172a",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: "#334155",
+    marginBottom: 4,
+  },
+  emptyTitle: {
+    color: "#f1f5f9",
+    fontSize: 17,
+    fontWeight: "700",
+    textAlign: "center",
+    letterSpacing: 0.2,
+  },
+  emptyBody: {
+    color: "#94a3b8",
+    fontSize: 13,
+    textAlign: "center",
+    lineHeight: 20,
+    maxWidth: 260,
+  },
+  importBtnLarge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "#0ea5e9",
+    paddingHorizontal: 24,
+    paddingVertical: 13,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  importBtnLargeText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "700",
+    letterSpacing: 0.1,
   },
 });
