@@ -21,64 +21,85 @@ import { PhotoTagEditor } from "@/components/PhotoTagEditor";
 import { useColors } from "@/hooks/useColors";
 import { StandardPhotoSlot, useInspection } from "@/context/InspectionContext";
 
+type PreviewTarget = { slot: StandardPhotoSlot; isExtra: boolean };
+
 export default function PhotosScreen() {
   const c = useColors();
   const insets = useSafeAreaInsets();
-  const { standardPhotos, setStandardPhotoSlot, standardPhotosComplete, structureNumber } = useInspection();
-  const [previewSlot, setPreviewSlot] = useState<StandardPhotoSlot | null>(null);
+  const {
+    standardPhotos,
+    setStandardPhotoSlot,
+    standardPhotosComplete,
+    structureNumber,
+    extraPhotos,
+    addExtraPhoto,
+    setExtraPhotoSlot,
+    removeExtraPhoto: deleteExtraSlotFromContext,
+  } = useInspection();
+  const [previewTarget, setPreviewTarget] = useState<PreviewTarget | null>(null);
 
-  const capturePhoto = async (slot: StandardPhotoSlot) => {
+  const pickPhotoResult = async (): Promise<{ uri: string; heading?: number } | null> => {
     if (Platform.OS === "web") {
       Alert.alert("Info", "Camera not available in web preview.");
-      return;
+      return null;
     }
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
       Alert.alert("Permission Denied", "Camera permission is required.");
-      return;
+      return null;
     }
     const result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
-    if (!result.canceled) {
-      let heading: number | null = null;
-      try {
-        const perm = await Location.getForegroundPermissionsAsync();
-        if (perm.granted) {
-          const h = await Location.getHeadingAsync();
-          const raw = h.trueHeading >= 0 ? h.trueHeading : h.magHeading;
-          if (raw >= 0) heading = Math.round(raw);
-        }
-      } catch {}
-      const uri = result.assets[0].uri;
-      const directionTags: string[] = [];
-      if (heading !== null) {
-        if (heading >= 315 || heading < 45) directionTags.push("N");
-        else if (heading >= 45 && heading < 135) directionTags.push("E");
-        else if (heading >= 135 && heading < 225) directionTags.push("S");
-        else directionTags.push("W");
+    if (result.canceled) return null;
+    let heading: number | undefined;
+    try {
+      const perm = await Location.getForegroundPermissionsAsync();
+      if (perm.granted) {
+        const h = await Location.getHeadingAsync();
+        const raw = h.trueHeading >= 0 ? h.trueHeading : h.magHeading;
+        if (raw >= 0) heading = Math.round(raw);
       }
-      setStandardPhotoSlot(slot.slotId, {
-        photoUri: uri,
-        capturedAt: new Date().toISOString(),
-        directionTags,
-      });
-    }
+    } catch {}
+    return { uri: result.assets[0].uri, heading };
   };
 
-  const pickPhoto = async (slot: StandardPhotoSlot) => {
+  const pickLibraryResult = async (): Promise<string | null> => {
     if (Platform.OS === "web") {
       Alert.alert("Info", "Photo library not supported in web preview. Use camera.");
-      return;
+      return null;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.8,
     });
-    if (!result.canceled) {
-      setStandardPhotoSlot(slot.slotId, {
-        photoUri: result.assets[0].uri,
-        capturedAt: new Date().toISOString(),
-      });
-    }
+    if (result.canceled) return null;
+    return result.assets[0].uri;
+  };
+
+  const headingToDirection = (heading: number): string => {
+    if (heading >= 315 || heading < 45) return "N";
+    if (heading >= 45 && heading < 135) return "E";
+    if (heading >= 135 && heading < 225) return "S";
+    return "W";
+  };
+
+  const capturePhoto = async (slot: StandardPhotoSlot) => {
+    const res = await pickPhotoResult();
+    if (!res) return;
+    const directionTags: string[] = res.heading !== undefined ? [headingToDirection(res.heading)] : [];
+    setStandardPhotoSlot(slot.slotId, {
+      photoUri: res.uri,
+      capturedAt: new Date().toISOString(),
+      directionTags,
+    });
+  };
+
+  const pickPhoto = async (slot: StandardPhotoSlot) => {
+    const uri = await pickLibraryResult();
+    if (!uri) return;
+    setStandardPhotoSlot(slot.slotId, {
+      photoUri: uri,
+      capturedAt: new Date().toISOString(),
+    });
   };
 
   const removePhoto = (slotId: string) => {
@@ -88,8 +109,45 @@ export default function PhotosScreen() {
     ]);
   };
 
+  const captureExtraPhoto = async (slot: StandardPhotoSlot) => {
+    const res = await pickPhotoResult();
+    if (!res) return;
+    const directionTags: string[] = res.heading !== undefined ? [headingToDirection(res.heading)] : [];
+    setExtraPhotoSlot(slot.slotId, {
+      photoUri: res.uri,
+      capturedAt: new Date().toISOString(),
+      directionTags,
+    });
+  };
+
+  const pickExtraPhoto = async (slot: StandardPhotoSlot) => {
+    const uri = await pickLibraryResult();
+    if (!uri) return;
+    setExtraPhotoSlot(slot.slotId, {
+      photoUri: uri,
+      capturedAt: new Date().toISOString(),
+    });
+  };
+
+  const removeExtraPhoto = (slotId: string) => {
+    Alert.alert("Remove Photo", "Remove this photo?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Remove", style: "destructive", onPress: () => setExtraPhotoSlot(slotId, { photoUri: undefined, capturedAt: undefined, directionTags: [], subjectTags: [] }) },
+    ]);
+  };
+
+  const deleteExtraSlot = (slotId: string) => {
+    Alert.alert("Delete Slot", "Delete this additional photo slot?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: () => deleteExtraSlotFromContext(slotId) },
+    ]);
+  };
+
   const capturedCount = standardPhotos.filter((s) => !!s.photoUri).length;
   const total = standardPhotos.length;
+
+  const previewSlot = previewTarget?.slot ?? null;
+  const previewIsExtra = previewTarget?.isExtra ?? false;
 
   return (
     <View style={[styles.container, { backgroundColor: c.background }]}>
@@ -135,9 +193,51 @@ export default function PhotosScreen() {
             onCapture={() => capturePhoto(slot)}
             onPick={() => pickPhoto(slot)}
             onRemove={() => removePhoto(slot.slotId)}
-            onPreview={() => setPreviewSlot(slot)}
+            onPreview={() => setPreviewTarget({ slot, isExtra: false })}
             onTagsChange={(directionTags, subjectTags) =>
               setStandardPhotoSlot(slot.slotId, { directionTags, subjectTags })
+            }
+          />
+        ))}
+
+        <View style={styles.sectionHeader}>
+          <View style={styles.sectionHeaderLeft}>
+            <Feather name="image" size={14} color="#a78bfa" />
+            <Text style={styles.sectionHeaderText}>Additional Photos</Text>
+            {extraPhotos.length > 0 && (
+              <View style={[styles.extraBadge, { backgroundColor: "#1e1b4b" }]}>
+                <Text style={styles.extraBadgeText}>{extraPhotos.length}</Text>
+              </View>
+            )}
+          </View>
+          <TouchableOpacity style={styles.addPhotoBtn} onPress={addExtraPhoto}>
+            <Feather name="plus" size={14} color="#fff" />
+            <Text style={styles.addPhotoBtnText}>Add Photo</Text>
+          </TouchableOpacity>
+        </View>
+
+        {extraPhotos.length === 0 && (
+          <View style={[styles.emptyExtraCard, { backgroundColor: c.card, borderColor: c.border }]}>
+            <Feather name="camera" size={22} color="#475569" />
+            <Text style={[styles.emptyExtraText, { color: c.mutedForeground }]}>
+              Tap "Add Photo" to capture additional photos for this inspection
+            </Text>
+          </View>
+        )}
+
+        {extraPhotos.map((slot) => (
+          <SlotCard
+            key={slot.slotId}
+            slot={slot}
+            colors={c}
+            isExtra
+            onCapture={() => captureExtraPhoto(slot)}
+            onPick={() => pickExtraPhoto(slot)}
+            onRemove={() => removeExtraPhoto(slot.slotId)}
+            onDelete={() => deleteExtraSlot(slot.slotId)}
+            onPreview={() => setPreviewTarget({ slot, isExtra: true })}
+            onTagsChange={(directionTags, subjectTags) =>
+              setExtraPhotoSlot(slot.slotId, { directionTags, subjectTags })
             }
           />
         ))}
@@ -146,12 +246,12 @@ export default function PhotosScreen() {
       </ScrollView>
 
       {previewSlot && (
-        <Modal visible transparent animationType="fade" onRequestClose={() => setPreviewSlot(null)}>
-          <Pressable style={styles.previewBackdrop} onPress={() => setPreviewSlot(null)}>
+        <Modal visible transparent animationType="fade" onRequestClose={() => setPreviewTarget(null)}>
+          <Pressable style={styles.previewBackdrop} onPress={() => setPreviewTarget(null)}>
             <Pressable style={[styles.previewCard, { backgroundColor: c.card }]} onPress={() => {}}>
               <View style={styles.previewHeader}>
                 <Text style={[styles.previewTitle, { color: c.foreground }]}>{previewSlot.label}</Text>
-                <TouchableOpacity onPress={() => setPreviewSlot(null)} style={{ padding: 4 }}>
+                <TouchableOpacity onPress={() => setPreviewTarget(null)} style={{ padding: 4 }}>
                   <Feather name="x" size={20} color={c.mutedForeground} />
                 </TouchableOpacity>
               </View>
@@ -163,12 +263,20 @@ export default function PhotosScreen() {
                   directionTags={previewSlot.directionTags}
                   subjectTags={previewSlot.subjectTags}
                   onDirectionChange={(tags) => {
-                    setStandardPhotoSlot(previewSlot.slotId, { directionTags: tags });
-                    setPreviewSlot((p) => p ? { ...p, directionTags: tags } : p);
+                    if (previewIsExtra) {
+                      setExtraPhotoSlot(previewSlot.slotId, { directionTags: tags });
+                    } else {
+                      setStandardPhotoSlot(previewSlot.slotId, { directionTags: tags });
+                    }
+                    setPreviewTarget((p) => p ? { ...p, slot: { ...p.slot, directionTags: tags } } : p);
                   }}
                   onSubjectChange={(tags) => {
-                    setStandardPhotoSlot(previewSlot.slotId, { subjectTags: tags });
-                    setPreviewSlot((p) => p ? { ...p, subjectTags: tags } : p);
+                    if (previewIsExtra) {
+                      setExtraPhotoSlot(previewSlot.slotId, { subjectTags: tags });
+                    } else {
+                      setStandardPhotoSlot(previewSlot.slotId, { subjectTags: tags });
+                    }
+                    setPreviewTarget((p) => p ? { ...p, slot: { ...p.slot, subjectTags: tags } } : p);
                   }}
                 />
               </View>
@@ -188,27 +296,36 @@ export default function PhotosScreen() {
 interface SlotCardProps {
   slot: StandardPhotoSlot;
   colors: ReturnType<typeof useColors>;
+  isExtra?: boolean;
   onCapture: () => void;
   onPick: () => void;
   onRemove: () => void;
+  onDelete?: () => void;
   onPreview: () => void;
   onTagsChange: (directionTags: string[], subjectTags: string[]) => void;
 }
 
-function SlotCard({ slot, colors: c, onCapture, onPick, onRemove, onPreview, onTagsChange }: SlotCardProps) {
+function SlotCard({ slot, colors: c, isExtra, onCapture, onPick, onRemove, onDelete, onPreview, onTagsChange }: SlotCardProps) {
   const captured = !!slot.photoUri;
   return (
-    <View style={[styles.card, { backgroundColor: c.card, borderColor: captured ? "#10b981" : c.border, borderWidth: captured ? 1.5 : 1 }]}>
+    <View style={[styles.card, { backgroundColor: c.card, borderColor: captured ? "#10b981" : (isExtra ? "#4c1d95" : c.border), borderWidth: captured ? 1.5 : 1 }]}>
       <View style={styles.cardHeader}>
         <View style={styles.cardLeft}>
-          <View style={[styles.statusDot, { backgroundColor: captured ? "#10b981" : "#475569" }]} />
+          <View style={[styles.statusDot, { backgroundColor: captured ? "#10b981" : (isExtra ? "#7c3aed" : "#475569") }]} />
           <Text style={[styles.slotLabel, { color: c.foreground }]}>{slot.label}</Text>
         </View>
-        {captured && (
-          <TouchableOpacity onPress={onRemove} style={styles.removeBtn} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-            <Feather name="trash-2" size={14} color="#ef4444" />
-          </TouchableOpacity>
-        )}
+        <View style={styles.cardActions}>
+          {captured && (
+            <TouchableOpacity onPress={onRemove} style={styles.removeBtn} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+              <Feather name="trash-2" size={14} color="#ef4444" />
+            </TouchableOpacity>
+          )}
+          {isExtra && (
+            <TouchableOpacity onPress={onDelete} style={styles.removeBtn} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+              <Feather name="x-circle" size={14} color="#64748b" />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {captured ? (
@@ -273,6 +390,7 @@ const styles = StyleSheet.create({
   card: { borderRadius: 12, overflow: "hidden" },
   cardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingVertical: 10 },
   cardLeft: { flexDirection: "row", alignItems: "center", gap: 8 },
+  cardActions: { flexDirection: "row", alignItems: "center", gap: 6 },
   statusDot: { width: 8, height: 8, borderRadius: 4 },
   slotLabel: { fontSize: 14, fontWeight: "600" },
   removeBtn: { padding: 4 },
@@ -295,4 +413,13 @@ const styles = StyleSheet.create({
   previewImage: { width: "100%", height: 280 },
   previewTags: { padding: 14 },
   previewMeta: { paddingHorizontal: 14, paddingBottom: 12, fontSize: 11 },
+  sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8, marginBottom: 4 },
+  sectionHeaderLeft: { flexDirection: "row", alignItems: "center", gap: 6 },
+  sectionHeaderText: { color: "#c4b5fd", fontSize: 14, fontWeight: "700" },
+  extraBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10 },
+  extraBadgeText: { color: "#a78bfa", fontSize: 11, fontWeight: "600" },
+  addPhotoBtn: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#7c3aed", paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8 },
+  addPhotoBtnText: { color: "#fff", fontSize: 13, fontWeight: "600" },
+  emptyExtraCard: { alignItems: "center", justifyContent: "center", gap: 10, padding: 24, borderRadius: 12, borderWidth: 1, borderStyle: "dashed" },
+  emptyExtraText: { fontSize: 13, textAlign: "center", maxWidth: 260 },
 });

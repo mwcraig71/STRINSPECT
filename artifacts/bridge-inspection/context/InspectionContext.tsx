@@ -1243,6 +1243,11 @@ interface InspectionContextType {
   standardPhotos: StandardPhotoSlot[];
   setStandardPhotoSlot: (slotId: string, patch: Partial<StandardPhotoSlot>) => void;
   standardPhotosComplete: boolean;
+  // ── Extra Photos ──
+  extraPhotos: StandardPhotoSlot[];
+  addExtraPhoto: () => void;
+  setExtraPhotoSlot: (slotId: string, patch: Partial<StandardPhotoSlot>) => void;
+  removeExtraPhoto: (slotId: string) => void;
 }
 
 export interface ElementSummaryRow {
@@ -1495,6 +1500,7 @@ const STORAGE_KEYS = {
   IMPORT_AUDIT_ACK: "@bridge_import_audit_ack",
   CRITICAL_FINDINGS_ACK: "@bridge_critical_findings_ack",
   STANDARD_PHOTOS: "@bridge_standard_photos",
+  EXTRA_PHOTOS: "@bridge_extra_photos",
 };
 
 // ─── Shared header merge utility ─────────────────────────────────────────────
@@ -1604,6 +1610,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const [pdfUploaded, setPdfUploadedState] = useState(false);
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const [standardPhotos, setStandardPhotosState] = useState<StandardPhotoSlot[]>(TXDOT_REQUIRED_SLOTS);
+  const [extraPhotos, setExtraPhotosState] = useState<StandardPhotoSlot[]>([]);
 
   // ── AsyncStorage load on mount ──
   useEffect(() => {
@@ -1619,7 +1626,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           ]);
           await AsyncStorage.setItem(STORAGE_KEYS.DEMO_CLEARED, "1");
         }
-        const [defects, nbi, nom, insType, superType, subType, superMat, subMat, structNum, uc, ch, sb, sn, spp, impSummary, lastJoint, lastSync, lastMod, pdfPath, pdfAnns, pdfUploadedStr, imgSz, dateStampStr, finalizedAtStr, importAuditAckStr, criticalAckStr, stdPhotosStr, openAiKeyStr, aiRephraseStr] = await Promise.all([
+        const [defects, nbi, nom, insType, superType, subType, superMat, subMat, structNum, uc, ch, sb, sn, spp, impSummary, lastJoint, lastSync, lastMod, pdfPath, pdfAnns, pdfUploadedStr, imgSz, dateStampStr, finalizedAtStr, importAuditAckStr, criticalAckStr, stdPhotosStr, openAiKeyStr, aiRephraseStr, extraPhotosStr] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.SAVED_DEFECTS),
           AsyncStorage.getItem(STORAGE_KEYS.NBI_RATINGS),
           AsyncStorage.getItem(STORAGE_KEYS.NOMENCLATURE),
@@ -1649,6 +1656,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           AsyncStorage.getItem(STORAGE_KEYS.STANDARD_PHOTOS),
           AsyncStorage.getItem(STORAGE_KEYS.OPENAI_KEY),
           AsyncStorage.getItem(STORAGE_KEYS.AI_REPHRASE),
+          AsyncStorage.getItem(STORAGE_KEYS.EXTRA_PHOTOS),
         ]);
         if (lastJoint) setLastJointElementIdState(lastJoint);
         if (lastSync) setLastSynced(lastSync);
@@ -1672,6 +1680,11 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
                 return found ? { ...slot, ...found } : slot;
               })
             );
+          } catch {}
+        }
+        if (extraPhotosStr) {
+          try {
+            setExtraPhotosState(JSON.parse(extraPhotosStr) as StandardPhotoSlot[]);
           } catch {}
         }
         if (defects) setSavedDefectsState(JSON.parse(defects));
@@ -2040,6 +2053,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     AsyncStorage.removeItem(STORAGE_KEYS.PDF_UPLOADED).catch(() => {});
     setStandardPhotosState(TXDOT_REQUIRED_SLOTS);
     AsyncStorage.removeItem(STORAGE_KEYS.STANDARD_PHOTOS).catch(() => {});
+    setExtraPhotosState([]);
+    AsyncStorage.removeItem(STORAGE_KEYS.EXTRA_PHOTOS).catch(() => {});
     setFinalizedAtState(null);
     AsyncStorage.removeItem(STORAGE_KEYS.FINALIZED_AT).catch(() => {});
     setImportAuditAcknowledgedState(false);
@@ -2052,6 +2067,32 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     setStandardPhotosState((prev) => {
       const next = prev.map((s) => s.slotId === slotId ? { ...s, ...patch } : s);
       AsyncStorage.setItem(STORAGE_KEYS.STANDARD_PHOTOS, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  }, []);
+
+  const addExtraPhoto = useCallback(() => {
+    setExtraPhotosState((prev) => {
+      const slotId = `extra_${Date.now()}`;
+      const label = `Extra Photo ${prev.length + 1}`;
+      const next = [...prev, { slotId, label, directionTags: [], subjectTags: [] }];
+      AsyncStorage.setItem(STORAGE_KEYS.EXTRA_PHOTOS, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  }, []);
+
+  const setExtraPhotoSlot = useCallback((slotId: string, patch: Partial<StandardPhotoSlot>) => {
+    setExtraPhotosState((prev) => {
+      const next = prev.map((s) => s.slotId === slotId ? { ...s, ...patch } : s);
+      AsyncStorage.setItem(STORAGE_KEYS.EXTRA_PHOTOS, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  }, []);
+
+  const removeExtraPhoto = useCallback((slotId: string) => {
+    setExtraPhotosState((prev) => {
+      const next = prev.filter((s) => s.slotId !== slotId);
+      AsyncStorage.setItem(STORAGE_KEYS.EXTRA_PHOTOS, JSON.stringify(next)).catch(() => {});
       return next;
     });
   }, []);
@@ -3207,6 +3248,10 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     standardPhotos,
     setStandardPhotoSlot,
     standardPhotosComplete,
+    extraPhotos,
+    addExtraPhoto,
+    setExtraPhotoSlot,
+    removeExtraPhoto,
   };
 
   return (
