@@ -199,13 +199,15 @@ router.put(
     }
 
     const mimeType = String(req.headers["content-type"] ?? "image/jpeg");
+    const descriptionHeader = req.headers["x-photo-description"];
+    const description = typeof descriptionHeader === "string" ? descriptionHeader : null;
 
     await db
       .insert(sessionPhotosTable)
-      .values({ structureNumber, photoId, photoData: body, mimeType })
+      .values({ structureNumber, photoId, photoData: body, mimeType, ...(description !== null ? { description } : {}) })
       .onConflictDoUpdate({
         target: [sessionPhotosTable.structureNumber, sessionPhotosTable.photoId],
-        set: { photoData: body, mimeType },
+        set: { photoData: body, mimeType, ...(description !== null ? { description } : {}) },
       });
 
     res.json({ ok: true, bytes: body.length });

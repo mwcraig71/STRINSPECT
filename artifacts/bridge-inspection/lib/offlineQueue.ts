@@ -7,8 +7,9 @@ const UPLOADED_PHOTOS_KEY = "@bridge_uploaded_photo_ids_v1";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface PhotoToUpload {
-  id: string;  // stable: "${defectId}_${photoIndex}"
+  id: string;  // stable: "${defectId}_${photoIndex}" or "std_${slotId}"
   uri: string;
+  description?: string; // JSON-encoded tags, e.g. '{"directionTags":["N"],"subjectTags":["deck"]}'
 }
 
 export interface SyncQueueEntry {
@@ -91,9 +92,16 @@ export async function getUploadedPhotoIds(): Promise<Set<string>> {
   }
 }
 
-export async function markPhotoUploaded(id: string): Promise<void> {
+// Keys are stored as "<structureNumber>:<photoId>" to avoid cross-session collisions.
+// Two inspections for different bridges that happen to share a slot ID (e.g. "std_roadway")
+// must each upload independently.
+function scopedPhotoKey(structureNumber: string, photoId: string): string {
+  return `${structureNumber}:${photoId}`;
+}
+
+export async function markPhotoUploaded(structureNumber: string, id: string): Promise<void> {
   const set = await getUploadedPhotoIds();
-  set.add(id);
+  set.add(scopedPhotoKey(structureNumber, id));
   await AsyncStorage.setItem(UPLOADED_PHOTOS_KEY, JSON.stringify([...set]));
 }
 
@@ -109,6 +117,28 @@ export function collectPhotosFromDefects(defects: unknown[]): PhotoToUpload[] {
     });
   }
   return photos;
+}
+
+export interface StandardPhotoSlotLike {
+  slotId: string;
+  photoUri?: string;
+  directionTags: string[];
+  subjectTags: string[];
+}
+
+export function collectPhotosFromStandardSlots(
+  slots: StandardPhotoSlotLike[],
+): PhotoToUpload[] {
+  return slots
+    .filter((s) => !!s.photoUri)
+    .map((s) => ({
+      id: `std_${s.slotId}`,
+      uri: s.photoUri as string,
+      description: JSON.stringify({
+        directionTags: s.directionTags,
+        subjectTags: s.subjectTags,
+      }),
+    }));
 }
 
 // ─── Photo upload ─────────────────────────────────────────────────────────────
@@ -129,14 +159,10 @@ async function uploadOnePhoto(
     });
     const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
     const url = `${apiUrl}/api/sessions/photos/${encodeURIComponent(structureNumber)}/${encodeURIComponent(photo.id)}`;
-    const res = await fetch(url, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "image/jpeg",
-        ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
-      },
-      body: bytes,
-    });
+    const headers: Record<string, string> = { "Content-Type": "image/jpeg" };
+    if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
+    if (photo.description) headers["X-Photo-Description"] = photo.description;
+    const res = await fetch(url, { method: "PUT", headers, body: bytes });
     return res.ok;
   } catch {
     return false;
@@ -151,9 +177,9 @@ export async function uploadPhotos(
 ): Promise<void> {
   const uploadedIds = await getUploadedPhotoIds();
   for (const photo of photos) {
-    if (uploadedIds.has(photo.id)) continue;
+    if (uploadedIds.has(scopedPhotoKey(structureNumber, photo.id))) continue;
     const ok = await uploadOnePhoto(photo, structureNumber, apiUrl, apiKey);
-    if (ok) await markPhotoUploaded(photo.id);
+    if (ok) await markPhotoUploaded(structureNumber, photo.id);
   }
 }
 
@@ -164,12 +190,14 @@ export async function processQueueEntry(
   apiUrl: string,
   apiKey: string | undefined,
 ): Promise<void> {
-  const authHeaders = apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
+  const authHeader: Record<string, string> = apiKey
+    ? { Authorization: `Bearer ${apiKey}` }
+    : {};
 
   // 1. Upload session JSON
   const sessionRes = await fetch(`${apiUrl}/api/sessions`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...authHeaders },
+    headers: { "Content-Type": "application/json", ...authHeader },
     body: JSON.stringify({
       structureNumber: entry.structureNumber,
       source: "mobile_sync",
@@ -197,7 +225,7 @@ export async function processQueueEntry(
           `${apiUrl}/api/sessions/pdf/${encodeURIComponent(entry.structureNumber)}`,
           {
             method: "PUT",
-            headers: { "Content-Type": "application/pdf", ...authHeaders },
+            headers: { "Content-Type": "application/pdf", ...authHeader },
             body: bytes,
           },
         );
@@ -207,6 +235,6 @@ export async function processQueueEntry(
     }
   }
 
-  // 3. Upload photos (best-effort per photo)
+  // 3. Upload photos (best-effort per photo) — includes both defect and standard photos
   await uploadPhotos(entry.photos, entry.structureNumber, apiUrl, apiKey);
 }

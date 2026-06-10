@@ -16,6 +16,7 @@ import {
   removeFromQueue,
   getQueueLength,
   collectPhotosFromDefects,
+  collectPhotosFromStandardSlots,
   uploadPhotos,
 } from "@/lib/offlineQueue";
 setAuthTokenGetter(() => process.env.EXPO_PUBLIC_API_KEY ?? null);
@@ -1885,7 +1886,10 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         pdfAnnotations: pdfAnnotations ?? null,
       },
       pdfPath: importedPdfPath ?? undefined,
-      photos: collectPhotosFromDefects(savedDefects as unknown[]),
+      photos: [
+        ...collectPhotosFromDefects(savedDefects as unknown[]),
+        ...collectPhotosFromStandardSlots(standardPhotos),
+      ],
     });
 
     // Check connectivity first — queue immediately if offline
@@ -1939,9 +1943,12 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         }
       }
 
-      // Upload photos (best-effort — non-fatal if some fail)
+      // Upload photos (best-effort — non-fatal if some fail) — includes defect and standard photos
       if (Platform.OS !== "web" && apiUrl) {
-        const photos = collectPhotosFromDefects(savedDefects as unknown[]);
+        const photos = [
+          ...collectPhotosFromDefects(savedDefects as unknown[]),
+          ...collectPhotosFromStandardSlots(standardPhotos),
+        ];
         uploadPhotos(photos, sn, apiUrl, apiKey).catch(() => {});
       }
 
@@ -1962,7 +1969,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
       setPendingSyncCount(qLen);
       throw err; // re-throw so SettingsModal can display error state
     }
-  }, [structureNumber, savedDefects, nbiRatings, importSummary, pdfAnnotations, importedPdfPath, pdfUploaded, finalizedAt]);
+  }, [structureNumber, savedDefects, nbiRatings, importSummary, pdfAnnotations, importedPdfPath, pdfUploaded, finalizedAt, standardPhotos]);
 
   const acknowledgeImportAudit = useCallback(() => {
     setImportAuditAcknowledgedState(true);

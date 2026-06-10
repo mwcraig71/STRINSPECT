@@ -15,6 +15,7 @@ export const sessionPhotosTable = pgTable(
     photoId: text("photo_id").notNull(),
     photoData: bytea("photo_data").notNull(),
     mimeType: text("mime_type").notNull().default("image/jpeg"),
+    description: text("description"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("uq_session_photos_sn_pid").on(t.structureNumber, t.photoId)],
