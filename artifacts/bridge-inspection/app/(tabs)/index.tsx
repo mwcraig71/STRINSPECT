@@ -342,6 +342,7 @@ export default function InspectionScreen() {
         statusBarTranslucent
         onRequestClose={() => setModuleMenuOpen(false)}
       >
+        <>
         <Pressable
           style={styles.menuBackdrop}
           onPress={() => setModuleMenuOpen(false)}
@@ -438,6 +439,7 @@ export default function InspectionScreen() {
               </>
             )}
           </View>
+        </>
       </Modal>
 
       <KeyboardAwareScrollViewCompat

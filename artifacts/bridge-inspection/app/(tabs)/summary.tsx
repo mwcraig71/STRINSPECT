@@ -46,7 +46,10 @@ export default function SummaryScreen() {
     acknowledgeImportAudit,
     criticalFindingsAcknowledged,
     acknowledgeCriticalFindings,
+    standardPhotos,
+    standardPhotosComplete,
   } = useInspection();
+  const missingPhotos = standardPhotos.filter((s) => !s.photoUri).length;
   const [settingsOpen, setSettingsOpen] = React.useState(false);
   const [submitStatus, setSubmitStatus] = React.useState<"idle" | "syncing" | "success" | "error">("idle");
   const [finalizeStatus, setFinalizeStatus] = React.useState<"idle" | "working">("idle");
@@ -174,6 +177,26 @@ export default function SummaryScreen() {
       <SettingsModal visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
       <ScrollView ref={scrollRef} style={styles.body} contentContainerStyle={styles.bodyContent}>
+
+        {/* ── Standard Photos Warning ── */}
+        {!standardPhotosComplete && (
+          <TouchableOpacity
+            style={[styles.photosWarning, { borderColor: "#78716c", backgroundColor: "#1c1917" }]}
+            onPress={() => router.navigate("/(tabs)/photos")}
+            activeOpacity={0.8}
+          >
+            <Feather name="camera" size={16} color="#f59e0b" />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.photosWarningTitle}>
+                {missingPhotos} required photo{missingPhotos !== 1 ? "s" : ""} missing
+              </Text>
+              <Text style={styles.photosWarningBody}>
+                Capture all standard photos before leaving the bridge
+              </Text>
+            </View>
+            <Feather name="arrow-right" size={16} color="#f59e0b" />
+          </TouchableOpacity>
+        )}
 
         {/* ── Readiness Checklist ── */}
         <View
@@ -774,4 +797,7 @@ const styles = StyleSheet.create({
   },
   ackDoneText: { fontSize: 11.5, fontWeight: "800", color: "#047857", textTransform: "uppercase", letterSpacing: 0.3 },
   critAckWrap: { padding: 14 },
+  photosWarning: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: 12, borderWidth: 1.5, marginBottom: 2 },
+  photosWarningTitle: { color: "#f59e0b", fontSize: 13, fontWeight: "700" },
+  photosWarningBody: { color: "#a8a29e", fontSize: 12, marginTop: 2 },
 });

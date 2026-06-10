@@ -422,6 +422,26 @@ export interface PhotoItem {
   capturedAt?: string;
 }
 
+export interface StandardPhotoSlot {
+  slotId: string;
+  label: string;
+  photoUri?: string;
+  capturedAt?: string;
+  directionTags: string[];
+  subjectTags: string[];
+}
+
+export const TXDOT_REQUIRED_SLOTS: StandardPhotoSlot[] = [
+  { slotId: "roadway",          label: "Roadway",                    directionTags: [], subjectTags: [] },
+  { slotId: "load_sign_1",      label: "Load Posting Sign (Approach 1)", directionTags: [], subjectTags: [] },
+  { slotId: "load_sign_2",      label: "Load Posting Sign (Approach 2)", directionTags: [], subjectTags: [] },
+  { slotId: "elevation",        label: "Elevation",                  directionTags: [], subjectTags: [] },
+  { slotId: "super_underside",  label: "Superstructure Underside",   directionTags: [], subjectTags: [] },
+  { slotId: "under_view",       label: "Under View",                 directionTags: [], subjectTags: [] },
+  { slotId: "upstream",         label: "Upstream",                   directionTags: [], subjectTags: [] },
+  { slotId: "downstream",       label: "Downstream",                 directionTags: [], subjectTags: [] },
+];
+
 export interface DefectRecord {
   id: string;
   location: string;
@@ -1214,6 +1234,10 @@ interface InspectionContextType {
   acknowledgeImportAudit: () => void;
   criticalFindingsAcknowledged: boolean;
   acknowledgeCriticalFindings: () => void;
+  // ── Standard Photos ──
+  standardPhotos: StandardPhotoSlot[];
+  setStandardPhotoSlot: (slotId: string, patch: Partial<StandardPhotoSlot>) => void;
+  standardPhotosComplete: boolean;
 }
 
 export interface ElementSummaryRow {
@@ -1463,6 +1487,7 @@ const STORAGE_KEYS = {
   FINALIZED_AT: "@bridge_finalized_at",
   IMPORT_AUDIT_ACK: "@bridge_import_audit_ack",
   CRITICAL_FINDINGS_ACK: "@bridge_critical_findings_ack",
+  STANDARD_PHOTOS: "@bridge_standard_photos",
 };
 
 // ─── Shared header merge utility ─────────────────────────────────────────────
@@ -1569,6 +1594,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const [pdfAnnotations, setPdfAnnotationsState] = useState<unknown[] | null>(null);
   const [pdfUploaded, setPdfUploadedState] = useState(false);
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
+  const [standardPhotos, setStandardPhotosState] = useState<StandardPhotoSlot[]>(TXDOT_REQUIRED_SLOTS);
 
   // ── AsyncStorage load on mount ──
   useEffect(() => {
@@ -1584,7 +1610,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           ]);
           await AsyncStorage.setItem(STORAGE_KEYS.DEMO_CLEARED, "1");
         }
-        const [defects, nbi, nom, insType, superType, subType, superMat, subMat, structNum, uc, ch, sb, sn, spp, impSummary, lastJoint, lastSync, lastMod, pdfPath, pdfAnns, pdfUploadedStr, imgSz, dateStampStr, finalizedAtStr, importAuditAckStr, criticalAckStr] = await Promise.all([
+        const [defects, nbi, nom, insType, superType, subType, superMat, subMat, structNum, uc, ch, sb, sn, spp, impSummary, lastJoint, lastSync, lastMod, pdfPath, pdfAnns, pdfUploadedStr, imgSz, dateStampStr, finalizedAtStr, importAuditAckStr, criticalAckStr, stdPhotosStr] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.SAVED_DEFECTS),
           AsyncStorage.getItem(STORAGE_KEYS.NBI_RATINGS),
           AsyncStorage.getItem(STORAGE_KEYS.NOMENCLATURE),
@@ -1611,6 +1637,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           AsyncStorage.getItem(STORAGE_KEYS.FINALIZED_AT),
           AsyncStorage.getItem(STORAGE_KEYS.IMPORT_AUDIT_ACK),
           AsyncStorage.getItem(STORAGE_KEYS.CRITICAL_FINDINGS_ACK),
+          AsyncStorage.getItem(STORAGE_KEYS.STANDARD_PHOTOS),
         ]);
         if (lastJoint) setLastJointElementIdState(lastJoint);
         if (lastSync) setLastSynced(lastSync);
@@ -1623,6 +1650,17 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         if (finalizedAtStr) setFinalizedAtState(finalizedAtStr);
         if (importAuditAckStr === "1") setImportAuditAcknowledgedState(true);
         if (criticalAckStr === "1") setCriticalFindingsAcknowledgedState(true);
+        if (stdPhotosStr) {
+          try {
+            const saved = JSON.parse(stdPhotosStr) as StandardPhotoSlot[];
+            setStandardPhotosState(
+              TXDOT_REQUIRED_SLOTS.map((slot) => {
+                const found = saved.find((s) => s.slotId === slot.slotId);
+                return found ? { ...slot, ...found } : slot;
+              })
+            );
+          } catch {}
+        }
         if (defects) setSavedDefectsState(JSON.parse(defects));
         if (nbi) setNbiRatingsState(JSON.parse(nbi));
         if (impSummary) {
@@ -1981,7 +2019,19 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     AsyncStorage.removeItem(STORAGE_KEYS.PDF_ANNOTATIONS).catch(() => {});
     setPdfUploadedState(false);
     AsyncStorage.removeItem(STORAGE_KEYS.PDF_UPLOADED).catch(() => {});
+    setStandardPhotosState(TXDOT_REQUIRED_SLOTS);
+    AsyncStorage.removeItem(STORAGE_KEYS.STANDARD_PHOTOS).catch(() => {});
   }, [setStructureNumber, setImportSummary]);
+
+  const setStandardPhotoSlot = useCallback((slotId: string, patch: Partial<StandardPhotoSlot>) => {
+    setStandardPhotosState((prev) => {
+      const next = prev.map((s) => s.slotId === slotId ? { ...s, ...patch } : s);
+      AsyncStorage.setItem(STORAGE_KEYS.STANDARD_PHOTOS, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  }, []);
+
+  const standardPhotosComplete = standardPhotos.every((s) => !!s.photoUri);
 
   const setPdfAnnotations = useCallback((a: unknown[] | null) => {
     setPdfAnnotationsState(a);
@@ -3109,6 +3159,9 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     acknowledgeImportAudit,
     criticalFindingsAcknowledged,
     acknowledgeCriticalFindings,
+    standardPhotos,
+    setStandardPhotoSlot,
+    standardPhotosComplete,
   };
 
   return (
