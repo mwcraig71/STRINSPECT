@@ -258,6 +258,13 @@ export default function InspectionScreen() {
                 {inspectionType}
               </Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.gearBtn}
+              onPress={() => setSettingsOpen(true)}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
+              <Feather name="settings" size={18} color="#94a3b8" />
+            </TouchableOpacity>
           </View>
         </View>
       </View>
