@@ -60,13 +60,38 @@ export function PdfReadOnlyPanel({ pdfPath, style, onImportPress }: Props) {
   }, [injectPdf]);
 
   if (Platform.OS === "web") {
+    if (!pdfPath) {
+      return (
+        <View style={[styles.placeholder, style]}>
+          <Feather name="file-text" size={32} color="#475569" />
+          <Text style={styles.placeholderTitle}>No Report Imported</Text>
+          <Text style={styles.placeholderBody}>
+            Import a previous inspection report to compare it side-by-side with the current inspection.
+          </Text>
+          {onImportPress && (
+            <TouchableOpacity style={styles.importBtn} onPress={onImportPress}>
+              <Feather name="upload" size={14} color="#0f172a" />
+              <Text style={styles.importBtnText}>Import Previous Report</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      );
+    }
+    // On web, use a browser-native iframe — the browser renders PDFs natively
     return (
-      <View style={[styles.placeholder, style]}>
-        <Feather name="file-text" size={32} color="#475569" />
-        <Text style={styles.placeholderTitle}>Previous Report</Text>
-        <Text style={styles.placeholderBody}>
-          PDF preview is available on iOS and Android devices.
-        </Text>
+      <View style={[styles.root, style, { position: "relative" } as never]}>
+        {React.createElement("iframe", {
+          src: pdfPath,
+          style: {
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            border: "none",
+            background: "#0f172a",
+          },
+        } as React.HTMLAttributes<HTMLIFrameElement>)}
       </View>
     );
   }

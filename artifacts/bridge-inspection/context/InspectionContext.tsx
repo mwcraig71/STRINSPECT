@@ -2909,6 +2909,17 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           } catch (copyErr) {
             console.warn("[PDF copy]", copyErr);
           }
+        } else if (Platform.OS === "web") {
+          // On web, store the blob/data URL directly — expo-file-system is unavailable
+          const webUri =
+            source instanceof File
+              ? URL.createObjectURL(source as File)
+              : (source as { uri: string }).uri;
+          if (webUri) {
+            setImportedPdfPathState(webUri);
+            setPdfAnnotationsState(null);
+            setPdfUploadedState(false);
+          }
         }
 
         const emptySummary =
