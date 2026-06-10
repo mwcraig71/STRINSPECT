@@ -1,5 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { Audio } from "expo-av";
+import * as Network from "expo-network";
 import React, { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -20,12 +21,16 @@ interface SpeechToTextButtonProps {
 
 const MAX_RECORD_MS = 60000;
 
-const BRIDGE_PROMPT =
+const WHISPER_PROMPT =
   "Bridge field inspection note. Terms may include: spalling, delamination, corrosion, section loss, cracking, scour, settlement, abutment, pier, girder, bearing, joint, railing, deck, pile, NBI, SNBI, CS1, CS2, CS3, CS4, TxDOT, NCDOT.";
+
+const GPT_SYSTEM_PROMPT =
+  "You are a bridge inspection assistant. Rewrite the following field note as a concise, professional inspection narrative using this exact format: \"Location: [location reference]. [Defect description with measurements and severity in one or two sentences].\" Location must come first. Preserve all technical details, measurements, and location references. Return only the formatted text with no preamble or extra commentary.";
 
 export function SpeechToTextButton({ onResult, style }: SpeechToTextButtonProps) {
   const c = useColors();
   const { openAiKey, aiRephrase } = useInspection();
+  const networkState = Network.useNetworkState();
 
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [busy, setBusy] = useState(false);
@@ -34,85 +39,87 @@ export function SpeechToTextButton({ onResult, style }: SpeechToTextButtonProps)
 
   const clearErr = () => setError(null);
 
-  const stopAndTranscribe = useCallback(
-    async (rec: Audio.Recording) => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
+  const isOnline = networkState.isConnected === true && networkState.isInternetReachable !== false;
+
+  if (Platform.OS === "web") return null;
+  if (!openAiKey?.trim()) return null;
+  if (!isOnline) return null;
+
+  const stopAndTranscribe = async (rec: Audio.Recording) => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    setRecording(null);
+    setBusy(true);
+    setError(null);
+    try {
+      await rec.stopAndUnloadAsync();
+      const uri = rec.getURI();
+      if (!uri) throw new Error("No recording URI.");
+
+      const key = openAiKey.trim();
+
+      const formData = new FormData();
+      formData.append("file", {
+        uri,
+        type: "audio/m4a",
+        name: "recording.m4a",
+      } as unknown as Blob);
+      formData.append("model", "whisper-1");
+      formData.append("prompt", WHISPER_PROMPT);
+
+      const whisperRes = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}` },
+        body: formData,
+      });
+      if (!whisperRes.ok) {
+        const body = await whisperRes.text();
+        throw new Error(`Whisper ${whisperRes.status}: ${body.slice(0, 100)}`);
       }
-      setRecording(null);
-      setBusy(true);
-      setError(null);
-      try {
-        await rec.stopAndUnloadAsync();
-        const uri = rec.getURI();
-        if (!uri) throw new Error("No recording URI");
+      const whisperJson = (await whisperRes.json()) as { text: string };
+      let transcript = (whisperJson.text || "").trim();
+      if (!transcript) throw new Error("Transcription returned empty text.");
 
-        const key = openAiKey?.trim();
-        if (!key) throw new Error("No OpenAI API key set. Add it in Settings → AI Transcription.");
-
-        const formData = new FormData();
-        formData.append("file", {
-          uri,
-          type: "audio/m4a",
-          name: "recording.m4a",
-        } as unknown as Blob);
-        formData.append("model", "whisper-1");
-        formData.append("prompt", BRIDGE_PROMPT);
-
-        const whisperRes = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+      if (aiRephrase) {
+        const chatRes = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
-          headers: { Authorization: `Bearer ${key}` },
-          body: formData,
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${key}`,
+          },
+          body: JSON.stringify({
+            model: "gpt-4o-mini",
+            max_tokens: 256,
+            messages: [
+              { role: "system", content: GPT_SYSTEM_PROMPT },
+              { role: "user", content: transcript },
+            ],
+          }),
         });
-        if (!whisperRes.ok) {
-          const body = await whisperRes.text();
-          throw new Error(`Whisper error ${whisperRes.status}: ${body.slice(0, 120)}`);
+        if (!chatRes.ok) {
+          const body = await chatRes.text();
+          throw new Error(`AI Rephrasing failed (${chatRes.status}): ${body.slice(0, 100)}`);
         }
-        const whisperJson = (await whisperRes.json()) as { text: string };
-        let transcript = (whisperJson.text || "").trim();
-
-        if (aiRephrase && transcript) {
-          const chatRes = await fetch("https://api.openai.com/v1/chat/completions", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${key}`,
-            },
-            body: JSON.stringify({
-              model: "gpt-4o-mini",
-              max_tokens: 256,
-              messages: [
-                {
-                  role: "system",
-                  content:
-                    "You are a bridge inspection assistant. Rewrite the following field note as a concise, professional inspection narrative. Preserve all technical details, measurements, and location references. Return only the improved text with no preamble.",
-                },
-                { role: "user", content: transcript },
-              ],
-            }),
-          });
-          if (chatRes.ok) {
-            const chatJson = (await chatRes.json()) as {
-              choices?: { message?: { content?: string } }[];
-            };
-            const rephrased = chatJson.choices?.[0]?.message?.content?.trim();
-            if (rephrased) transcript = rephrased;
-          }
-        }
-
-        if (transcript) onResult(transcript);
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : "Transcription failed";
-        setError(msg);
-      } finally {
-        setBusy(false);
+        const chatJson = (await chatRes.json()) as {
+          choices?: { message?: { content?: string } }[];
+        };
+        const rephrased = chatJson.choices?.[0]?.message?.content?.trim();
+        if (!rephrased) throw new Error("AI Rephrasing returned empty response.");
+        transcript = rephrased;
       }
-    },
-    [openAiKey, aiRephrase, onResult]
-  );
 
-  const handlePress = useCallback(async () => {
+      onResult(transcript);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Transcription failed.";
+      setError(msg);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handlePress = async () => {
     if (busy) return;
     clearErr();
 
@@ -139,12 +146,10 @@ export function SpeechToTextButton({ onResult, style }: SpeechToTextButtonProps)
         stopAndTranscribe(rec);
       }, MAX_RECORD_MS);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Could not start recording";
+      const msg = err instanceof Error ? err.message : "Could not start recording.";
       setError(msg);
     }
-  }, [busy, recording, stopAndTranscribe]);
-
-  if (Platform.OS === "web") return null;
+  };
 
   const isRecording = !!recording;
 
@@ -156,16 +161,8 @@ export function SpeechToTextButton({ onResult, style }: SpeechToTextButtonProps)
         style={[
           styles.btn,
           {
-            backgroundColor: isRecording
-              ? "#7f1d1d"
-              : busy
-              ? c.muted
-              : c.card,
-            borderColor: isRecording
-              ? "#ef4444"
-              : busy
-              ? c.border
-              : c.border,
+            backgroundColor: isRecording ? "#7f1d1d" : busy ? c.muted : c.card,
+            borderColor: isRecording ? "#ef4444" : c.border,
           },
         ]}
         accessibilityLabel={isRecording ? "Stop recording" : "Dictate note"}
