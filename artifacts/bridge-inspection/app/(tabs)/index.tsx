@@ -4,6 +4,7 @@ import * as ImagePicker from "expo-image-picker";
 import { resizePhoto } from "@/lib/photoUtils";
 import * as Location from "expo-location";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
+import { useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
 import {
   Alert,
@@ -105,6 +106,21 @@ export default function InspectionScreen() {
     imageSize,
     dateStampEnabled,
   } = useInspection();
+
+  const { focus, focusTs } = useLocalSearchParams<{ focus?: string; focusTs?: string }>();
+  const handledFocusRef = React.useRef<string | undefined>(undefined);
+  React.useEffect(() => {
+    // focusTs is a per-tap nonce; resolve each deep-link once, but keep manifests
+    // in deps so a link that arrives before data is ready still resolves on load.
+    const nonce = focusTs ?? focus;
+    if (!focus || !nonce || handledFocusRef.current === nonce) return;
+    const target =
+      sessionManifest.find((d) => d.id === focus) ?? legacyManifest.find((d) => d.id === focus);
+    if (target) {
+      startEdit(target);
+      handledFocusRef.current = nonce;
+    }
+  }, [focus, focusTs, sessionManifest, legacyManifest, startEdit]);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [moduleMenuOpen, setModuleMenuOpen] = useState(false);

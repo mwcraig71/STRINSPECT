@@ -43,6 +43,8 @@ router.get("/sessions", async (_req, res) => {
       id: inspectionSessionsTable.id,
       structureNumber: inspectionSessionsTable.structureNumber,
       source: inspectionSessionsTable.source,
+      status: inspectionSessionsTable.status,
+      finalizedAt: inspectionSessionsTable.finalizedAt,
       defectCount: inspectionSessionsTable.defectCount,
       cs4Count: inspectionSessionsTable.cs4Count,
       syncedAt: inspectionSessionsTable.syncedAt,
@@ -62,6 +64,8 @@ router.post("/sessions", requireApiKey, async (req, res) => {
 
   const { structureNumber } = bodyParsed.data;
   const source = bodyParsed.data.source ?? "mobile_sync";
+  const status = bodyParsed.data.status ?? "in_progress";
+  const finalizedAt = bodyParsed.data.finalizedAt ?? null;
   const defects = bodyParsed.data.defects ?? [];
   const nbiRatings = bodyParsed.data.nbiRatings ?? [];
   const importSummary = bodyParsed.data.importSummary ?? null;
@@ -76,15 +80,17 @@ router.post("/sessions", requireApiKey, async (req, res) => {
 
   const [row] = await db
     .insert(inspectionSessionsTable)
-    .values({ structureNumber, source, defects, nbiRatings, importSummary, pdfAnnotations, defectCount, cs4Count })
+    .values({ structureNumber, source, status, finalizedAt, defects, nbiRatings, importSummary, pdfAnnotations, defectCount, cs4Count })
     .onConflictDoUpdate({
       target: inspectionSessionsTable.structureNumber,
-      set: { source, defects, nbiRatings, importSummary, pdfAnnotations, defectCount, cs4Count, syncedAt: new Date() },
+      set: { source, status, finalizedAt, defects, nbiRatings, importSummary, pdfAnnotations, defectCount, cs4Count, syncedAt: new Date() },
     })
     .returning({
       id: inspectionSessionsTable.id,
       structureNumber: inspectionSessionsTable.structureNumber,
       source: inspectionSessionsTable.source,
+      status: inspectionSessionsTable.status,
+      finalizedAt: inspectionSessionsTable.finalizedAt,
       defectCount: inspectionSessionsTable.defectCount,
       cs4Count: inspectionSessionsTable.cs4Count,
       syncedAt: inspectionSessionsTable.syncedAt,

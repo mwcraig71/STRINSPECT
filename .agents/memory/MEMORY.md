@@ -19,3 +19,4 @@
 - [iOS WebView canvas touch offset](webview-scroll-coordinate-offset.md) — `-webkit-overflow-scrolling:touch` makes getBoundingClientRect ignore scroll; canvas draw lands offset by scroll distance. Remove the property.
 - [pdf.js inline bundle in WKWebView](pdfjs-webview-esm-classic-script.md) — embed as classic <script>, strip trailing ESM export{} or whole script is discarded; no backticks in the HTML template literal.
 - [Offline-first sync architecture](offline-sync-arch.md) — persistent queue (offlineQueue.ts), photo upload to session_photos table, syncSession returns "synced"|"queued" (never throws when offline).
+- [Cross-tab deep-link focus](cross-tab-deep-link-focus.md) — router.navigate focus+focusTs nonce; receiver applies once via handledFocusRef while keeping data dep, or it re-snaps on later edits.

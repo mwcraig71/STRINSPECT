@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import { useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
 import {
   Platform,
@@ -45,6 +46,20 @@ export default function NBIScreen() {
     [importSummary]
   );
   const [activeItem, setActiveItem] = useState("58");
+
+  const { focus, focusTs } = useLocalSearchParams<{ focus?: string; focusTs?: string }>();
+  const handledFocusRef = React.useRef<string | undefined>(undefined);
+  React.useEffect(() => {
+    // focusTs is a per-tap nonce; apply each deep-link exactly once so later
+    // rating edits don't re-snap the user back to the originally focused item.
+    const nonce = focusTs ?? focus;
+    if (!focus || !nonce || handledFocusRef.current === nonce) return;
+    if (nbiRatings.some((r) => r.item === focus)) {
+      setActiveItem(focus);
+      handledFocusRef.current = nonce;
+    }
+  }, [focus, focusTs, nbiRatings]);
+
   const [expandedComp, setExpandedComp] = useState<number | null>(null);
   const [ratingPickerOpen, setRatingPickerOpen] = useState<number | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);

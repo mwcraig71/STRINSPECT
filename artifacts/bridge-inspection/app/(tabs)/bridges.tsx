@@ -49,6 +49,7 @@ export default function BridgesScreen() {
     setPdfAnnotations,
     importFromPdf,
     parsingActive,
+    isFinalized,
   } = useInspection();
 
   const [submitStatus, setSubmitStatus] = useState<"idle" | "syncing" | "success" | "error">("idle");
@@ -350,18 +351,19 @@ export default function BridgesScreen() {
                 </View>
                 <View style={[
                   styles.statusBadge,
-                  { backgroundColor: hasUnsyncedChanges ? "#7c2d12" : "#052e16" },
+                  { backgroundColor: isFinalized ? "#064e3b" : hasUnsyncedChanges ? "#7c2d12" : "#052e16" },
+                  isFinalized && { borderWidth: 1, borderColor: "#10b981" },
                 ]}>
                   <Feather
-                    name={hasUnsyncedChanges ? "upload-cloud" : "check-circle"}
+                    name={isFinalized ? "award" : hasUnsyncedChanges ? "upload-cloud" : "check-circle"}
                     size={11}
-                    color={hasUnsyncedChanges ? "#fb923c" : "#34d399"}
+                    color={isFinalized ? "#34d399" : hasUnsyncedChanges ? "#fb923c" : "#34d399"}
                   />
                   <Text style={[
                     styles.statusText,
-                    { color: hasUnsyncedChanges ? "#fb923c" : "#34d399" },
+                    { color: isFinalized ? "#6ee7b7" : hasUnsyncedChanges ? "#fb923c" : "#34d399" },
                   ]}>
-                    {hasUnsyncedChanges ? "Unsubmitted" : "Submitted"}
+                    {isFinalized ? "Complete" : hasUnsyncedChanges ? "Unsubmitted" : "Submitted"}
                   </Text>
                 </View>
               </View>
@@ -519,6 +521,12 @@ export default function BridgesScreen() {
                     </Text>
                   </View>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    {s.status === "finalized" && (
+                      <View style={[styles.sourceBadge, { backgroundColor: "#064e3b", borderWidth: 1, borderColor: "#10b981" }]}>
+                        <Feather name="award" size={11} color="#34d399" />
+                        <Text style={[styles.sourceText, { color: "#6ee7b7" }]}>Complete</Text>
+                      </View>
+                    )}
                     <View style={[
                       styles.sourceBadge,
                       { backgroundColor: (s.source as string) === "pdf_import" ? "#451a03" : "#0c1a2e" },

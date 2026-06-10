@@ -1041,6 +1041,16 @@ const INITIAL_STEEL_PIPE_PILE: SteelPipePileData = {
 
 // ─── Context Types ────────────────────────────────────────────────────────────
 
+export type ReadinessTargetScreen = "bridges" | "inspection" | "nbi" | "summary";
+
+export interface ReadinessCheck {
+  id: string;
+  label: string;
+  passed: boolean;
+  reason: string;
+  target: { screen: ReadinessTargetScreen; focusId?: string };
+}
+
 interface InspectionContextType {
   // Settings
   nomenclature: string;
@@ -1185,12 +1195,25 @@ interface InspectionContextType {
   lastSynced: string | null;
   lastModified: string | null;
   hasUnsyncedChanges: boolean;
-  syncSession: () => Promise<"synced" | "queued">;
+  syncSession: (
+    statusArg?: "in_progress" | "finalized",
+    finalizedAtArg?: string | null,
+  ) => Promise<"synced" | "queued">;
   pendingSyncCount: number;
   importedPdfPath: string | null;
   pdfAnnotations: unknown[] | null;
   setPdfAnnotations: (a: unknown[] | null) => void;
   pdfUploaded: boolean;
+  // ── Readiness / finalize gate ──
+  readiness: ReadinessCheck[];
+  isReady: boolean;
+  isFinalized: boolean;
+  finalizedAt: string | null;
+  finalizeInspection: () => Promise<"synced" | "queued">;
+  importAuditAcknowledged: boolean;
+  acknowledgeImportAudit: () => void;
+  criticalFindingsAcknowledged: boolean;
+  acknowledgeCriticalFindings: () => void;
 }
 
 export interface ElementSummaryRow {
@@ -1437,6 +1460,9 @@ const STORAGE_KEYS = {
   PDF_UPLOADED: "@bridge_pdf_uploaded",
   IMAGE_SIZE: "@bridge_image_size",
   DATE_STAMP: "@bridge_date_stamp",
+  FINALIZED_AT: "@bridge_finalized_at",
+  IMPORT_AUDIT_ACK: "@bridge_import_audit_ack",
+  CRITICAL_FINDINGS_ACK: "@bridge_critical_findings_ack",
 };
 
 export function InspectionProvider({ children }: { children: React.ReactNode }) {
@@ -1451,6 +1477,9 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const [elementSearch, setElementSearch] = useState("");
   const [lastSynced, setLastSynced] = useState<string | null>(null);
   const [lastModified, setLastModifiedState] = useState<string | null>(null);
+  const [finalizedAt, setFinalizedAtState] = useState<string | null>(null);
+  const [importAuditAcknowledged, setImportAuditAcknowledgedState] = useState(false);
+  const [criticalFindingsAcknowledged, setCriticalFindingsAcknowledgedState] = useState(false);
   const [savedDefects, setSavedDefectsState] = useState<DefectRecord[]>([]);
   const [nbiRatings, setNbiRatingsState] = useState<NbiRating[]>(INITIAL_NBI_RATINGS);
   const [structureNumber, setStructureNumberState] = useState("");
@@ -1519,7 +1548,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           ]);
           await AsyncStorage.setItem(STORAGE_KEYS.DEMO_CLEARED, "1");
         }
-        const [defects, nbi, nom, insType, superType, subType, superMat, subMat, structNum, uc, ch, sb, sn, spp, impSummary, lastJoint, lastSync, lastMod, pdfPath, pdfAnns, pdfUploadedStr, imgSz, dateStampStr] = await Promise.all([
+        const [defects, nbi, nom, insType, superType, subType, superMat, subMat, structNum, uc, ch, sb, sn, spp, impSummary, lastJoint, lastSync, lastMod, pdfPath, pdfAnns, pdfUploadedStr, imgSz, dateStampStr, finalizedAtStr, importAuditAckStr, criticalAckStr] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.SAVED_DEFECTS),
           AsyncStorage.getItem(STORAGE_KEYS.NBI_RATINGS),
           AsyncStorage.getItem(STORAGE_KEYS.NOMENCLATURE),
@@ -1543,6 +1572,9 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           AsyncStorage.getItem(STORAGE_KEYS.PDF_UPLOADED),
           AsyncStorage.getItem(STORAGE_KEYS.IMAGE_SIZE),
           AsyncStorage.getItem(STORAGE_KEYS.DATE_STAMP),
+          AsyncStorage.getItem(STORAGE_KEYS.FINALIZED_AT),
+          AsyncStorage.getItem(STORAGE_KEYS.IMPORT_AUDIT_ACK),
+          AsyncStorage.getItem(STORAGE_KEYS.CRITICAL_FINDINGS_ACK),
         ]);
         if (lastJoint) setLastJointElementIdState(lastJoint);
         if (lastSync) setLastSynced(lastSync);
@@ -1552,6 +1584,9 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         if (pdfUploadedStr === "1") setPdfUploadedState(true);
         if (imgSz) setImageSizeState(imgSz);
         if (dateStampStr === "1") setDateStampEnabledState(true);
+        if (finalizedAtStr) setFinalizedAtState(finalizedAtStr);
+        if (importAuditAckStr === "1") setImportAuditAcknowledgedState(true);
+        if (criticalAckStr === "1") setCriticalFindingsAcknowledgedState(true);
         if (defects) setSavedDefectsState(JSON.parse(defects));
         if (nbi) setNbiRatingsState(JSON.parse(nbi));
         if (impSummary) {
@@ -1677,6 +1712,20 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     const ts = new Date().toISOString();
     setLastModifiedState(ts);
     AsyncStorage.setItem(STORAGE_KEYS.LAST_MODIFIED, ts).catch(() => {});
+    // Any edit reverts a finalized inspection back to in-progress and
+    // invalidates prior acknowledgements so readiness must be re-confirmed.
+    setFinalizedAtState((prev) => {
+      if (prev !== null) AsyncStorage.removeItem(STORAGE_KEYS.FINALIZED_AT).catch(() => {});
+      return null;
+    });
+    setImportAuditAcknowledgedState((prev) => {
+      if (prev) AsyncStorage.removeItem(STORAGE_KEYS.IMPORT_AUDIT_ACK).catch(() => {});
+      return false;
+    });
+    setCriticalFindingsAcknowledgedState((prev) => {
+      if (prev) AsyncStorage.removeItem(STORAGE_KEYS.CRITICAL_FINDINGS_ACK).catch(() => {});
+      return false;
+    });
   }, []);
 
   const setSavedDefects = useCallback((v: DefectRecord[]) => {
@@ -1736,7 +1785,10 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     AsyncStorage.setItem(STORAGE_KEYS.SUBSTRUCTURE_MATERIAL, v).catch(() => {});
   }, []);
 
-  const syncSession = useCallback(async (): Promise<"synced" | "queued"> => {
+  const syncSession = useCallback(async (
+    statusArg?: "in_progress" | "finalized",
+    finalizedAtArg?: string | null,
+  ): Promise<"synced" | "queued"> => {
     const apiUrl = process.env.EXPO_PUBLIC_API_URL ??
       (process.env.EXPO_PUBLIC_DOMAIN
         ? `https://${process.env.EXPO_PUBLIC_DOMAIN}:8080`
@@ -1745,9 +1797,14 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     const sn = structureNumber.trim() || "UNKNOWN";
     const apiKey = process.env.EXPO_PUBLIC_API_KEY;
 
+    const status = statusArg ?? (finalizedAt ? "finalized" : "in_progress");
+    const finAt = finalizedAtArg !== undefined ? finalizedAtArg : finalizedAt;
+
     const buildQueueEntry = () => ({
       structureNumber: sn,
       payload: {
+        status,
+        finalizedAt: finAt,
         defects: savedDefects as unknown[],
         nbiRatings: nbiRatings as unknown[],
         importSummary: importSummary ?? null,
@@ -1775,6 +1832,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     try {
       await upsertSession({
         structureNumber: sn,
+        status,
+        finalizedAt: finAt,
         defects: savedDefects,
         nbiRatings,
         importSummary: importSummary ?? undefined,
@@ -1829,7 +1888,17 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
       setPendingSyncCount(qLen);
       throw err; // re-throw so SettingsModal can display error state
     }
-  }, [structureNumber, savedDefects, nbiRatings, importSummary, pdfAnnotations, importedPdfPath, pdfUploaded]);
+  }, [structureNumber, savedDefects, nbiRatings, importSummary, pdfAnnotations, importedPdfPath, pdfUploaded, finalizedAt]);
+
+  const acknowledgeImportAudit = useCallback(() => {
+    setImportAuditAcknowledgedState(true);
+    AsyncStorage.setItem(STORAGE_KEYS.IMPORT_AUDIT_ACK, "1").catch(() => {});
+  }, []);
+
+  const acknowledgeCriticalFindings = useCallback(() => {
+    setCriticalFindingsAcknowledgedState(true);
+    AsyncStorage.setItem(STORAGE_KEYS.CRITICAL_FINDINGS_ACK, "1").catch(() => {});
+  }, []);
 
   const setStructureNumber = useCallback((v: string) => {
     setStructureNumberState(v);
@@ -2094,6 +2163,135 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     () => savedDefects.filter((d) => d.isMaintenance),
     [savedDefects]
   );
+
+  // ── Readiness checklist (inspection finalize gate) ──
+  const readiness = useMemo<ReadinessCheck[]>(() => {
+    const checks: ReadinessCheck[] = [];
+
+    // 1. Structure number present
+    const hasSN = structureNumber.trim().length > 0;
+    checks.push({
+      id: "structureNumber",
+      label: "Structure number set",
+      passed: hasSN,
+      reason: hasSN ? "" : "No structure number has been entered for this bridge.",
+      target: { screen: "bridges" },
+    });
+
+    // 2. No imported defects awaiting verification
+    const unverified = savedDefects.filter((d) => d.needsVerification);
+    checks.push({
+      id: "unverifiedDefects",
+      label: "Imported defects verified",
+      passed: unverified.length === 0,
+      reason:
+        unverified.length === 0
+          ? ""
+          : `${unverified.length} imported defect(s) still need verification.`,
+      target: { screen: "inspection", focusId: unverified[0]?.id },
+    });
+
+    // 3. Every NBI sub-component rated + no imported-but-unreviewed leftover
+    let nbiUnrated = 0;
+    let nbiImported = 0;
+    let firstNbiItem: string | undefined;
+    nbiRatings.forEach((r) => {
+      r.subComponents.forEach((sc) => {
+        const blank =
+          !sc.rating || sc.rating.trim() === "" || sc.rating === "—" || sc.rating === "-";
+        if (blank) {
+          nbiUnrated++;
+          if (!firstNbiItem) firstNbiItem = r.item;
+        }
+        if (sc.isImported) {
+          nbiImported++;
+          if (!firstNbiItem) firstNbiItem = r.item;
+        }
+      });
+    });
+    const nbiPass = nbiUnrated === 0 && nbiImported === 0;
+    checks.push({
+      id: "nbiRatings",
+      label: "NBI ratings complete & reviewed",
+      passed: nbiPass,
+      reason: nbiPass
+        ? ""
+        : [
+            nbiUnrated ? `${nbiUnrated} sub-component(s) unrated` : "",
+            nbiImported ? `${nbiImported} imported component(s) not reviewed` : "",
+          ]
+            .filter(Boolean)
+            .join("; ") + ".",
+      target: { screen: "nbi", focusId: firstNbiItem },
+    });
+
+    // 4. Import audit empty sections resolved or acknowledged
+    const emptyCount = importSummary?.emptySections.length ?? 0;
+    const auditPass = emptyCount === 0 || importAuditAcknowledged;
+    checks.push({
+      id: "importAudit",
+      label: "Import audit reviewed",
+      passed: auditPass,
+      reason: auditPass
+        ? ""
+        : `${emptyCount} imported section(s) returned no data — review or acknowledge them.`,
+      target: { screen: "summary", focusId: "importAudit" },
+    });
+
+    // 5. Required defect fields present (element / defect / condition state / quantity)
+    const incomplete = savedDefects.filter((d) => {
+      const hasElement = !!(d.elementId || d.element);
+      const hasDefect = !!(d.defectId || d.defect);
+      const hasCs = !!(d.cs && d.cs.trim());
+      const hasQty = !!(d.quantityValue?.trim() || d.maintenanceQuantityValue?.trim());
+      return !(hasElement && hasDefect && hasCs && hasQty);
+    });
+    checks.push({
+      id: "defectFields",
+      label: "Defect fields complete",
+      passed: incomplete.length === 0,
+      reason:
+        incomplete.length === 0
+          ? ""
+          : `${incomplete.length} defect(s) are missing an element, defect, condition state, or quantity.`,
+      target: { screen: "inspection", focusId: incomplete[0]?.id },
+    });
+
+    // 6. Critical findings acknowledged
+    const critPass = criticalFindingsSummary.length === 0 || criticalFindingsAcknowledged;
+    checks.push({
+      id: "criticalFindings",
+      label: "Critical findings reviewed",
+      passed: critPass,
+      reason: critPass
+        ? ""
+        : `${criticalFindingsSummary.length} critical finding(s) require review and acknowledgement.`,
+      target: { screen: "summary", focusId: "criticalFindings" },
+    });
+
+    return checks;
+  }, [
+    structureNumber,
+    savedDefects,
+    nbiRatings,
+    importSummary,
+    importAuditAcknowledged,
+    criticalFindingsSummary,
+    criticalFindingsAcknowledged,
+  ]);
+
+  const isReady = useMemo(() => readiness.every((c) => c.passed), [readiness]);
+  const isFinalized = finalizedAt !== null;
+
+  const finalizeInspection = useCallback(async (): Promise<"synced" | "queued"> => {
+    if (!isReady) {
+      throw new Error("Inspection is not ready to finalize — resolve all readiness checks first.");
+    }
+    const ts = new Date().toISOString();
+    setFinalizedAtState(ts);
+    await AsyncStorage.setItem(STORAGE_KEYS.FINALIZED_AT, ts).catch(() => {});
+    return syncSession("finalized", ts);
+  }, [isReady, syncSession]);
 
   // ── Actions ──
   const handleSave = useCallback(() => {
@@ -2841,6 +3039,15 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     pdfAnnotations,
     setPdfAnnotations,
     pdfUploaded,
+    readiness,
+    isReady,
+    isFinalized,
+    finalizedAt,
+    finalizeInspection,
+    importAuditAcknowledged,
+    acknowledgeImportAudit,
+    criticalFindingsAcknowledged,
+    acknowledgeCriticalFindings,
   };
 
   return (

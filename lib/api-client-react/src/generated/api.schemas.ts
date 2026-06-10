@@ -11,10 +11,14 @@ export interface HealthStatus {
 
 export type SessionSource = "mobile_sync" | "pdf_import";
 
+export type SessionStatus = "in_progress" | "finalized";
+
 export interface SessionSummary {
   id: string;
   structureNumber: string;
   source: SessionSource;
+  status: SessionStatus;
+  finalizedAt?: string | null;
   defectCount: number;
   cs4Count: number;
   syncedAt: string;
@@ -24,6 +28,8 @@ export interface SessionDetail {
   id: string;
   structureNumber: string;
   source: SessionSource;
+  status: SessionStatus;
+  finalizedAt?: string | null;
   defectCount: number;
   cs4Count: number;
   syncedAt: string;
@@ -36,6 +42,8 @@ export interface SessionDetail {
 export interface UpsertSessionBody {
   structureNumber: string;
   source?: SessionSource;
+  status?: SessionStatus;
+  finalizedAt?: string | null;
   defects?: unknown[];
   nbiRatings?: unknown[];
   importSummary?: unknown;

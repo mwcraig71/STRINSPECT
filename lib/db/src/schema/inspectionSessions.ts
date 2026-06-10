@@ -12,12 +12,17 @@ const bytea = customType<{ data: Buffer; driverData: Buffer }>({
 export const SESSION_SOURCES = ["mobile_sync", "pdf_import"] as const;
 export type SessionSource = typeof SESSION_SOURCES[number];
 
+export const SESSION_STATUSES = ["in_progress", "finalized"] as const;
+export type SessionStatus = typeof SESSION_STATUSES[number];
+
 export const inspectionSessionsTable = pgTable(
   "inspection_sessions",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     structureNumber: text("structure_number").notNull(),
     source: text("source").$type<SessionSource>().notNull().default("mobile_sync"),
+    status: text("status").$type<SessionStatus>().notNull().default("in_progress"),
+    finalizedAt: timestamp("finalized_at", { withTimezone: true }),
     defectCount: integer("defect_count").notNull().default(0),
     cs4Count: integer("cs4_count").notNull().default(0),
     syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),

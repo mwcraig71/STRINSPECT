@@ -1,8 +1,10 @@
 import { Feather } from "@expo/vector-icons";
+import { router } from "expo-router";
 import React from "react";
 import {
   ActivityIndicator,
   Alert,
+  LayoutChangeEvent,
   Platform,
   ScrollView,
   StyleSheet,
@@ -13,7 +15,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
-import { useInspection, INSPECTION_TYPES } from "@/context/InspectionContext";
+import { useInspection, type ReadinessCheck } from "@/context/InspectionContext";
 import { SettingsModal } from "@/components/SettingsModal";
 import colors from "@/constants/colors";
 
@@ -31,16 +33,68 @@ export default function SummaryScreen() {
     elementSummary,
     maintenanceSummary,
     criticalFindingsSummary,
-    inspectionType,
     importSummary,
     clearImportSummary,
     syncSession,
     structureNumber,
     hasUnsyncedChanges,
-    lastSynced,
+    readiness,
+    isReady,
+    isFinalized,
+    finalizeInspection,
+    importAuditAcknowledged,
+    acknowledgeImportAudit,
+    criticalFindingsAcknowledged,
+    acknowledgeCriticalFindings,
   } = useInspection();
   const [settingsOpen, setSettingsOpen] = React.useState(false);
   const [submitStatus, setSubmitStatus] = React.useState<"idle" | "syncing" | "success" | "error">("idle");
+  const [finalizeStatus, setFinalizeStatus] = React.useState<"idle" | "working">("idle");
+
+  const scrollRef = React.useRef<ScrollView>(null);
+  const sectionY = React.useRef<Record<string, number>>({});
+  const onSectionLayout = (id: string) => (e: LayoutChangeEvent) => {
+    sectionY.current[id] = e.nativeEvent.layout.y;
+  };
+
+  const goToTarget = (target: ReadinessCheck["target"]) => {
+    if (target.screen === "summary") {
+      const y = target.focusId ? sectionY.current[target.focusId] ?? 0 : 0;
+      scrollRef.current?.scrollTo({ y: Math.max(0, y - 12), animated: true });
+      return;
+    }
+    const focusTs = String(Date.now());
+    if (target.screen === "bridges") {
+      router.navigate("/(tabs)/bridges");
+    } else if (target.screen === "inspection") {
+      router.navigate({ pathname: "/(tabs)", params: { focus: target.focusId ?? "", focusTs } });
+    } else if (target.screen === "nbi") {
+      router.navigate({ pathname: "/(tabs)/nbi", params: { focus: target.focusId ?? "", focusTs } });
+    }
+  };
+
+  const handleFinalize = async () => {
+    if (finalizeStatus === "working") return;
+    if (!isReady) {
+      Alert.alert("Not Ready", "Resolve every readiness check before marking this inspection complete.");
+      return;
+    }
+    setFinalizeStatus("working");
+    try {
+      const result = await finalizeInspection();
+      Alert.alert(
+        "Inspection Finalized",
+        result === "queued"
+          ? "Marked complete. It will sync automatically when you're back online."
+          : "Marked complete and synced to the cloud."
+      );
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Finalize failed";
+      Alert.alert("Cannot Finalize", msg);
+    } finally {
+      setFinalizeStatus("idle");
+    }
+  };
 
   const handleSubmit = async () => {
     if (submitStatus === "syncing") return;
@@ -74,6 +128,12 @@ export default function SummaryScreen() {
           <View style={styles.headerInner}>
             <Feather name="list" size={16} color="#38bdf8" />
             <Text style={styles.headerTitle}>Summary</Text>
+            {isFinalized && (
+              <View style={styles.headerCompleteBadge}>
+                <Feather name="check-circle" size={11} color="#34d399" />
+                <Text style={styles.headerCompleteText}>Complete</Text>
+              </View>
+            )}
           </View>
           <View style={styles.headerActions}>
             {hasUnsyncedChanges && (
@@ -113,11 +173,117 @@ export default function SummaryScreen() {
       </View>
       <SettingsModal visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
-      <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
+      <ScrollView ref={scrollRef} style={styles.body} contentContainerStyle={styles.bodyContent}>
+
+        {/* ── Readiness Checklist ── */}
+        <View
+          style={[
+            styles.card,
+            {
+              backgroundColor: c.card,
+              borderColor: isFinalized ? "#10b981" : isReady ? "#10b981" : "#f59e0b",
+              borderWidth: 2,
+            },
+          ]}
+        >
+          <View style={[styles.cardHeader, { borderBottomColor: isReady ? "#bbf7d0" : "#fde68a" }]}>
+            <View style={styles.cardHeaderLeft}>
+              <Feather
+                name={isReady ? "check-circle" : "alert-circle"}
+                size={20}
+                color={isReady ? "#10b981" : "#f59e0b"}
+              />
+              <Text style={[styles.cardTitle, { color: isReady ? "#047857" : "#b45309" }]}>
+                Readiness Checklist
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.countBadge,
+                { backgroundColor: isReady ? "#10b981" : "#f59e0b" },
+              ]}
+            >
+              <Text style={styles.countBadgeText}>
+                {readiness.filter((r) => r.passed).length}/{readiness.length}
+              </Text>
+            </View>
+          </View>
+
+          {readiness.map((check, idx) => (
+            <View
+              key={check.id}
+              style={[
+                styles.checkRow,
+                { borderBottomColor: c.border },
+                idx === readiness.length - 1 && { borderBottomWidth: 0 },
+              ]}
+            >
+              <Feather
+                name={check.passed ? "check-circle" : "x-circle"}
+                size={18}
+                color={check.passed ? "#10b981" : "#ef4444"}
+              />
+              <View style={styles.checkTextWrap}>
+                <Text style={[styles.checkLabel, { color: c.foreground }]}>{check.label}</Text>
+                <Text
+                  style={[
+                    styles.checkReason,
+                    { color: check.passed ? c.mutedForeground : "#dc2626" },
+                  ]}
+                >
+                  {check.reason}
+                </Text>
+              </View>
+              {!check.passed && (
+                <TouchableOpacity
+                  style={[styles.fixBtn, { borderColor: "#fca5a5", backgroundColor: "#fef2f2" }]}
+                  onPress={() => goToTarget(check.target)}
+                >
+                  <Text style={styles.fixBtnText}>Fix</Text>
+                  <Feather name="arrow-right" size={12} color="#dc2626" />
+                </TouchableOpacity>
+              )}
+            </View>
+          ))}
+
+          <View style={[styles.finalizeFooter, { borderTopColor: c.border }]}>
+            {isFinalized ? (
+              <View style={styles.finalizedRow}>
+                <Feather name="check-circle" size={16} color="#10b981" />
+                <Text style={styles.finalizedText}>
+                  Inspection marked complete. Editing any field will reopen it.
+                </Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={[
+                  styles.finalizeBtn,
+                  isReady
+                    ? { backgroundColor: "#059669", borderColor: "#047857" }
+                    : { backgroundColor: "#e2e8f0", borderColor: "#cbd5e1" },
+                ]}
+                onPress={handleFinalize}
+                disabled={!isReady || finalizeStatus === "working"}
+              >
+                {finalizeStatus === "working" ? (
+                  <ActivityIndicator size="small" color={isReady ? "#fff" : "#94a3b8"} />
+                ) : (
+                  <Feather name="check-square" size={16} color={isReady ? "#fff" : "#94a3b8"} />
+                )}
+                <Text style={[styles.finalizeBtnText, { color: isReady ? "#fff" : "#94a3b8" }]}>
+                  {isReady ? "Mark Complete" : "Resolve checks to finalize"}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
 
         {/* ── Import Audit ── */}
         {importSummary && (
-          <View style={[styles.card, { backgroundColor: c.card, borderColor: "#f97316", borderWidth: 2 }]}>
+          <View
+            onLayout={onSectionLayout("importAudit")}
+            style={[styles.card, { backgroundColor: c.card, borderColor: "#f97316", borderWidth: 2 }]}
+          >
             <View style={[styles.cardHeader, { borderBottomColor: "#fed7aa" }]}>
               <View style={styles.cardHeaderLeft}>
                 <Feather name="file-text" size={20} color="#f97316" />
@@ -229,6 +395,21 @@ export default function SummaryScreen() {
                     </Text>
                   ))}
                 </View>
+              )}
+
+              {/* Acknowledge — clears the readiness blocker for blank sections */}
+              {importSummary.emptySections.length > 0 && (
+                importAuditAcknowledged ? (
+                  <View style={styles.ackDone}>
+                    <Feather name="check-circle" size={14} color="#059669" />
+                    <Text style={styles.ackDoneText}>Blank sections reviewed & acknowledged</Text>
+                  </View>
+                ) : (
+                  <TouchableOpacity style={styles.ackBtn} onPress={acknowledgeImportAudit}>
+                    <Feather name="check" size={14} color="#fff" />
+                    <Text style={styles.ackBtnText}>Acknowledge blank sections</Text>
+                  </TouchableOpacity>
+                )
               )}
             </View>
           </View>
@@ -342,7 +523,10 @@ export default function SummaryScreen() {
         </View>
 
         {/* ── Critical Finding Summary ── */}
-        <View style={[styles.card, { backgroundColor: c.card, borderColor: "#dc2626", borderWidth: 2 }]}>
+        <View
+          onLayout={onSectionLayout("criticalFindings")}
+          style={[styles.card, { backgroundColor: c.card, borderColor: "#dc2626", borderWidth: 2 }]}
+        >
           <View style={styles.cardHeader}>
             <View style={styles.cardHeaderLeft}>
               <Feather name="alert-octagon" size={20} color="#dc2626" />
@@ -392,6 +576,24 @@ export default function SummaryScreen() {
                 </Text>
               </View>
             ))
+          )}
+          {criticalFindingsSummary.length > 0 && (
+            <View style={styles.critAckWrap}>
+              {criticalFindingsAcknowledged ? (
+                <View style={styles.ackDone}>
+                  <Feather name="check-circle" size={14} color="#059669" />
+                  <Text style={styles.ackDoneText}>Critical findings reviewed & acknowledged</Text>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={[styles.ackBtn, { backgroundColor: "#dc2626" }]}
+                  onPress={acknowledgeCriticalFindings}
+                >
+                  <Feather name="check" size={14} color="#fff" />
+                  <Text style={styles.ackBtnText}>Acknowledge critical findings</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           )}
         </View>
 
@@ -502,4 +704,74 @@ const styles = StyleSheet.create({
   calloutHeader: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 },
   calloutTitle: { fontSize: 11, fontWeight: "900", color: "#b91c1c", textTransform: "uppercase" },
   calloutItem: { fontSize: 11, fontWeight: "600", color: "#b91c1c" },
+  headerCompleteBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 20,
+    backgroundColor: "#052e16",
+    borderWidth: 1,
+    borderColor: "#10b981",
+    marginLeft: 4,
+  },
+  headerCompleteText: { fontSize: 10, fontWeight: "900", color: "#34d399", textTransform: "uppercase", letterSpacing: 0.4 },
+  checkRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderBottomWidth: 1,
+  },
+  checkTextWrap: { flex: 1, minWidth: 0, gap: 2 },
+  checkLabel: { fontSize: 12.5, fontWeight: "800" },
+  checkReason: { fontSize: 11, fontWeight: "600" },
+  fixBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  fixBtnText: { fontSize: 11, fontWeight: "900", color: "#dc2626", textTransform: "uppercase", letterSpacing: 0.3 },
+  finalizeFooter: { padding: 14, borderTopWidth: 1 },
+  finalizeBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  finalizeBtnText: { fontSize: 14, fontWeight: "900", textTransform: "uppercase", letterSpacing: 0.5 },
+  finalizedRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  finalizedText: { flex: 1, minWidth: 0, fontSize: 12, fontWeight: "700", color: "#047857" },
+  ackBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 11,
+    borderRadius: 10,
+    backgroundColor: "#059669",
+  },
+  ackBtnText: { fontSize: 12, fontWeight: "900", color: "#fff", textTransform: "uppercase", letterSpacing: 0.4 },
+  ackDone: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: "#ecfdf5",
+    borderWidth: 1,
+    borderColor: "#a7f3d0",
+  },
+  ackDoneText: { fontSize: 11.5, fontWeight: "800", color: "#047857", textTransform: "uppercase", letterSpacing: 0.3 },
+  critAckWrap: { padding: 14 },
 });

@@ -17,6 +17,8 @@ export interface SyncQueueEntry {
   attempts: number;
   lastError?: string;
   payload: {
+    status?: "in_progress" | "finalized";
+    finalizedAt?: string | null;
     defects: unknown[];
     nbiRatings: unknown[];
     importSummary: unknown | null;

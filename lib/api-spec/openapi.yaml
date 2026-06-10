@@ -117,6 +117,14 @@ components:
       required:
         - status
 
+    SessionSource:
+      type: string
+      enum: [mobile_sync, pdf_import]
+
+    SessionStatus:
+      type: string
+      enum: [in_progress, finalized]
+
     SessionSummary:
       type: object
       properties:
@@ -124,6 +132,14 @@ components:
           type: string
         structureNumber:
           type: string
+        source:
+          $ref: "#/components/schemas/SessionSource"
+        status:
+          $ref: "#/components/schemas/SessionStatus"
+        finalizedAt:
+          type: string
+          format: date-time
+          nullable: true
         defectCount:
           type: integer
         cs4Count:
@@ -134,6 +150,8 @@ components:
       required:
         - id
         - structureNumber
+        - source
+        - status
         - defectCount
         - cs4Count
         - syncedAt
@@ -145,6 +163,14 @@ components:
           type: string
         structureNumber:
           type: string
+        source:
+          $ref: "#/components/schemas/SessionSource"
+        status:
+          $ref: "#/components/schemas/SessionStatus"
+        finalizedAt:
+          type: string
+          format: date-time
+          nullable: true
         defectCount:
           type: integer
         cs4Count:
@@ -158,9 +184,17 @@ components:
         nbiRatings:
           type: array
           items: {}
+        importSummary:
+          nullable: true
+        pdfAnnotations:
+          type: array
+          items: {}
+          nullable: true
       required:
         - id
         - structureNumber
+        - source
+        - status
         - defectCount
         - cs4Count
         - syncedAt
@@ -172,10 +206,22 @@ components:
       properties:
         structureNumber:
           type: string
+        source:
+          $ref: "#/components/schemas/SessionSource"
+        status:
+          $ref: "#/components/schemas/SessionStatus"
+        finalizedAt:
+          type: string
+          format: date-time
+          nullable: true
         defects:
           type: array
           items: {}
         nbiRatings:
+          type: array
+          items: {}
+        importSummary: {}
+        pdfAnnotations:
           type: array
           items: {}
       required:

@@ -21,10 +21,14 @@ export const HealthCheckResponse = zod.object({
  */
 export const SessionSource = zod.enum(["mobile_sync", "pdf_import"]);
 
+export const SessionStatus = zod.enum(["in_progress", "finalized"]);
+
 export const ListSessionsResponseItem = zod.object({
   id: zod.string(),
   structureNumber: zod.string(),
   source: SessionSource.default("mobile_sync"),
+  status: SessionStatus.default("in_progress"),
+  finalizedAt: zod.coerce.date().nullable().optional(),
   defectCount: zod.number(),
   cs4Count: zod.number(),
   syncedAt: zod.coerce.date(),
@@ -38,6 +42,8 @@ export const ListSessionsResponse = zod.array(ListSessionsResponseItem);
 export const UpsertSessionBody = zod.object({
   structureNumber: zod.string(),
   source: SessionSource.optional(),
+  status: SessionStatus.optional(),
+  finalizedAt: zod.coerce.date().nullable().optional(),
   defects: zod.array(zod.unknown()).optional(),
   nbiRatings: zod.array(zod.unknown()).optional(),
   importSummary: zod.unknown().optional(),
@@ -48,6 +54,8 @@ export const UpsertSessionResponse = zod.object({
   id: zod.string(),
   structureNumber: zod.string(),
   source: SessionSource.default("mobile_sync"),
+  status: SessionStatus.default("in_progress"),
+  finalizedAt: zod.coerce.date().nullable().optional(),
   defectCount: zod.number(),
   cs4Count: zod.number(),
   syncedAt: zod.coerce.date(),
@@ -64,6 +72,8 @@ export const GetSessionResponse = zod.object({
   id: zod.string(),
   structureNumber: zod.string(),
   source: SessionSource.default("mobile_sync"),
+  status: SessionStatus.default("in_progress"),
+  finalizedAt: zod.coerce.date().nullable().optional(),
   defectCount: zod.number(),
   cs4Count: zod.number(),
   syncedAt: zod.coerce.date(),
