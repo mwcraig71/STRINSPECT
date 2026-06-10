@@ -476,7 +476,9 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
           paras.push(new Paragraph({
             children: [new ImageRun({ data: imgData.b64, transformation: { width: w, height: h }, type: imgData.type })],
           }));
-        } else if (!e.photo.uri || (!e.photo.uri.startsWith("data:") && !e.photo.uri.startsWith("http"))) {
+        } else if (e.photo.uri && (e.photo.uri.startsWith("http://") || e.photo.uri.startsWith("https://"))) {
+          paras.push(new Paragraph({ children: [new TextRun({ text: "(image unavailable)", italics: true, color: "888888" })] }));
+        } else {
           paras.push(new Paragraph({ children: [new TextRun({ text: "(image stored on device)", italics: true, color: "888888" })] }));
         }
         paras.push(new Paragraph({ text: "" }));
@@ -541,6 +543,10 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
               new TableCell({ children: [new Paragraph(d.locationDesc)] }),
             ]}));
           }
+          fuaRows.push(new TableRow({ children: [
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Recommendation", bold: true })] })] }),
+            new TableCell({ children: [new Paragraph("")] }),
+          ]}));
           children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: fuaRows }));
           for (const p of (d.photos ?? [])) {
             const entry = photoInventory.find((e) => e.photo === p);
@@ -718,42 +724,13 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
           </p>
         </div>
         {sessionData && (
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <button
-              onClick={clearSession}
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground border border-border rounded-md px-3 py-1.5 transition-colors"
-            >
-              <X className="h-3 w-3" />
-              Change
-            </button>
-            <button
-              data-testid="button-export-excel"
-              onClick={exportExcel}
-              disabled={exporting !== null}
-              className="flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white px-3 py-1.5 rounded-md text-xs font-semibold transition-colors"
-            >
-              <FileSpreadsheet className="h-3.5 w-3.5" />
-              {exporting === "excel" ? "Exporting…" : "Excel"}
-            </button>
-            <button
-              data-testid="button-export-word"
-              onClick={exportWord}
-              disabled={exporting !== null}
-              className="flex items-center gap-1.5 bg-blue-700 hover:bg-blue-600 disabled:opacity-50 text-white px-3 py-1.5 rounded-md text-xs font-semibold transition-colors"
-            >
-              <FileText className="h-3.5 w-3.5" />
-              {exporting === "word" ? "Exporting…" : "Word"}
-            </button>
-            <button
-              data-testid="button-export-pdf"
-              onClick={exportPdf}
-              disabled={exporting !== null}
-              className="flex items-center gap-1.5 bg-red-700 hover:bg-red-600 disabled:opacity-50 text-white px-3 py-1.5 rounded-md text-xs font-semibold transition-colors"
-            >
-              <FileDown className="h-3.5 w-3.5" />
-              {exporting === "pdf" ? "Opening…" : "Print PDF"}
-            </button>
-          </div>
+          <button
+            onClick={clearSession}
+            className="flex-shrink-0 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground border border-border rounded-md px-3 py-1.5 transition-colors"
+          >
+            <X className="h-3 w-3" />
+            Change
+          </button>
         )}
       </div>
 
@@ -884,6 +861,39 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Export buttons — below Report Header so the header is filled in first */}
+      {sessionData && (
+        <div className="flex items-center justify-end gap-2 mb-5">
+          <button
+            data-testid="button-export-excel"
+            onClick={exportExcel}
+            disabled={exporting !== null}
+            className="flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white px-3 py-1.5 rounded-md text-xs font-semibold transition-colors"
+          >
+            <FileSpreadsheet className="h-3.5 w-3.5" />
+            {exporting === "excel" ? "Exporting…" : "Excel"}
+          </button>
+          <button
+            data-testid="button-export-word"
+            onClick={exportWord}
+            disabled={exporting !== null}
+            className="flex items-center gap-1.5 bg-blue-700 hover:bg-blue-600 disabled:opacity-50 text-white px-3 py-1.5 rounded-md text-xs font-semibold transition-colors"
+          >
+            <FileText className="h-3.5 w-3.5" />
+            {exporting === "word" ? "Exporting…" : "Word (.docx)"}
+          </button>
+          <button
+            data-testid="button-export-pdf"
+            onClick={exportPdf}
+            disabled={exporting !== null}
+            className="flex items-center gap-1.5 bg-red-700 hover:bg-red-600 disabled:opacity-50 text-white px-3 py-1.5 rounded-md text-xs font-semibold transition-colors"
+          >
+            <FileDown className="h-3.5 w-3.5" />
+            {exporting === "pdf" ? "Opening…" : "Print PDF"}
+          </button>
         </div>
       )}
 
