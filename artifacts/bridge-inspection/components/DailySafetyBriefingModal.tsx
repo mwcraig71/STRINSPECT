@@ -27,7 +27,7 @@ import {
 const ACCENT = "#b91c1c";
 const SAFETY_PLAN_PDF = require("@/assets/docs/safety-plan.pdf");
 
-export function DailySafetyBriefingModal() {
+export function DailySafetyBriefingModal({ inline = false }: { inline?: boolean }) {
   const c = useColors();
   const {
     showDailySafetyModal,
@@ -110,14 +110,9 @@ export function DailySafetyBriefingModal() {
     }
   };
 
-  return (
-    <Modal
-      visible={showDailySafetyModal}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={() => setShowDailySafetyModal(false)}
-    >
-      <View style={[styles.container, { backgroundColor: c.background }]}>
+  if (inline && !showDailySafetyModal) return null;
+  const sheet = (
+    <View style={inline ? [StyleSheet.absoluteFill, styles.container, { backgroundColor: c.background, zIndex: 999 }] : [styles.container, { backgroundColor: c.background }]}>
         {/* Header */}
         <View style={[styles.header, { backgroundColor: ACCENT }]}>
           <View style={styles.headerLeft}>
@@ -412,7 +407,17 @@ export function DailySafetyBriefingModal() {
             <Text style={styles.doneBtnText}>Save & Close</Text>
           </TouchableOpacity>
         </View>
-      </View>
+    </View>
+  );
+  if (inline) return sheet;
+  return (
+    <Modal
+      visible={showDailySafetyModal}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={() => setShowDailySafetyModal(false)}
+    >
+      {sheet}
     </Modal>
   );
 }

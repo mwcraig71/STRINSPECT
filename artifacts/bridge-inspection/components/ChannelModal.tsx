@@ -23,7 +23,7 @@ const AMBER = "#f59e0b";
 const AMBER_BG = "#fffbeb";
 const AMBER_BORDER = "#fcd34d";
 
-export function ChannelModal() {
+export function ChannelModal({ inline = false }: { inline?: boolean }) {
   const c = useColors();
   const {
     showChannelModal,
@@ -319,14 +319,9 @@ export function ChannelModal() {
     </View>
   );
 
-  return (
-    <Modal
-      visible={showChannelModal}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={() => setShowChannelModal(false)}
-    >
-      <View style={[styles.container, { backgroundColor: c.background }]}>
+  if (inline && !showChannelModal) return null;
+  const sheet = (
+    <View style={inline ? [StyleSheet.absoluteFill, styles.container, { backgroundColor: c.background, zIndex: 999 }] : [styles.container, { backgroundColor: c.background }]}>
         {/* Header */}
         <View style={[styles.header, { backgroundColor: ACCENT }]}>
           <View style={styles.headerLeft}>
@@ -427,7 +422,17 @@ export function ChannelModal() {
             <Text style={styles.doneBtnText}>Save & Close</Text>
           </TouchableOpacity>
         </View>
-      </View>
+    </View>
+  );
+  if (inline) return sheet;
+  return (
+    <Modal
+      visible={showChannelModal}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={() => setShowChannelModal(false)}
+    >
+      {sheet}
     </Modal>
   );
 }

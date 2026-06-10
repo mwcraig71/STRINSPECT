@@ -26,7 +26,7 @@ const AMBER = "#f59e0b";
 const AMBER_BG = "#fffbeb";
 const AMBER_BORDER = "#fcd34d";
 
-export function UnderclearanceModal() {
+export function UnderclearanceModal({ inline = false }: { inline?: boolean }) {
   const c = useColors();
   const {
     showUnderclearanceModal,
@@ -109,14 +109,9 @@ export function UnderclearanceModal() {
     { key: "inspectionDate", label: "Date", placeholder: "MM/DD/YYYY" },
   ];
 
-  return (
-    <Modal
-      visible={showUnderclearanceModal}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={() => setShowUnderclearanceModal(false)}
-    >
-      <View style={[styles.container, { backgroundColor: c.background }]}>
+  if (inline && !showUnderclearanceModal) return null;
+  const sheet = (
+    <View style={inline ? [StyleSheet.absoluteFill, styles.container, { backgroundColor: c.background, zIndex: 999 }] : [styles.container, { backgroundColor: c.background }]}>
         {/* Header */}
         <View style={[styles.header, { backgroundColor: "#0f766e" }]}>
           <View style={styles.headerLeft}>
@@ -374,7 +369,17 @@ export function UnderclearanceModal() {
             <Text style={styles.doneBtnText}>Save & Close</Text>
           </TouchableOpacity>
         </View>
-      </View>
+    </View>
+  );
+  if (inline) return sheet;
+  return (
+    <Modal
+      visible={showUnderclearanceModal}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={() => setShowUnderclearanceModal(false)}
+    >
+      {sheet}
     </Modal>
   );
 }

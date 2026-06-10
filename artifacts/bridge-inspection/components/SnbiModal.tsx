@@ -44,7 +44,7 @@ function sanitizeNumeric(text: string, decimals: number): string {
   return decPart !== undefined ? `${intPart}.${decPart.slice(0, decimals)}` : intPart;
 }
 
-export function SnbiModal() {
+export function SnbiModal({ inline = false }: { inline?: boolean }) {
   const c = useColors();
   const { showSnbiModal, setShowSnbiModal, snbiData, setSnbiData } = useInspection();
   const d = snbiData;
@@ -121,14 +121,9 @@ export function SnbiModal() {
     </View>
   );
 
-  return (
-    <Modal
-      visible={showSnbiModal}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={() => setShowSnbiModal(false)}
-    >
-      <View style={[styles.container, { backgroundColor: c.background }]}>
+  if (inline && !showSnbiModal) return null;
+  const sheet = (
+    <View style={inline ? [StyleSheet.absoluteFill, styles.container, { backgroundColor: c.background, zIndex: 999 }] : [styles.container, { backgroundColor: c.background }]}>
         {/* Header */}
         <View style={[styles.header, { backgroundColor: ACCENT }]}>
           <View style={styles.headerLeft}>
@@ -346,7 +341,17 @@ export function SnbiModal() {
             <Text style={styles.doneBtnText}>Save & Close</Text>
           </TouchableOpacity>
         </View>
-      </View>
+    </View>
+  );
+  if (inline) return sheet;
+  return (
+    <Modal
+      visible={showSnbiModal}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={() => setShowSnbiModal(false)}
+    >
+      {sheet}
     </Modal>
   );
 }

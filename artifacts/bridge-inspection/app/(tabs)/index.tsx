@@ -921,10 +921,10 @@ export default function InspectionScreen() {
 
       <CIFModal />
       <FUAModal />
-      <UnderclearanceModal />
-      <ChannelModal />
-      <DailySafetyBriefingModal />
-      <SnbiModal />
+      <UnderclearanceModal inline={isTabletLayout} />
+      <ChannelModal inline={isTabletLayout} />
+      <DailySafetyBriefingModal inline={isTabletLayout} />
+      <SnbiModal inline={isTabletLayout} />
       <SteelPipePileModal />
     </View>
   );
