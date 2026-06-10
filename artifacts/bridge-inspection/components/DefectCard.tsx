@@ -1,7 +1,6 @@
 import { Feather } from "@expo/vector-icons";
-import React from "react";
+import React, { useState } from "react";
 import {
-  Alert,
   Image,
   StyleSheet,
   Text,
@@ -29,6 +28,7 @@ const CS_COLORS: Record<string, string> = {
 export function DefectCard({ record, isLegacy, onEdit }: DefectCardProps) {
   const c = useColors();
   const { deleteDefect, verifyDefect } = useInspection();
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const borderColor = record.isCritical
     ? "#dc2626"
@@ -39,21 +39,6 @@ export function DefectCard({ record, isLegacy, onEdit }: DefectCardProps) {
     : isLegacy && record.needsVerification
     ? "#d97706"
     : c.border;
-
-  const handleDelete = () => {
-    Alert.alert(
-      "Delete Record",
-      "Are you sure you want to delete this defect record?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => deleteDefect(record.id),
-        },
-      ]
-    );
-  };
 
   return (
     <View
@@ -129,28 +114,50 @@ export function DefectCard({ record, isLegacy, onEdit }: DefectCardProps) {
             </Text>
           ) : null}
         </View>
-        <View style={styles.actions}>
-          {record.needsVerification && (
+
+        {confirmingDelete ? (
+          <View style={styles.confirmRow}>
             <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: "#dcfce7" }]}
-              onPress={() => verifyDefect(record.id)}
+              style={[styles.confirmBtn, { backgroundColor: "#fef2f2", borderColor: "#dc2626" }]}
+              onPress={() => {
+                setConfirmingDelete(false);
+                deleteDefect(record.id);
+              }}
             >
-              <Feather name="check-circle" size={16} color="#059669" />
+              <Feather name="trash-2" size={14} color="#dc2626" />
+              <Text style={[styles.confirmText, { color: "#dc2626" }]}>Delete</Text>
             </TouchableOpacity>
-          )}
-          <TouchableOpacity
-            style={[styles.actionBtn, { backgroundColor: c.secondary }]}
-            onPress={onEdit}
-          >
-            <Feather name="edit-2" size={16} color={c.mutedForeground} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionBtn, { backgroundColor: "#fef2f2" }]}
-            onPress={handleDelete}
-          >
-            <Feather name="trash-2" size={16} color="#dc2626" />
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              style={[styles.confirmBtn, { backgroundColor: c.secondary, borderColor: c.border }]}
+              onPress={() => setConfirmingDelete(false)}
+            >
+              <Text style={[styles.confirmText, { color: c.mutedForeground }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.actions}>
+            {record.needsVerification && (
+              <TouchableOpacity
+                style={[styles.actionBtn, { backgroundColor: "#dcfce7" }]}
+                onPress={() => verifyDefect(record.id)}
+              >
+                <Feather name="check-circle" size={16} color="#059669" />
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: c.secondary }]}
+              onPress={onEdit}
+            >
+              <Feather name="edit-2" size={16} color={c.mutedForeground} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: "#fef2f2" }]}
+              onPress={() => setConfirmingDelete(true)}
+            >
+              <Feather name="trash-2" size={16} color="#dc2626" />
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -183,4 +190,15 @@ const styles = StyleSheet.create({
   desc: { fontSize: 10, fontStyle: "italic" },
   actions: { gap: 4, alignItems: "center", flexDirection: "row" },
   actionBtn: { padding: 6, borderRadius: 8 },
+  confirmRow: { gap: 4, alignItems: "center", flexDirection: "column" },
+  confirmBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  confirmText: { fontSize: 11, fontWeight: "700" },
 });
