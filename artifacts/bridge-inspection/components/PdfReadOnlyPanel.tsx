@@ -10,7 +10,7 @@ import {
 import { Feather } from "@expo/vector-icons";
 import { getPdfReadOnlyHtml } from "./pdfReadOnlyHtml";
 
-const HTML = Platform.OS !== "web" ? getPdfReadOnlyHtml() : "";
+const HTML = getPdfReadOnlyHtml();
 
 interface Props {
   pdfPath: string | null;
@@ -24,6 +24,7 @@ export function PdfReadOnlyPanel({ pdfPath, style, onImportPress }: Props) {
   const [sessionKey, setSessionKey] = useState(0);
   const injectedRef = useRef(false);
   const webViewRef = useRef<import("react-native-webview").WebView>(null);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
   useEffect(() => {
     setSessionKey((k) => k + 1);
@@ -32,6 +33,7 @@ export function PdfReadOnlyPanel({ pdfPath, style, onImportPress }: Props) {
     injectedRef.current = false;
   }, [pdfPath]);
 
+  // ── Native: read file via expo-file-system and inject as base64 ──
   const injectPdf = useCallback(async () => {
     if (injectedRef.current || !pdfPath) return;
     injectedRef.current = true;
@@ -59,6 +61,32 @@ export function PdfReadOnlyPanel({ pdfPath, style, onImportPress }: Props) {
     injectPdf();
   }, [injectPdf]);
 
+  // ── Web: fetch the blob/data URL and postMessage base64 into the srcdoc iframe ──
+  const injectPdfWeb = useCallback(async () => {
+    if (injectedRef.current || !pdfPath) return;
+    injectedRef.current = true;
+    try {
+      const resp = await fetch(pdfPath);
+      const blob = await resp.blob();
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload = () => resolve(fr.result as string);
+        fr.onerror = reject;
+        fr.readAsDataURL(blob);
+      });
+      const msg = JSON.stringify({ type: "init", pdfBase64: dataUrl });
+      (iframeRef.current as HTMLIFrameElement | null)?.contentWindow?.postMessage(msg, "*");
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : "Failed to load PDF");
+    }
+  }, [pdfPath]);
+
+  const onWebIframeLoad = useCallback(() => {
+    setReady(true);
+    injectPdfWeb();
+  }, [injectPdfWeb]);
+
+  // ── Web branch ──
   if (Platform.OS === "web") {
     if (!pdfPath) {
       return (
@@ -66,7 +94,8 @@ export function PdfReadOnlyPanel({ pdfPath, style, onImportPress }: Props) {
           <Feather name="file-text" size={32} color="#475569" />
           <Text style={styles.placeholderTitle}>No Report Imported</Text>
           <Text style={styles.placeholderBody}>
-            Import a previous inspection report to compare it side-by-side with the current inspection.
+            Import a previous inspection report to compare it side-by-side with
+            the current inspection.
           </Text>
           {onImportPress && (
             <TouchableOpacity style={styles.importBtn} onPress={onImportPress}>
@@ -77,32 +106,55 @@ export function PdfReadOnlyPanel({ pdfPath, style, onImportPress }: Props) {
         </View>
       );
     }
-    // On web, use a browser-native iframe — the browser renders PDFs natively
+    // Use srcdoc + postMessage so pdf.js renders the PDF — avoids Chrome's
+    // blob-URL-in-nested-iframe block that fires when the canvas preview
+    // embeds the Expo web app in its own iframe.
     return (
       <View style={[styles.root, style, { position: "relative" } as never]}>
-        {React.createElement("iframe", {
-          src: pdfPath,
-          style: {
-            position: "absolute",
-            top: 0,
-            left: 0,
-            width: "100%",
-            height: "100%",
-            border: "none",
-            background: "#0f172a",
-          },
-        } as React.HTMLAttributes<HTMLIFrameElement>)}
+        {!ready && !loadError && (
+          <View style={styles.loadingOverlay}>
+            <ActivityIndicator size="large" color="#38bdf8" />
+            <Text style={styles.loadingText}>Loading report...</Text>
+          </View>
+        )}
+        {loadError ? (
+          <View style={styles.placeholder}>
+            <Feather name="alert-triangle" size={28} color="#f87171" />
+            <Text style={[styles.placeholderTitle, { color: "#f87171" }]}>
+              Cannot Open PDF
+            </Text>
+            <Text style={styles.placeholderBody}>{loadError}</Text>
+          </View>
+        ) : (
+          React.createElement("iframe", {
+            key: sessionKey,
+            ref: iframeRef,
+            srcdoc: HTML,
+            onLoad: onWebIframeLoad,
+            style: {
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              border: "none",
+              background: "#0f172a",
+            },
+          } as React.HTMLAttributes<HTMLIFrameElement> & { srcdoc: string; ref: React.Ref<HTMLIFrameElement> })
+        )}
       </View>
     );
   }
 
+  // ── Native branch ──
   if (!pdfPath) {
     return (
       <View style={[styles.placeholder, style]}>
         <Feather name="file-text" size={32} color="#475569" />
         <Text style={styles.placeholderTitle}>No Report Imported</Text>
         <Text style={styles.placeholderBody}>
-          Import a previous inspection report to compare it side-by-side with the current inspection.
+          Import a previous inspection report to compare it side-by-side with
+          the current inspection.
         </Text>
         {onImportPress && (
           <TouchableOpacity style={styles.importBtn} onPress={onImportPress}>
