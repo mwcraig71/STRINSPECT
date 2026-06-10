@@ -1061,7 +1061,7 @@ const INITIAL_STEEL_PIPE_PILE: SteelPipePileData = {
 
 // ─── Context Types ────────────────────────────────────────────────────────────
 
-export type ReadinessTargetScreen = "bridges" | "inspection" | "nbi" | "summary";
+export type ReadinessTargetScreen = "bridges" | "inspection" | "nbi" | "summary" | "photos";
 
 export interface ReadinessCheck {
   id: string;
@@ -2361,6 +2361,16 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
       target: { screen: "summary", focusId: "criticalFindings" },
     });
 
+    // 7. Standard photos complete
+    const missingCount = standardPhotos.filter((s) => !s.photoUri).length;
+    checks.push({
+      id: "standardPhotos",
+      label: "Standard photos",
+      passed: missingCount === 0,
+      reason: missingCount === 0 ? "" : `${missingCount} of 8 required photo${missingCount !== 1 ? "s" : ""} missing`,
+      target: { screen: "photos" },
+    });
+
     return checks;
   }, [
     structureNumber,
@@ -2370,6 +2380,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     importAuditAcknowledged,
     criticalFindingsSummary,
     criticalFindingsAcknowledged,
+    standardPhotos,
   ]);
 
   const isReady = useMemo(() => readiness.every((c) => c.passed), [readiness]);

@@ -73,6 +73,8 @@ export default function SummaryScreen() {
       router.navigate({ pathname: "/(tabs)", params: { focus: target.focusId ?? "", focusTs } });
     } else if (target.screen === "nbi") {
       router.navigate({ pathname: "/(tabs)/nbi", params: { focus: target.focusId ?? "", focusTs } });
+    } else if (target.screen === "photos") {
+      router.navigate("/(tabs)/photos");
     }
   };
 
