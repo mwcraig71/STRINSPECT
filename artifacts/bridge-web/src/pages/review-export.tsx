@@ -6,7 +6,7 @@ import {
 import * as XLSX from "xlsx";
 import {
   Document, Packer, Paragraph, Table, TableRow, TableCell,
-  TextRun, HeadingLevel, WidthType,
+  TextRun, HeadingLevel, WidthType, ImageRun,
 } from "docx";
 import { SessionData, DefectRecord, NbiRating, ImportSummary } from "@/lib/types";
 import {
@@ -285,6 +285,14 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
   const [showFlagged, setShowFlagged] = useState(false);
   const [exporting, setExporting] = useState<"excel" | "word" | "pdf" | null>(null);
   const [expandedNbi, setExpandedNbi] = useState<string | null>(null);
+  const [showReportHeader, setShowReportHeader] = useState(false);
+  const [reportHeader, setReportHeader] = useState({
+    facilityCarried: "",
+    featureCrossed: "",
+    inspectionDate: "",
+    inspectors: "",
+    inspectionType: "Routine",
+  });
 
   const { data: sessions, isLoading: listLoading, isError: listError, refetch, isFetching } =
     useListSessions({ query: { queryKey: getListSessionsQueryKey(), refetchInterval: 60_000 } });
@@ -402,87 +410,223 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
     setExporting("word");
     try {
       const structNum = sessionData?.structureNumber ?? "";
-      const children: (Paragraph | Table)[] = [
-        new Paragraph({ text: "Bridge Inspection Report", heading: HeadingLevel.HEADING_1 }),
-        new Paragraph({
-          children: [
-            new TextRun({ text: "Structure Number: ", bold: true }),
-            new TextRun(structNum || "(not set)"),
-          ],
-        }),
-        new Paragraph({
-          children: [
-            new TextRun({ text: "Total Defect Records: ", bold: true }),
-            new TextRun(String(defects.length)),
-          ],
-        }),
-        new Paragraph({ text: "" }),
-        new Paragraph({ text: "Condition State Summary", heading: HeadingLevel.HEADING_2 }),
-        new Table({
-          width: { size: 60, type: WidthType.PERCENTAGE },
+
+      async function fetchPhotoBase64(uri: string): Promise<{ b64: string; type: "jpg" | "png" | "gif" | "bmp" } | null> {
+        if (!uri) return null;
+        try {
+          if (uri.startsWith("data:image/")) {
+            const m = uri.match(/^data:image\/(\w+);base64,(.+)$/s);
+            if (!m) return null;
+            const sub = m[1].toLowerCase();
+            const imgType = sub === "jpeg" ? "jpg" : (["png", "gif", "bmp"].includes(sub) ? sub as "png" | "gif" | "bmp" : "jpg");
+            return { b64: m[2], type: imgType };
+          }
+          if (uri.startsWith("http://") || uri.startsWith("https://")) {
+            const resp = await fetch(uri);
+            if (!resp.ok) return null;
+            const ct = resp.headers.get("content-type") ?? "";
+            const imgType: "jpg" | "png" | "gif" | "bmp" = ct.includes("png") ? "png" : ct.includes("gif") ? "gif" : "jpg";
+            const buf = await resp.arrayBuffer();
+            const bytes = new Uint8Array(buf);
+            let bin = "";
+            for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+            return { b64: btoa(bin), type: imgType };
+          }
+        } catch { /* unreachable or CORS blocked */ }
+        return null;
+      }
+
+      function dirLabel(deg: number | null | undefined): string {
+        if (deg == null) return "";
+        const names = ["north","north-northeast","northeast","east-northeast","east","east-southeast",
+          "southeast","south-southeast","south","south-southwest","southwest","west-southwest",
+          "west","west-northwest","northwest","north-northwest"];
+        return "looking " + names[Math.round(deg / 22.5) % 16];
+      }
+
+      type PhotoEntry = { photo: { uri: string; description: string; heading?: number | null }; element: string; defect: string; num: number };
+      const photoInventory: PhotoEntry[] = [];
+      let photoIdx = 0;
+      for (const d of defects) {
+        for (const p of (d.photos ?? [])) {
+          photoIdx++;
+          photoInventory.push({ photo: p, element: d.element, defect: d.defect, num: photoIdx });
+        }
+      }
+
+      const photoDataMap = new Map<number, { b64: string; type: "jpg" | "png" | "gif" | "bmp" } | null>();
+      await Promise.all(photoInventory.map(async (e) => {
+        photoDataMap.set(e.num, await fetchPhotoBase64(e.photo.uri));
+      }));
+
+      function buildPhotoBlock(e: PhotoEntry, w: number, h: number): Paragraph[] {
+        const dir = dirLabel(e.photo.heading);
+        const raw = e.photo.description ?? "";
+        const desc = raw && dir ? `${raw}, ${dir}` : raw || dir;
+        const paras: Paragraph[] = [];
+        paras.push(new Paragraph({ children: [new TextRun({ text: `PHOTO ${e.num}`, bold: true, size: 26 })] }));
+        if (e.element || e.defect) {
+          paras.push(new Paragraph({ children: [new TextRun({ text: [e.element, e.defect].filter(Boolean).join(" \u2014 "), color: "555555" })] }));
+        }
+        if (desc) {
+          paras.push(new Paragraph({ children: [new TextRun({ text: `Description: ${desc}` })] }));
+        }
+        const imgData = photoDataMap.get(e.num);
+        if (imgData) {
+          paras.push(new Paragraph({
+            children: [new ImageRun({ data: imgData.b64, transformation: { width: w, height: h }, type: imgData.type })],
+          }));
+        } else if (!e.photo.uri || (!e.photo.uri.startsWith("data:") && !e.photo.uri.startsWith("http"))) {
+          paras.push(new Paragraph({ children: [new TextRun({ text: "(image stored on device)", italics: true, color: "888888" })] }));
+        }
+        paras.push(new Paragraph({ text: "" }));
+        return paras;
+      }
+
+      const children: (Paragraph | Table)[] = [];
+
+      // ── 1. COVER ────────────────────────────────────────────────────────────
+      children.push(new Paragraph({ text: "Bridge Inspection Report", heading: HeadingLevel.HEADING_1 }));
+      children.push(new Paragraph({ text: "" }));
+      const coverFields: [string, string][] = [
+        ["Structure Number", structNum || "(not set)"],
+        ["Facility Carried", reportHeader.facilityCarried],
+        ["Feature Crossed", reportHeader.featureCrossed],
+        ["Inspection Date", reportHeader.inspectionDate],
+        ["Inspected By", reportHeader.inspectors],
+        ["Inspection Type(s)", reportHeader.inspectionType],
+        ["Report Generated", new Date().toLocaleString()],
+      ];
+      for (const [label, value] of coverFields) {
+        if (!value) continue;
+        children.push(new Paragraph({
+          children: [new TextRun({ text: `${label}: `, bold: true }), new TextRun(value)],
+        }));
+      }
+      children.push(new Paragraph({ text: "" }));
+
+      // ── 2. FOLLOW-UP ACTIONS ──────────────────────────────────────────────
+      const fuaDefects = defects.filter((d) => d.isCritical || d.isMaintenance);
+      if (fuaDefects.length > 0) {
+        children.push(new Paragraph({ text: "Bridge Inspection Follow-Up Actions", heading: HeadingLevel.HEADING_2 }));
+        for (const d of fuaDefects) {
+          children.push(new Paragraph({ text: "" }));
+          children.push(new Paragraph({
+            children: [
+              new TextRun({ text: `${d.isCritical ? "Critical Finding" : "Maintenance Item"}: `, bold: true }),
+              new TextRun(d.element || ""),
+            ],
+          }));
+          const fuaRows: TableRow[] = [
+            new TableRow({ children: [
+              new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Bridge Component", bold: true })] })] }),
+              new TableCell({ children: [new Paragraph(d.element || "")] }),
+            ]}),
+            new TableRow({ children: [
+              new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Defect Type", bold: true })] })] }),
+              new TableCell({ children: [new Paragraph(d.defect || "")] }),
+            ]}),
+            new TableRow({ children: [
+              new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Condition State", bold: true })] })] }),
+              new TableCell({ children: [new Paragraph(d.cs)] }),
+            ]}),
+            new TableRow({ children: [
+              new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Location", bold: true })] })] }),
+              new TableCell({ children: [new Paragraph(d.location || "")] }),
+            ]}),
+          ];
+          if (d.locationDesc) {
+            fuaRows.push(new TableRow({ children: [
+              new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Description / Notes", bold: true })] })] }),
+              new TableCell({ children: [new Paragraph(d.locationDesc)] }),
+            ]}));
+          }
+          children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: fuaRows }));
+          for (const p of (d.photos ?? [])) {
+            const entry = photoInventory.find((e) => e.photo === p);
+            if (entry) children.push(...buildPhotoBlock(entry, 400, 300));
+          }
+        }
+        children.push(new Paragraph({ text: "" }));
+      }
+
+      // ── 3. LOAD POSTING INFORMATION ────────────────────────────────────────
+      children.push(new Paragraph({ text: "Load Posting Information", heading: HeadingLevel.HEADING_2 }));
+      const LOAD_CODES = ["58", "59", "60", "62"];
+      const loadRatings = nbiRatings.filter((n) => LOAD_CODES.some((c) => n.item.includes(c)));
+      if (loadRatings.length > 0) {
+        children.push(new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
           rows: [
             new TableRow({
-              children: ["Condition State", "Count", "%"].map(
+              children: ["Item", "Description", "Rating", "Comments"].map(
                 (h) => new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: h, bold: true })] })] }),
               ),
             }),
-            ...(["CS1", "CS2", "CS3", "CS4"] as const).map((cs) => {
-              const count = defects.filter((d) => d.cs === cs).length;
-              const pct = defects.length ? `${Math.round((count / defects.length) * 100)}%` : "0%";
+            ...loadRatings.map((n) => {
+              const sub = n.subComponents[0];
               return new TableRow({
-                children: [cs, String(count), pct].map(
+                children: [n.item, n.description, sub?.rating ?? "\u2014", sub?.comments ?? ""].map(
                   (v) => new TableCell({ children: [new Paragraph(v)] }),
                 ),
               });
             }),
           ],
-        }),
-        new Paragraph({ text: "" }),
-      ];
+        }));
+      } else {
+        children.push(new Paragraph({
+          children: [new TextRun({ text: "N/A \u2014 No deck, superstructure, substructure, or culvert ratings recorded.", italics: true })],
+        }));
+      }
+      children.push(new Paragraph({ text: "" }));
 
+      // ── 4. BRIDGE INSPECTION RECORD (NBI) ──────────────────────────────────
       if (nbiRatings.length > 0) {
-        children.push(new Paragraph({ text: "NBI Ratings", heading: HeadingLevel.HEADING_2 }));
-        children.push(
-          new Table({
-            width: { size: 100, type: WidthType.PERCENTAGE },
-            rows: [
-              new TableRow({
-                children: ["Item", "Description", "Rating", "Comments"].map(
-                  (h) => new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: h, bold: true })] })] }),
+        children.push(new Paragraph({ text: "Bridge Inspection Record", heading: HeadingLevel.HEADING_2 }));
+        children.push(new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          rows: [
+            new TableRow({
+              children: ["Item", "Description", "Rating", "Comments"].map(
+                (h) => new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: h, bold: true })] })] }),
+              ),
+            }),
+            ...nbiRatings.map((n) => {
+              const sub = n.subComponents[0];
+              return new TableRow({
+                children: [n.item, n.description, sub?.rating ?? "\u2014", sub?.comments ?? ""].map(
+                  (v) => new TableCell({ children: [new Paragraph(v)] }),
                 ),
-              }),
-              ...nbiRatings.map((n) => {
-                const sub = n.subComponents[0];
-                return new TableRow({
-                  children: [n.item, n.description, sub?.rating ?? "—", sub?.comments ?? ""].map(
-                    (v) => new TableCell({ children: [new Paragraph(v)] }),
-                  ),
-                });
-              }),
-            ],
-          }),
-        );
+              });
+            }),
+          ],
+        }));
         children.push(new Paragraph({ text: "" }));
       }
 
+      // ── 5. DEFECT RECORDS BY LOCATION ──────────────────────────────────────
       children.push(new Paragraph({ text: "Defect Records by Location", heading: HeadingLevel.HEADING_2 }));
-      sortedLocations(defects).forEach((loc) => {
-        const locDefects = defects.filter((d) => d.location === loc);
-        children.push(new Paragraph({ text: loc, heading: HeadingLevel.HEADING_3 }));
-        children.push(
-          new Table({
+      if (defects.length === 0) {
+        children.push(new Paragraph({ children: [new TextRun({ text: "No defect records in this session.", italics: true })] }));
+      } else {
+        sortedLocations(defects).forEach((loc) => {
+          const locDefects = defects.filter((d) => d.location === loc);
+          children.push(new Paragraph({ text: loc, heading: HeadingLevel.HEADING_3 }));
+          children.push(new Table({
             width: { size: 100, type: WidthType.PERCENTAGE },
             rows: [
               new TableRow({
-                children: ["Element", "Defect", "CS", "Qty", "Notes", "Photos"].map(
+                children: ["Element", "Defect", "CS", "Qty", "Notes", "Flags"].map(
                   (h) => new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: h, bold: true })] })] }),
                 ),
               }),
               ...locDefects.map((d) => {
-                const photoParts = (d.photos ?? []).map((p, i) => {
-                  const dir = p.heading != null ? ` [${headingLabel(p.heading)}]` : "";
-                  return `${i + 1}. ${p.description || "(no desc)"}${dir}`;
-                });
+                const flags = [
+                  d.isCritical ? "Critical" : "",
+                  d.isMaintenance ? "Maintenance" : "",
+                  d.needsVerification ? "Needs Verify" : "",
+                  d.isLegacy ? "Legacy" : "",
+                ].filter(Boolean).join(", ");
                 return new TableRow({
                   children: [
                     `${d.elementId} \u2014 ${d.element}`,
@@ -490,15 +634,23 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
                     d.cs,
                     d.quantityValue || d.quantity,
                     d.locationDesc || "",
-                    photoParts.join("\n") || String((d.photos ?? []).length > 0 ? (d.photos ?? []).length : ""),
+                    flags || "\u2014",
                   ].map((v) => new TableCell({ children: [new Paragraph(v)] })),
                 });
               }),
             ],
-          }),
-        );
-        children.push(new Paragraph({ text: "" }));
-      });
+          }));
+          children.push(new Paragraph({ text: "" }));
+        });
+      }
+
+      // ── 6. PHOTOS ──────────────────────────────────────────────────────────
+      if (photoInventory.length > 0) {
+        children.push(new Paragraph({ text: "Photos", heading: HeadingLevel.HEADING_2 }));
+        for (const e of photoInventory) {
+          children.push(...buildPhotoBlock(e, 480, 360));
+        }
+      }
 
       const doc = new Document({ sections: [{ children }] });
       const blob = await Packer.toBlob(doc);
@@ -513,7 +665,7 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
     } finally {
       setExporting(null);
     }
-  }, [sessionData, defects, nbiRatings]);
+  }, [sessionData, defects, nbiRatings, reportHeader]);
 
   const exportPdf = useCallback(() => {
     if (!sessionData) return;
@@ -679,6 +831,61 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
           </div>
         )}
       </div>
+
+      {/* Report Header (for Word export) */}
+      {sessionData && (
+        <div className="bg-card border border-border rounded-lg mb-4 overflow-hidden">
+          <button
+            className="w-full flex items-center justify-between px-4 py-2.5 border-b border-border bg-secondary/30 text-left"
+            onClick={() => setShowReportHeader((v) => !v)}
+          >
+            <div className="flex items-center gap-2">
+              <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                Report Header
+              </span>
+              <span className="text-xs text-muted-foreground/50 normal-case font-normal">
+                — optional fields for the Word export
+              </span>
+            </div>
+            {showReportHeader
+              ? <ChevronUp className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+              : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />}
+          </button>
+          {showReportHeader && (
+            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {([
+                { key: "facilityCarried", label: "Facility Carried", placeholder: "e.g. MAIN ST" },
+                { key: "featureCrossed",  label: "Feature Crossed",  placeholder: "e.g. MUDDY CREEK" },
+                { key: "inspectionDate",  label: "Inspection Date",  placeholder: "e.g. 03/18/2023" },
+                { key: "inspectors",      label: "Inspected By",     placeholder: "e.g. Jane Smith, PE" },
+              ] as const).map(({ key, label, placeholder }) => (
+                <div key={key}>
+                  <label className="text-xs text-muted-foreground block mb-1">{label}</label>
+                  <input
+                    className="w-full bg-secondary border border-border rounded-md text-xs px-2.5 py-1.5 text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary"
+                    placeholder={placeholder}
+                    value={reportHeader[key]}
+                    onChange={(e) => setReportHeader((h) => ({ ...h, [key]: e.target.value }))}
+                  />
+                </div>
+              ))}
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">Inspection Type</label>
+                <select
+                  className="w-full bg-secondary border border-border rounded-md text-xs px-2.5 py-1.5 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                  value={reportHeader.inspectionType}
+                  onChange={(e) => setReportHeader((h) => ({ ...h, inspectionType: e.target.value }))}
+                >
+                  {["Routine", "In-Depth", "Fracture Critical", "Underwater", "Special", "Other"].map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Review panel */}
       {sessionData && (
