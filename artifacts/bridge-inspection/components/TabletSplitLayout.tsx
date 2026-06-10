@@ -19,7 +19,7 @@ interface Props {
 
 export function TabletSplitLayout({ children }: Props) {
   const isTablet = useIsTablet();
-  const { importedPdfPath, importFromPdf } = useInspection();
+  const { importedPdfPath, importFromPdf, pdfAnnotations, setPdfAnnotations } = useInspection();
   const [pdfExpanded, setPdfExpanded] = useState(false);
 
   const handleImportPress = useCallback(async () => {
@@ -66,6 +66,8 @@ export function TabletSplitLayout({ children }: Props) {
           pdfPath={importedPdfPath}
           style={styles.pdfViewer}
           onImportPress={handleImportPress}
+          annotations={pdfAnnotations}
+          onAnnotationsSave={setPdfAnnotations}
         />
       </View>
 

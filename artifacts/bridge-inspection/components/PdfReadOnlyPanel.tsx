@@ -16,15 +16,19 @@ interface Props {
   pdfPath: string | null;
   style?: object;
   onImportPress?: () => void;
+  annotations?: unknown[] | null;
+  onAnnotationsSave?: (anns: unknown[]) => void;
 }
 
-export function PdfReadOnlyPanel({ pdfPath, style, onImportPress }: Props) {
+export function PdfReadOnlyPanel({ pdfPath, style, onImportPress, annotations, onAnnotationsSave }: Props) {
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [sessionKey, setSessionKey] = useState(0);
   const injectedRef = useRef(false);
   const webViewRef = useRef<import("react-native-webview").WebView>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const onAnnotationsSaveRef = useRef(onAnnotationsSave);
+  onAnnotationsSaveRef.current = onAnnotationsSave;
 
   useEffect(() => {
     setSessionKey((k) => k + 1);
@@ -32,6 +36,21 @@ export function PdfReadOnlyPanel({ pdfPath, style, onImportPress }: Props) {
     setLoadError(null);
     injectedRef.current = false;
   }, [pdfPath]);
+
+  // ── Web: listen for save messages posted back from the srcdoc iframe ──
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    const handler = (e: MessageEvent) => {
+      if (e.source !== (iframeRef.current as HTMLIFrameElement | null)?.contentWindow) return;
+      let data: { type?: string; annotations?: unknown[] } | null = null;
+      try { data = JSON.parse(e.data as string); } catch { return; }
+      if (data?.type === "save" && onAnnotationsSaveRef.current) {
+        onAnnotationsSaveRef.current(data.annotations ?? []);
+      }
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, []);
 
   // ── Native: read file via expo-file-system and inject as base64 ──
   const injectPdf = useCallback(async () => {
@@ -48,13 +67,16 @@ export function PdfReadOnlyPanel({ pdfPath, style, onImportPress }: Props) {
         encoding: FileSystem.EncodingType.Base64,
       });
       const base64Uri = "data:application/pdf;base64," + b64;
-      const msg = JSON.stringify({ type: "init", pdfBase64: base64Uri });
+      const existingAnns = (annotations ?? []).filter(
+        (a) => (a as { type?: string } | null)?.type !== "_meta",
+      );
+      const msg = JSON.stringify({ type: "init", pdfBase64: base64Uri, annotations: existingAnns });
       const js = `(function(){var e=new MessageEvent('message',{data:${JSON.stringify(msg)}});window.dispatchEvent(e);document.dispatchEvent(e);})();true;`;
       webViewRef.current?.injectJavaScript(js);
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : "Failed to load PDF");
     }
-  }, [pdfPath]);
+  }, [pdfPath, annotations]);
 
   const onWebViewLoad = useCallback(() => {
     setReady(true);
@@ -74,12 +96,15 @@ export function PdfReadOnlyPanel({ pdfPath, style, onImportPress }: Props) {
         fr.onerror = reject;
         fr.readAsDataURL(blob);
       });
-      const msg = JSON.stringify({ type: "init", pdfBase64: dataUrl });
+      const existingAnns = (annotations ?? []).filter(
+        (a) => (a as { type?: string } | null)?.type !== "_meta",
+      );
+      const msg = JSON.stringify({ type: "init", pdfBase64: dataUrl, annotations: existingAnns });
       (iframeRef.current as HTMLIFrameElement | null)?.contentWindow?.postMessage(msg, "*");
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : "Failed to load PDF");
     }
-  }, [pdfPath]);
+  }, [pdfPath, annotations]);
 
   const onWebIframeLoad = useCallback(() => {
     setReady(true);
@@ -200,6 +225,14 @@ export function PdfReadOnlyPanel({ pdfPath, style, onImportPress }: Props) {
             allowFileAccess
             scrollEnabled={false}
             onLoad={onWebViewLoad}
+            onMessage={(event: { nativeEvent: { data: string } }) => {
+              try {
+                const data = JSON.parse(event.nativeEvent.data);
+                if (data?.type === "save" && onAnnotationsSaveRef.current) {
+                  onAnnotationsSaveRef.current(data.annotations ?? []);
+                }
+              } catch {}
+            }}
             onError={(e: { nativeEvent: { description: string } }) =>
               setLoadError(e.nativeEvent.description || "WebView error")
             }
