@@ -14,9 +14,14 @@
       "backgroundColor": "#0f172a"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Microphone is used to record inspection notes via speech-to-text."
+      }
     },
-    "android": {},
+    "android": {
+      "permissions": ["android.permission.RECORD_AUDIO"]
+    },
     "web": {
       "favicon": "./assets/images/icon.png"
     },

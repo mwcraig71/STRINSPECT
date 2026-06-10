@@ -9,6 +9,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -56,7 +57,14 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
     setImageSize,
     dateStampEnabled,
     setDateStampEnabled,
+    openAiKey,
+    setOpenAiKey,
+    aiRephrase,
+    setAiRephrase,
   } = useInspection();
+
+  const [keyInput, setKeyInput] = React.useState("");
+  const [keyVisible, setKeyVisible] = React.useState(false);
 
   const hasInspectionData =
     savedDefects.length > 0 || !!structureNumber || !!importSummary;
@@ -538,6 +546,91 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
             </TouchableOpacity>
           </View>
 
+          {/* AI Transcription */}
+          <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
+            <View style={styles.cardHeader}>
+              <Feather name="mic" size={15} color={c.mutedForeground} />
+              <Text style={[styles.cardTitle, { color: c.foreground }]}>AI Transcription</Text>
+            </View>
+            <Text style={[styles.cardDesc, { color: c.mutedForeground }]}>
+              Dictate inspection notes using the mic button on the Inspection and NBI tabs. Whisper transcribes your speech; optionally GPT-4o-mini reformats it into a professional narrative.
+            </Text>
+
+            {/* API key input */}
+            <View style={[styles.keyRow, { borderColor: c.border, backgroundColor: c.background }]}>
+              <TextInput
+                style={[styles.keyInput, { color: c.foreground }]}
+                value={keyInput || (openAiKey ? "sk-••••••••••••••••••••••••••••••••••••••••••••••••" : "")}
+                onFocus={() => setKeyInput(openAiKey)}
+                onChangeText={setKeyInput}
+                secureTextEntry={!keyVisible}
+                placeholder="Paste OpenAI API key…"
+                placeholderTextColor={c.mutedForeground}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <TouchableOpacity onPress={() => setKeyVisible((v) => !v)} style={styles.keyEye}>
+                <Feather name={keyVisible ? "eye-off" : "eye"} size={14} color={c.mutedForeground} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.keyActions}>
+              <TouchableOpacity
+                style={[styles.keyBtn, { backgroundColor: "#0c4a6e", borderColor: "#0284c7" }]}
+                onPress={() => {
+                  const trimmed = keyInput.trim();
+                  if (!trimmed) return;
+                  setOpenAiKey(trimmed);
+                  setKeyInput("");
+                  Alert.alert("Saved", "OpenAI API key saved.");
+                }}
+              >
+                <Feather name="check" size={13} color="#38bdf8" />
+                <Text style={[styles.keyBtnText, { color: "#38bdf8" }]}>Save Key</Text>
+              </TouchableOpacity>
+              {openAiKey ? (
+                <TouchableOpacity
+                  style={[styles.keyBtn, { backgroundColor: "#1f0a0a", borderColor: "#7f1d1d" }]}
+                  onPress={() => {
+                    setOpenAiKey("");
+                    setKeyInput("");
+                    Alert.alert("Cleared", "OpenAI API key removed.");
+                  }}
+                >
+                  <Feather name="trash-2" size={13} color="#f87171" />
+                  <Text style={[styles.keyBtnText, { color: "#fca5a5" }]}>Clear</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+
+            {/* AI Rephrasing toggle */}
+            <View style={styles.photoToggleRow}>
+              <TouchableOpacity
+                style={[
+                  styles.toggleTrack,
+                  {
+                    backgroundColor: aiRephrase ? "#0c4a6e" : c.muted,
+                    borderColor: aiRephrase ? "#0284c7" : c.border,
+                  },
+                ]}
+                onPress={() => setAiRephrase(!aiRephrase)}
+              >
+                <View
+                  style={[
+                    styles.toggleThumb,
+                    {
+                      alignSelf: aiRephrase ? "flex-end" : "flex-start",
+                      backgroundColor: aiRephrase ? "#38bdf8" : c.mutedForeground,
+                    },
+                  ]}
+                />
+              </TouchableOpacity>
+              <Text style={[styles.cardDesc, { color: c.foreground, flex: 1, marginBottom: 0 }]}>
+                AI Rephrasing (GPT-4o-mini)
+              </Text>
+            </View>
+          </View>
+
           {/* Cloud Sync */}
           <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
             <View style={styles.cardHeader}>
@@ -781,4 +874,25 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   syncBtnText: { fontSize: 13, fontWeight: "800" as const, textTransform: "uppercase" as const },
+  keyRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    gap: 6,
+  },
+  keyInput: { flex: 1, fontSize: 12, fontWeight: "600" as const, paddingVertical: 10 },
+  keyEye: { padding: 4 },
+  keyActions: { flexDirection: "row" as const, gap: 8 },
+  keyBtn: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  keyBtnText: { fontSize: 12, fontWeight: "800" as const, textTransform: "uppercase" as const },
 });

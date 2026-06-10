@@ -1175,6 +1175,10 @@ interface InspectionContextType {
   setImageSize: (v: string) => void;
   dateStampEnabled: boolean;
   setDateStampEnabled: (v: boolean) => void;
+  openAiKey: string;
+  setOpenAiKey: (v: string) => void;
+  aiRephrase: boolean;
+  setAiRephrase: (v: boolean) => void;
 
   // Derived
   locationSequence: string[];
@@ -1485,6 +1489,8 @@ const STORAGE_KEYS = {
   PDF_UPLOADED: "@bridge_pdf_uploaded",
   IMAGE_SIZE: "@bridge_image_size",
   DATE_STAMP: "@bridge_date_stamp",
+  OPENAI_KEY: "@bridge_openai_key",
+  AI_REPHRASE: "@bridge_ai_rephrase",
   FINALIZED_AT: "@bridge_finalized_at",
   IMPORT_AUDIT_ACK: "@bridge_import_audit_ack",
   CRITICAL_FINDINGS_ACK: "@bridge_critical_findings_ack",
@@ -1589,6 +1595,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const [syncToCurrentLoc, setSyncToCurrentLoc] = useState(false);
   const [imageSize, setImageSizeState] = useState("original");
   const [dateStampEnabled, setDateStampEnabledState] = useState(false);
+  const [openAiKey, setOpenAiKeyState] = useState("");
+  const [aiRephrase, setAiRephraseState] = useState(true);
   const [parsingActive, setParsingActive] = useState(false);
   const [importSummary, setImportSummaryState] = useState<ImportSummary | null>(null);
   const [importedPdfPath, setImportedPdfPathState] = useState<string | null>(null);
@@ -1611,7 +1619,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           ]);
           await AsyncStorage.setItem(STORAGE_KEYS.DEMO_CLEARED, "1");
         }
-        const [defects, nbi, nom, insType, superType, subType, superMat, subMat, structNum, uc, ch, sb, sn, spp, impSummary, lastJoint, lastSync, lastMod, pdfPath, pdfAnns, pdfUploadedStr, imgSz, dateStampStr, finalizedAtStr, importAuditAckStr, criticalAckStr, stdPhotosStr] = await Promise.all([
+        const [defects, nbi, nom, insType, superType, subType, superMat, subMat, structNum, uc, ch, sb, sn, spp, impSummary, lastJoint, lastSync, lastMod, pdfPath, pdfAnns, pdfUploadedStr, imgSz, dateStampStr, finalizedAtStr, importAuditAckStr, criticalAckStr, stdPhotosStr, openAiKeyStr, aiRephraseStr] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.SAVED_DEFECTS),
           AsyncStorage.getItem(STORAGE_KEYS.NBI_RATINGS),
           AsyncStorage.getItem(STORAGE_KEYS.NOMENCLATURE),
@@ -1639,6 +1647,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           AsyncStorage.getItem(STORAGE_KEYS.IMPORT_AUDIT_ACK),
           AsyncStorage.getItem(STORAGE_KEYS.CRITICAL_FINDINGS_ACK),
           AsyncStorage.getItem(STORAGE_KEYS.STANDARD_PHOTOS),
+          AsyncStorage.getItem(STORAGE_KEYS.OPENAI_KEY),
+          AsyncStorage.getItem(STORAGE_KEYS.AI_REPHRASE),
         ]);
         if (lastJoint) setLastJointElementIdState(lastJoint);
         if (lastSync) setLastSynced(lastSync);
@@ -1651,6 +1661,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         if (finalizedAtStr) setFinalizedAtState(finalizedAtStr);
         if (importAuditAckStr === "1") setImportAuditAcknowledgedState(true);
         if (criticalAckStr === "1") setCriticalFindingsAcknowledgedState(true);
+        if (openAiKeyStr) setOpenAiKeyState(openAiKeyStr);
+        if (aiRephraseStr !== null) setAiRephraseState(aiRephraseStr !== "0");
         if (stdPhotosStr) {
           try {
             const saved = JSON.parse(stdPhotosStr) as StandardPhotoSlot[];
@@ -3140,6 +3152,16 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     setDateStampEnabled: (v: boolean) => {
       setDateStampEnabledState(v);
       AsyncStorage.setItem(STORAGE_KEYS.DATE_STAMP, v ? "1" : "0").catch(() => {});
+    },
+    openAiKey,
+    setOpenAiKey: (v: string) => {
+      setOpenAiKeyState(v);
+      AsyncStorage.setItem(STORAGE_KEYS.OPENAI_KEY, v).catch(() => {});
+    },
+    aiRephrase,
+    setAiRephrase: (v: boolean) => {
+      setAiRephraseState(v);
+      AsyncStorage.setItem(STORAGE_KEYS.AI_REPHRASE, v ? "1" : "0").catch(() => {});
     },
     locationSequence,
     filteredElements,

@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useInspection, ENVIRONMENTS, INSPECTION_TYPES } from "@/context/InspectionContext";
 import { SettingsModal } from "@/components/SettingsModal";
+import { SpeechToTextButton } from "@/components/SpeechToTextButton";
 
 const RATING_OPTIONS = ["9", "8", "7", "6", "5", "4", "3", "2", "1", "0", "N", "-"];
 
@@ -322,7 +323,21 @@ export default function NBIScreen() {
 
                   {/* Diagnostic narrative */}
                   <View style={styles.narrativeRow}>
-                    <Text style={[styles.fieldKey, { color: c.mutedForeground }]}>Diagnostic Narrative</Text>
+                    <View style={styles.narrativeLabelRow}>
+                      <Text style={[styles.fieldKey, { color: c.mutedForeground }]}>Diagnostic Narrative</Text>
+                      {Platform.OS !== "web" && (
+                        <SpeechToTextButton
+                          onResult={(text) =>
+                            updateSubComponent(
+                              activeIdx,
+                              compIdx,
+                              "comments",
+                              comp.comments ? `${comp.comments} ${text}` : text
+                            )
+                          }
+                        />
+                      )}
+                    </View>
                     <TextInput
                       style={[styles.narrativeInput, { backgroundColor: c.background, borderColor: c.border, color: c.foreground }]}
                       value={comp.comments}
@@ -501,6 +516,7 @@ const styles = StyleSheet.create({
   inlineInput: { flex: 1, borderWidth: 1, borderRadius: 8, padding: 8, fontSize: 12, fontWeight: "600" },
   inlineInputSmall: { width: 60, borderWidth: 1, borderRadius: 8, padding: 8, fontSize: 12, fontWeight: "700", textAlign: "center" },
   narrativeRow: { gap: 6 },
+  narrativeLabelRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   narrativeInput: {
     borderWidth: 1,
     borderRadius: 10,

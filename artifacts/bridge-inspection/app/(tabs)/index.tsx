@@ -40,6 +40,7 @@ import { DailySafetyBriefingModal } from "@/components/DailySafetyBriefingModal"
 import { SnbiModal } from "@/components/SnbiModal";
 import { SteelPipePileModal } from "@/components/SteelPipePileModal";
 import { SettingsModal } from "@/components/SettingsModal";
+import { SpeechToTextButton } from "@/components/SpeechToTextButton";
 import colors from "@/constants/colors";
 
 const CS_OPTIONS = ["CS1", "CS2", "CS3", "CS4"] as const;
@@ -676,7 +677,14 @@ export default function InspectionScreen() {
           </View>
 
           {/* Notes */}
-          <Text style={[styles.fieldLabel, { color: c.mutedForeground }]}>Location and size</Text>
+          <View style={styles.notesLabelRow}>
+            <Text style={[styles.fieldLabel, { color: c.mutedForeground }]}>Location and size</Text>
+            {Platform.OS !== "web" && (
+              <SpeechToTextButton
+                onResult={(text) => setLocationDesc(locationDesc ? `${locationDesc} ${text}` : text)}
+              />
+            )}
+          </View>
           <TextInput
             style={[styles.textArea, { backgroundColor: c.background, borderColor: c.border, color: c.foreground }]}
             value={locationDesc}
@@ -995,6 +1003,7 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
   sectionLabel: { fontSize: 10, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.5 },
   fieldLabel: { fontSize: 9, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.3 },
+  notesLabelRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   picker: {
     flexDirection: "row",
     alignItems: "center",

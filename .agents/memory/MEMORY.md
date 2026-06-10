@@ -20,3 +20,4 @@
 - [pdf.js inline bundle in WKWebView](pdfjs-webview-esm-classic-script.md) — embed as classic <script>, strip trailing ESM export{} or whole script is discarded; no backticks in the HTML template literal.
 - [Offline-first sync architecture](offline-sync-arch.md) — persistent queue (offlineQueue.ts), photo upload to session_photos table, syncSession returns "synced"|"queued" (never throws when offline).
 - [Cross-tab deep-link focus](cross-tab-deep-link-focus.md) — router.navigate focus+focusTs nonce; receiver applies once via handledFocusRef while keeping data dep, or it re-snaps on later edits.
+- [expo-av deprecation in SDK 54](expo-av-deprecation.md) — expo-av still works in SDK 54 but shows deprecation warning; migration path is expo-audio (recording) + expo-video when ready.
