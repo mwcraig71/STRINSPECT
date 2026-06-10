@@ -1,19 +1,31 @@
 import { Platform } from "react-native";
-import * as pdfjsLib from "pdfjs-dist";
-import * as pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.mjs";
+import { extractPdfTextNative } from "../components/pdfExtractorBridge";
 
-// On native (Hermes) there are no Web Workers, so pdf.js uses a "fake worker"
-// that runs synchronously on the main thread.  It expects WorkerMessageHandler
-// to be available on globalThis.pdfjsWorker; importing the worker module above
-// gives Metro a chance to bundle it, and we pin it here so the fake-worker
-// bootstrap can find it.  On web, the real worker URL takes precedence.
-if (typeof (globalThis as Record<string, unknown>).pdfjsWorker === "undefined") {
-  (globalThis as Record<string, unknown>).pdfjsWorker = pdfjsWorker;
+// PDF text extraction runs in a real browser, never in Hermes.
+//   - Web (Expo web): pdf.js runs directly in the browser (loadPdfTextWeb).
+//   - Native (Android/iOS): pdf.js runs inside a headless WebView, driven via
+//     the extractor bridge (loadPdfTextNative). Hermes is not a browser and
+//     cannot run pdf.js reliably, so there is no native pdf.js path here.
+type PdfjsModule = typeof import("pdfjs-dist");
+let webPdfjsPromise: Promise<PdfjsModule> | null = null;
+
+// Lazily load pdf.js on web only. Importing it is gated behind Platform.OS so
+// the (heavy, browser-only) pdf.js bundle is never pulled into the native graph.
+function getWebPdfjs(): Promise<PdfjsModule> {
+  if (!webPdfjsPromise) {
+    webPdfjsPromise = (async () => {
+      const pdfjsLib = await import("pdfjs-dist");
+      const pdfjsWorker = await import("pdfjs-dist/build/pdf.worker.min.mjs");
+      if (typeof (globalThis as Record<string, unknown>).pdfjsWorker === "undefined") {
+        (globalThis as Record<string, unknown>).pdfjsWorker = pdfjsWorker;
+      }
+      // Empty string = in-thread worker; no separate worker file URL needed.
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "";
+      return pdfjsLib;
+    })();
+  }
+  return webPdfjsPromise;
 }
-
-// Empty string = always use the in-thread fake worker (works on both web and
-// native without needing a separate worker file URL).
-pdfjsLib.GlobalWorkerOptions.workerSrc = "";
 
 export interface ParsedElementRow {
   elementId: string;
@@ -100,12 +112,10 @@ export interface ParsedChannelCrossSection {
 
 type PdfSource = File | { uri: string };
 
-// Read the raw PDF bytes from a source. Reading a LOCAL file is the part that
-// differs by platform: on React Native (Android/iOS) `fetch(fileUri)` does NOT
-// reliably return the file's bytes — it silently yields corrupt/empty data,
-// which pdf.js then reports as "Invalid PDF structure". So on native we read via
-// expo-file-system and decode the base64 ourselves (atob is available in the
-// Expo runtime). On web, fetch() reads file/blob/http URLs correctly.
+// Read the raw PDF bytes from a source. WEB ONLY — on web, fetch() reads
+// file/blob/http URLs correctly and File exposes arrayBuffer(). Native never
+// calls this; it reads base64 and extracts inside a WebView (see readPdfBase64
+// / loadPdfTextNative).
 async function readPdfBytes(source: PdfSource): Promise<ArrayBuffer | Uint8Array> {
   if (typeof File !== "undefined" && source instanceof File) {
     return source.arrayBuffer();
@@ -113,23 +123,43 @@ async function readPdfBytes(source: PdfSource): Promise<ArrayBuffer | Uint8Array
 
   const { uri } = source as { uri: string };
 
-  // Inline data: URIs carry the bytes directly — decode regardless of platform.
+  // Inline data: URIs carry the bytes directly — decode them.
   if (uri.startsWith("data:")) {
     const b64 = uri.slice(uri.indexOf(",") + 1);
     return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
   }
 
-  if (Platform.OS === "web") {
-    const response = await fetch(uri);
-    return response.arrayBuffer();
-  }
+  const response = await fetch(uri);
+  return response.arrayBuffer();
+}
 
+// Read a PDF as base64 for the native WebView extractor. The WebView decodes the
+// base64 back into bytes in a real browser, sidestepping Hermes' unreliable
+// local-file reads.
+async function readPdfBase64(source: PdfSource): Promise<string> {
+  const { uri } = source as { uri: string };
+  if (uri.startsWith("data:")) {
+    return uri.slice(uri.indexOf(",") + 1);
+  }
   const FS = await import("expo-file-system/legacy");
-  const b64 = await FS.readAsStringAsync(uri, { encoding: FS.EncodingType.Base64 });
-  return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  return FS.readAsStringAsync(uri, { encoding: FS.EncodingType.Base64 });
 }
 
 async function loadPdfText(source: PdfSource): Promise<string[][]> {
+  return Platform.OS === "web" ? loadPdfTextWeb(source) : loadPdfTextNative(source);
+}
+
+// Native: run pdf.js inside the headless WebView. The WebView reproduces the
+// SAME per-page line/column reconstruction as loadPdfTextWeb below (see
+// components/pdfExtractorHtml.ts), so downstream parsers match identically.
+async function loadPdfTextNative(source: PdfSource): Promise<string[][]> {
+  const base64 = await readPdfBase64(source);
+  return extractPdfTextNative(base64);
+}
+
+// Web: run pdf.js directly in the browser.
+async function loadPdfTextWeb(source: PdfSource): Promise<string[][]> {
+  const pdfjsLib = await getWebPdfjs();
   const data = await readPdfBytes(source);
 
   const pdf = await pdfjsLib.getDocument({ data }).promise;
