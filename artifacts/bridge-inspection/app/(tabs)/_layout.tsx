@@ -11,6 +11,7 @@ import { useColors } from "@/hooks/useColors";
 import { InspectionProvider } from "@/context/InspectionContext";
 import { SyncToast } from "@/components/SyncToast";
 import { useAutoSync } from "@/hooks/useAutoSync";
+import { TabletSplitLayout } from "@/components/TabletSplitLayout";
 
 function NativeTabLayout() {
   return (
@@ -123,11 +124,16 @@ function ClassicTabLayoutWithSync({ pendingCount }: { pendingCount: number }) {
 
 function TabContent() {
   const { toastVisible, toastKey, pendingCount } = useAutoSync();
+  const tabNav = isLiquidGlassAvailable()
+    ? <NativeTabLayout />
+    : <ClassicTabLayoutWithSync pendingCount={pendingCount} />;
   return (
-    <View style={{ flex: 1 }}>
-      {isLiquidGlassAvailable() ? <NativeTabLayout /> : <ClassicTabLayoutWithSync pendingCount={pendingCount} />}
-      <SyncToast key={toastKey} visible={toastVisible} message="Auto-synced to cloud" />
-    </View>
+    <TabletSplitLayout>
+      <View style={{ flex: 1 }}>
+        {tabNav}
+        <SyncToast key={toastKey} visible={toastVisible} message="Auto-synced to cloud" />
+      </View>
+    </TabletSplitLayout>
   );
 }
 
