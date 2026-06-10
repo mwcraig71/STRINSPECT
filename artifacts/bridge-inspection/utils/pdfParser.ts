@@ -58,6 +58,18 @@ export interface ParsedReport {
   channelCrossSection?: ParsedChannelCrossSection;
 }
 
+// ─── Shared form header (District, County, Control-Section, Structure #, Route, Feature Crossed, Date) ─────
+
+export interface ParsedFormHeader {
+  district: string;
+  county: string;
+  controlSection: string;
+  structureNumber: string;
+  route: string;
+  featureCrossed: string;
+  inspectionDate: string;
+}
+
 // ─── Form 2601 – Underclearance Record ───────────────────────────────────────
 
 export interface ParsedUcMeasure {

@@ -1465,6 +1465,42 @@ const STORAGE_KEYS = {
   CRITICAL_FINDINGS_ACK: "@bridge_critical_findings_ack",
 };
 
+// ─── Shared header merge utility ─────────────────────────────────────────────
+// Fills empty header fields on a form object from a parsed source header.
+// Never overwrites a field that already has a non-empty value.
+
+type FormHeaderFields = {
+  district: string;
+  county: string;
+  controlSection: string;
+  structureNumber: string;
+  route: string;
+  featureCrossed: string;
+};
+
+function mergeFormHeader<T extends FormHeaderFields>(
+  current: T,
+  source: FormHeaderFields
+): T {
+  const changed =
+    (!current.district && source.district) ||
+    (!current.county && source.county) ||
+    (!current.controlSection && source.controlSection) ||
+    (!current.structureNumber && source.structureNumber) ||
+    (!current.route && source.route) ||
+    (!current.featureCrossed && source.featureCrossed);
+  if (!changed) return current;
+  return {
+    ...current,
+    district: current.district || source.district,
+    county: current.county || source.county,
+    controlSection: current.controlSection || source.controlSection,
+    structureNumber: current.structureNumber || source.structureNumber,
+    route: current.route || source.route,
+    featureCrossed: current.featureCrossed || source.featureCrossed,
+  };
+}
+
 export function InspectionProvider({ children }: { children: React.ReactNode }) {
   const supportCount = 25;
 
@@ -2767,6 +2803,13 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
             AsyncStorage.setItem(STORAGE_KEYS.UNDERCLEARANCE, JSON.stringify(merged)).catch(() => {});
             return merged;
           });
+          // Cross-broadcast header to the channel form so inspectors don't re-enter the same fields.
+          setChannelDataState((prev) => {
+            const updated = mergeFormHeader(prev, parsedUnderclearance);
+            if (updated === prev) return prev;
+            AsyncStorage.setItem(STORAGE_KEYS.CHANNEL, JSON.stringify(updated)).catch(() => {});
+            return updated;
+          });
         }
 
         // ── Channel Cross-Section import (Form 2600) ──
@@ -2818,6 +2861,13 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
             merged.downstream = mergeChannelRows(merged.downstream, parsedChannelCrossSection.downstream);
             AsyncStorage.setItem(STORAGE_KEYS.CHANNEL, JSON.stringify(merged)).catch(() => {});
             return merged;
+          });
+          // Cross-broadcast header to the underclearance form so inspectors don't re-enter the same fields.
+          setUnderclearanceDataState((prev) => {
+            const updated = mergeFormHeader(prev, parsedChannelCrossSection);
+            if (updated === prev) return prev;
+            AsyncStorage.setItem(STORAGE_KEYS.UNDERCLEARANCE, JSON.stringify(updated)).catch(() => {});
+            return updated;
           });
         }
 
