@@ -5,6 +5,7 @@ import {
   StyleSheet,
   Platform,
   ActivityIndicator,
+  TouchableOpacity,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { getPdfReadOnlyHtml } from "./pdfReadOnlyHtml";
@@ -14,9 +15,10 @@ const HTML = Platform.OS !== "web" ? getPdfReadOnlyHtml() : "";
 interface Props {
   pdfPath: string | null;
   style?: object;
+  onImportPress?: () => void;
 }
 
-export function PdfReadOnlyPanel({ pdfPath, style }: Props) {
+export function PdfReadOnlyPanel({ pdfPath, style, onImportPress }: Props) {
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [sessionKey, setSessionKey] = useState(0);
@@ -75,8 +77,14 @@ export function PdfReadOnlyPanel({ pdfPath, style }: Props) {
         <Feather name="file-text" size={32} color="#475569" />
         <Text style={styles.placeholderTitle}>No Report Imported</Text>
         <Text style={styles.placeholderBody}>
-          Import a previous inspection report from the Bridges tab to view it here.
+          Import a previous inspection report to compare it side-by-side with the current inspection.
         </Text>
+        {onImportPress && (
+          <TouchableOpacity style={styles.importBtn} onPress={onImportPress}>
+            <Feather name="upload" size={14} color="#0f172a" />
+            <Text style={styles.importBtnText}>Import Previous Report</Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
   }
@@ -167,5 +175,20 @@ const styles = StyleSheet.create({
     color: "#94a3b8",
     fontSize: 12,
     fontWeight: "600",
+  },
+  importBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    backgroundColor: "#38bdf8",
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 10,
+    marginTop: 4,
+  },
+  importBtnText: {
+    color: "#0f172a",
+    fontSize: 13,
+    fontWeight: "700",
   },
 });

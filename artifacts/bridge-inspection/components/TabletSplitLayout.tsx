@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   Platform,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
+import * as DocumentPicker from "expo-document-picker";
 
 import { useIsTablet } from "@/hooks/useIsTablet";
 import { useInspection } from "@/context/InspectionContext";
@@ -18,8 +19,21 @@ interface Props {
 
 export function TabletSplitLayout({ children }: Props) {
   const isTablet = useIsTablet();
-  const { importedPdfPath } = useInspection();
+  const { importedPdfPath, importFromPdf } = useInspection();
   const [pdfExpanded, setPdfExpanded] = useState(false);
+
+  const handleImportPress = useCallback(async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: "application/pdf",
+        copyToCacheDirectory: true,
+      });
+      if (!result.canceled && result.assets?.[0]) {
+        const asset = result.assets[0];
+        await importFromPdf({ uri: asset.uri, name: asset.name ?? "report.pdf" });
+      }
+    } catch (_) {}
+  }, [importFromPdf]);
 
   if (!isTablet) {
     return <>{children}</>;
@@ -48,7 +62,11 @@ export function TabletSplitLayout({ children }: Props) {
           </TouchableOpacity>
         </View>
         {/* PDF viewer */}
-        <PdfReadOnlyPanel pdfPath={importedPdfPath} style={styles.pdfViewer} />
+        <PdfReadOnlyPanel
+          pdfPath={importedPdfPath}
+          style={styles.pdfViewer}
+          onImportPress={handleImportPress}
+        />
       </View>
 
       {/* ── Divider ── */}
