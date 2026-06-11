@@ -54,6 +54,7 @@ export interface ParsedReport {
   structureNumber: string;
   elements: ParsedElementRow[];
   nbi: ParsedNbiEntry[];
+  isSnbi: boolean;
   underclearance?: ParsedUnderclearance;
   channelCrossSection?: ParsedChannelCrossSection;
 }
@@ -365,6 +366,202 @@ const NBI_COMPONENT_ALIASES: Record<string, string> = {
   "waterway adequacy": "Waterway Adequacy",
   "approach roadway alignment": "Approach Roadway Alignment",
 };
+
+// ─── SNBI format (B.C.01–B.C.11) ────────────────────────────────────────────
+
+export function detectSnbiFormat(pages: string[][]): boolean {
+  const text = pages.flat().join(" ");
+  return /\(B\.C\.0[1-9]\)|\(B\.C\.1[01]\)/.test(text);
+}
+
+const SNBI_SECTION_PATTERNS: { pattern: RegExp; item: string }[] = [
+  { pattern: /\(B\.C\.01\)/i, item: "BC01" },
+  { pattern: /\(B\.C\.02\)/i, item: "BC02" },
+  { pattern: /\(B\.C\.03\)/i, item: "BC03" },
+  { pattern: /\(B\.C\.04\)/i, item: "BC04" },
+  { pattern: /\(B\.C\.05\)/i, item: "BC05" },
+  { pattern: /\(B\.C\.06\)/i, item: "BC06" },
+  { pattern: /\(B\.C\.07\)/i, item: "BC07" },
+  { pattern: /\(B\.C\.08\)/i, item: "BC08" },
+  { pattern: /\(B\.C\.09\)/i, item: "BC09" },
+  { pattern: /\(B\.C\.10\)/i, item: "BC10" },
+  { pattern: /\(B\.C\.11\)/i, item: "BC11" },
+];
+
+const SNBI_COMPONENT_ALIASES: Record<string, string> = {
+  "deck component rating": "Deck - Component Rating",
+  "deck - component rating": "Deck - Component Rating",
+  "wearing surface": "Wearing Surface",
+  "drainage system": "Drainage System",
+  "curbs & sidewalks": "Curbs & Sidewalks",
+  "curbs and sidewalks": "Curbs & Sidewalks",
+  "curbs sidewalks": "Curbs & Sidewalks",
+  "delineation": "Delineation",
+  "main members - steel": "Main Members - Steel",
+  "main members steel": "Main Members - Steel",
+  "main members - concrete": "Main Members - Concrete",
+  "main members concrete": "Main Members - Concrete",
+  "main members - timber": "Main Members - Timber",
+  "main members timber": "Main Members - Timber",
+  "main members - connections": "Main Members - Connections",
+  "main members connections": "Main Members - Connections",
+  "floor system members": "Floor System Members",
+  "floor system connections": "Floor System Connections",
+  "secondary members": "Secondary Members",
+  "secondary mem. connections": "Secondary Mem. Connections",
+  "secondary mem connections": "Secondary Mem. Connections",
+  "steel protective coating": "Steel Protective Coating",
+  "overall component rating": "Overall Component Rating",
+  "abutment caps": "Abutment Caps",
+  "above ground": "Above Ground",
+  "below ground or foundation": "Below Ground or Foundation",
+  "below ground": "Below Ground or Foundation",
+  "backwalls & wingwalls": "Backwalls & WingWalls",
+  "backwalls wingwalls": "Backwalls & WingWalls",
+  "backwalls": "Backwalls & WingWalls",
+  "int. supports: caps - concrete": "Int. Supports: Caps - Concrete",
+  "int supports caps concrete": "Int. Supports: Caps - Concrete",
+  "int. supports: caps - steel": "Int. Supports: Caps - Steel",
+  "int. supports: caps - timber": "Int. Supports: Caps - Timber",
+  "int. supports: above ground - concrete": "Int. Supports: Above Ground - Concrete",
+  "int. supports: above ground - steel": "Int. Supports: Above Ground - Steel",
+  "int. supports: above ground - timber": "Int. Supports: Above Ground - Timber",
+  "int. supports: above ground - masonry": "Int. Supports: Above Ground - Masonry",
+  "int. supports: below ground or foundation": "Int. Supports: Below Ground or Foundation",
+  "int. supports: below ground": "Int. Supports: Below Ground or Foundation",
+  "collision protection system": "Collision Protection System",
+  "collision protection": "Collision Protection System",
+  "top slabs": "Top Slabs",
+  "bottom slab or footing": "Bottom Slab or Footing",
+  "bottom slab": "Bottom Slab or Footing",
+  "abutments, intermed. supports": "Abutments, Intermed. Supports",
+  "abutments intermed supports": "Abutments, Intermed. Supports",
+  "headwalls & wingwalls": "Headwalls & WingWalls",
+  "headwalls wingwalls": "Headwalls & WingWalls",
+  "median barrier": "Median Barrier",
+  "railings": "Railings",
+  "pedestrian railing": "Pedestrian Railing",
+  "railing protective coating": "Railing Protective Coating",
+  "transition railings": "Transition Railings",
+  "railing transitions protective coating": "Railing Transitions Protective Coating",
+  "expansion bearings": "Expansion Bearings",
+  "fixed bearings": "Fixed Bearings",
+  "joints, expansion, open": "Joints, Expansion, Open",
+  "joints expansion open": "Joints, Expansion, Open",
+  "joints, expansion, sealed": "Joints, Expansion, Sealed",
+  "joints expansion sealed": "Joints, Expansion, Sealed",
+  "joints, other": "Joints, Other",
+  "joints other": "Joints, Other",
+  "channel banks": "Channel Banks",
+  "channel bed": "Channel Bed",
+  "rip rap, toe walls & apron": "Rip Rap, Toe Walls & Apron",
+  "rip rap": "Rip Rap, Toe Walls & Apron",
+  "dikes": "Dikes",
+  "jetties": "Jetties",
+  "waterway adequacy": "Waterway Adequacy",
+  "approach roadway alignment": "Approach Roadway Alignment",
+  "other": "Other",
+};
+
+function normalizeSnbiComponentName(raw: string): string {
+  const norm = normalizeForMatching(raw);
+  if (SNBI_COMPONENT_ALIASES[norm]) return SNBI_COMPONENT_ALIASES[norm];
+  const sortedKeys = Object.keys(SNBI_COMPONENT_ALIASES).sort((a, b) => b.length - a.length);
+  for (const key of sortedKeys) {
+    if (norm.startsWith(normalizeForMatching(key))) return SNBI_COMPONENT_ALIASES[key];
+  }
+  return raw.trim();
+}
+
+export function parseSnbiRatings(pages: string[][]): ParsedNbiEntry[] {
+  const results: ParsedNbiEntry[] = [];
+  const allLines = pages.flat();
+
+  let currentItem = "";
+  const seen = new Set<string>();
+
+  for (let i = 0; i < allLines.length; i++) {
+    const line = allLines[i];
+
+    if (isElementTableHeader(allLines, i)) {
+      break;
+    }
+
+    const next = allLines[i + 1] || "";
+    const next2 = allLines[i + 2] || "";
+    const block3 = line + " " + next + " " + next2;
+
+    for (const { pattern, item } of SNBI_SECTION_PATTERNS) {
+      if (pattern.test(line) || pattern.test(block3)) {
+        currentItem = item;
+        break;
+      }
+    }
+
+    if (!currentItem) continue;
+    if (/\(B\.C\.\d\d\)/i.test(line)) continue;
+
+    let matched: { rawName: string; desc: string; min: string; rating: string; comment: string } | null = null;
+
+    const m1 = line.match(RATING_LINE_PATTERNS[0]);
+    if (m1) {
+      matched = { rawName: m1[1].trim(), desc: (m1[2] || "").trim(), min: m1[3], rating: m1[4], comment: m1[5]?.trim() || "" };
+    } else {
+      const m2 = line.match(RATING_LINE_PATTERNS[1]);
+      if (m2) {
+        matched = { rawName: m2[1].trim(), desc: "", min: m2[2], rating: m2[3], comment: m2[4]?.trim() || "" };
+      } else {
+        const m3 = line.match(RATING_LINE_PATTERNS[2]);
+        if (m3) {
+          matched = { rawName: m3[1].trim(), desc: "", min: "", rating: m3[2], comment: m3[3]?.trim() || "" };
+        }
+      }
+    }
+
+    if (!matched) continue;
+
+    const { rawName, desc, min, rating, comment } = matched;
+    const componentName = normalizeSnbiComponentName(rawName);
+
+    if (componentName.length <= 3) continue;
+    if (rawName.match(/^\d{1,3}-/)) continue;
+    if (rawName.match(/^\d{4,}/)) continue;
+    if (rawName.match(/^\d[\d,]*\s+(?:sq|ft|each|ea)/i)) continue;
+    if (rawName.match(/Structure ID|Inspection Date|DO NOT DISCLOSE|Page\s*\d|^Date\b|^Time\b/i)) continue;
+    if (componentName.toLowerCase().match(/^(yes|no|n\/a|na|none|date|page|sheet)\b/)) continue;
+
+    const key = `${currentItem}|${componentName}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    let fullComment = comment;
+    let j = i + 1;
+    let continued = 0;
+    while (j < allLines.length && continued < 10) {
+      const cont = allLines[j];
+      if (!cont || !cont.trim()) break;
+      if (STRUCTURAL_LINE_RE.test(cont)) break;
+      if (RATING_LINE_PATTERNS.some((re) => re.test(cont))) break;
+      let isSection = false;
+      for (const { pattern } of SNBI_SECTION_PATTERNS) {
+        if (pattern.test(cont)) { isSection = true; break; }
+      }
+      if (isSection) break;
+      fullComment = fullComment ? `${fullComment} ${cont.trim()}` : cont.trim();
+      j++;
+      continued++;
+    }
+    i = j - 1;
+
+    results.push({ item: currentItem, componentName, desc, min, rating, comment: fullComment });
+  }
+
+  if (typeof console !== "undefined") {
+    console.log(`[pdfParser] Parsed ${results.length} SNBI entries`);
+  }
+
+  return results;
+}
 
 export function normalizeForMatching(s: string): string {
   return s
@@ -1176,12 +1373,13 @@ export async function parseReport(source: PdfSource): Promise<ParsedReport> {
   const pages = await loadPdfText(source);
   const structureNumber = parseStructureNumber(pages);
   const elements = parseElementsTable(pages);
-  const nbi = parseNbiRatings(pages);
+  const isSnbi = detectSnbiFormat(pages);
+  const nbi = isSnbi ? parseSnbiRatings(pages) : parseNbiRatings(pages);
   const underclearance = parseUnderclearance(pages) ?? undefined;
   // Try TxDOT Form 2600 first; fall back to Channel Measurement report format.
   const channelCrossSection =
     parseChannelCrossSection(pages) ??
     parseChannelMeasurementReport(pages) ??
     undefined;
-  return { structureNumber, elements, nbi, underclearance, channelCrossSection };
+  return { structureNumber, elements, nbi, isSnbi, underclearance, channelCrossSection };
 }

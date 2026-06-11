@@ -259,7 +259,8 @@ function generatePrintHtml(data: SessionData, header: ReportHeader = EMPTY_HEADE
       : `<p style="color:#6b7280;font-style:italic;font-size:11px">N/A &mdash; No deck, superstructure, substructure, or culvert ratings recorded.</p>`
     }`;
 
-  // ── 4. BRIDGE INSPECTION RECORD (NBI) ───────────────────────────────────────
+  // ── 4. BRIDGE INSPECTION RECORD (NBI / SNBI) ────────────────────────────────
+  const isSnbiData = nbiRatings.some((n) => /^BC\d{2}$/.test(n.item));
   const nbiRows = nbiRatings.map((n) => {
     const sub = n.subComponents[0];
     return `<tr>
@@ -271,7 +272,7 @@ function generatePrintHtml(data: SessionData, header: ReportHeader = EMPTY_HEADE
   }).join("");
 
   const nbiSection = nbiRatings.length === 0 ? "" : `
-    <h2>Bridge Inspection Record</h2>
+    <h2>${isSnbiData ? "SNBI Component Ratings" : "Bridge Inspection Record"}</h2>
     <table style="border-collapse:collapse;width:100%">
       <thead><tr style="background:#f9fafb">
         <th style="padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;color:#6b7280">Item</th>
@@ -401,7 +402,7 @@ function generatePrintHtml(data: SessionData, header: ReportHeader = EMPTY_HEADE
           <tr><td style="padding:3px 20px 3px 0;color:#6b7280">Structure # Found</td><td style="font-weight:600">${importSummary.structureNumberFound ? "Yes" : "No"}</td></tr>
           <tr><td style="padding:3px 20px 3px 0;color:#6b7280">Elements Found</td><td style="font-weight:600">${importSummary.elementsFound}</td></tr>
           <tr><td style="padding:3px 20px 3px 0;color:#6b7280">Records Created</td><td style="font-weight:600">${importSummary.elementRecordsCreated}</td></tr>
-          <tr><td style="padding:3px 20px 3px 0;color:#6b7280">NBI Items Filled</td><td style="font-weight:600">${importSummary.nbiFilledCount} / ${importSummary.nbiTotalCount}</td></tr>
+          <tr><td style="padding:3px 20px 3px 0;color:#6b7280">Rating Items Filled</td><td style="font-weight:600">${importSummary.nbiFilledCount} / ${importSummary.nbiTotalCount}</td></tr>
         </table>
         ${
           importSummary.unmatchedComponents.length
@@ -559,6 +560,7 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
 
   const defects = sessionData?.defects ?? [];
   const nbiRatings = sessionData?.nbiRatings ?? [];
+  const isSnbiData = nbiRatings.some((n) => /^BC\d{2}$/.test(n.item));
 
   const hasRedlinePdf = pdfAnnotations.some((a) => a.type !== "_meta");
   const pdfAvailable = !!sessionData?.structureNumber;
@@ -615,7 +617,7 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
         XLSX.utils.book_append_sheet(
           wb,
           XLSX.utils.aoa_to_sheet([["Item", "Description", "Rating", "Comments"], ...nbiRows]),
-          "NBI Ratings",
+          isSnbiData ? "SNBI Ratings" : "NBI Ratings",
         );
       }
 
@@ -844,9 +846,9 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
       }
       children.push(new Paragraph({ text: "" }));
 
-      // ── 4. BRIDGE INSPECTION RECORD (NBI) ──────────────────────────────────
+      // ── 4. BRIDGE INSPECTION RECORD (NBI / SNBI) ────────────────────────────
       if (nbiRatings.length > 0) {
-        children.push(new Paragraph({ text: "Bridge Inspection Record", heading: HeadingLevel.HEADING_2 }));
+        children.push(new Paragraph({ text: isSnbiData ? "SNBI Component Ratings" : "Bridge Inspection Record", heading: HeadingLevel.HEADING_2 }));
         children.push(new Table({
           width: { size: 100, type: WidthType.PERCENTAGE },
           rows: [

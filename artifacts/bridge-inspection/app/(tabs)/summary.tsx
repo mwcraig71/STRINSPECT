@@ -50,6 +50,7 @@ export default function SummaryScreen() {
     acknowledgeUcChannelOverride,
     standardPhotos,
     standardPhotosComplete,
+    isSnbiFormat,
   } = useInspection();
   const missingPhotos = standardPhotos.filter((s) => !s.photoUri).length;
   const [settingsOpen, setSettingsOpen] = React.useState(false);
@@ -361,7 +362,7 @@ export default function SummaryScreen() {
                   <Text style={[styles.statNum, { color: c.foreground }]}>
                     {importSummary.nbiFilledCount}/{importSummary.nbiTotalCount}
                   </Text>
-                  <Text style={[styles.statLabel, { color: c.mutedForeground }]}>NBI Fields Filled</Text>
+                  <Text style={[styles.statLabel, { color: c.mutedForeground }]}>{isSnbiFormat ? "Rating Fields Filled" : "NBI Fields Filled"}</Text>
                 </View>
               </View>
 
@@ -380,7 +381,7 @@ export default function SummaryScreen() {
               </View>
 
               {/* NBI section breakdown */}
-              <Text style={[styles.auditSectionTitle, { color: c.mutedForeground }]}>NBI Sections</Text>
+              <Text style={[styles.auditSectionTitle, { color: c.mutedForeground }]}>{isSnbiFormat ? "SNBI Sections" : "NBI Sections"}</Text>
               <View style={styles.chipWrap}>
                 {importSummary.sections.map((s) => {
                   const blank = !s.hasData;
@@ -418,7 +419,7 @@ export default function SummaryScreen() {
                   </View>
                   {importSummary.emptySections.map((s) => (
                     <Text key={s.item} style={styles.calloutItem}>
-                      Item {s.item} — {s.description}: no data extracted
+                      {isSnbiFormat ? `B.C.${s.item.replace("BC", "")}` : `Item ${s.item}`} — {s.description}: no data extracted
                     </Text>
                   ))}
                 </View>

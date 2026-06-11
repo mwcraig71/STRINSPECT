@@ -40,6 +40,7 @@ export default function NBIScreen() {
     environment,
     setEnvironment,
     importSummary,
+    isSnbiFormat,
   } = useInspection();
 
   const blankSectionItems = React.useMemo(
@@ -82,7 +83,7 @@ export default function NBIScreen() {
         <View style={styles.headerRow}>
           <View style={styles.headerTitle}>
             <Feather name="bar-chart-2" size={16} color="#38bdf8" />
-            <Text style={styles.headerTitleText}>NBI Ratings</Text>
+            <Text style={styles.headerTitleText}>{isSnbiFormat ? "SNBI Ratings" : "NBI Ratings"}</Text>
           </View>
           <TouchableOpacity style={[styles.gearBtn, { backgroundColor: "#1e293b" }]} onPress={() => setSettingsOpen(true)}>
             <Feather name="settings" size={16} color="#94a3b8" />
@@ -118,7 +119,7 @@ export default function NBIScreen() {
                   </View>
                 )}
                 <Text style={[styles.tabText, { color: activeItem === item.item ? "#fff" : c.mutedForeground }]}>
-                  Item {item.item}
+                  {isSnbiFormat ? `B.C.${item.item.replace("BC", "")}` : `Item ${item.item}`}
                 </Text>
                 <Text style={[styles.tabSub, { color: activeItem === item.item ? "rgba(255,255,255,0.8)" : c.mutedForeground }]}>
                   {item.description}
@@ -134,7 +135,7 @@ export default function NBIScreen() {
           <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
             <View style={[styles.cardHeader, { backgroundColor: c.headerBg }]}>
               <Text style={styles.cardHeaderTitle}>{activeNbi.description} Assessment</Text>
-              <Text style={styles.cardHeaderItem}>Item {activeNbi.item}</Text>
+              <Text style={styles.cardHeaderItem}>{isSnbiFormat ? `B.C.${activeNbi.item.replace("BC", "")}` : `Item ${activeNbi.item}`}</Text>
             </View>
 
             {activeNbi.subComponents.map((comp, compIdx) => {

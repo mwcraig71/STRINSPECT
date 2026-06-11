@@ -124,6 +124,7 @@ export default function InspectionProgress({ sessionData, setSessionData }: Prop
   });
   const elementCoverage = Object.entries(elementMap).sort((a, b) => b[1].count - a[1].count);
 
+  const isSnbiData = nbiRatings.some((n) => /^BC\d{2}$/.test(n.item));
   const nbiTotal = nbiRatings.reduce((s, n) => s + n.subComponents.length, 0);
   const nbiFilled = nbiRatings.reduce((s, n) => s + n.subComponents.filter((sc) => sc.rating).length, 0);
   const nbiPct = nbiTotal > 0 ? Math.round((nbiFilled / nbiTotal) * 100) : 0;
@@ -518,7 +519,7 @@ export default function InspectionProgress({ sessionData, setSessionData }: Prop
 
             {/* NBI Completion */}
             <div className="bg-card border border-border rounded-lg p-4">
-              <h2 className="text-sm font-semibold text-foreground mb-3">NBI Rating Completion</h2>
+              <h2 className="text-sm font-semibold text-foreground mb-3">{isSnbiData ? "SNBI Rating Completion" : "NBI Rating Completion"}</h2>
               {nbiTotal > 0 ? (
                 <>
                   <div className="flex items-end gap-2 mb-3">
@@ -545,7 +546,7 @@ export default function InspectionProgress({ sessionData, setSessionData }: Prop
                       return (
                         <div key={n.item} className="flex items-center gap-2">
                           <span className="text-xs text-muted-foreground flex-1 truncate">
-                            Item {n.item} — {n.description}
+                            {isSnbiData ? `B.C.${n.item.replace("BC", "")}` : `Item ${n.item}`} — {n.description}
                           </span>
                           <span
                             className={`text-xs font-semibold flex-shrink-0 ${
@@ -560,7 +561,7 @@ export default function InspectionProgress({ sessionData, setSessionData }: Prop
                   </div>
                 </>
               ) : (
-                <p className="text-sm text-muted-foreground">No NBI ratings found in session data.</p>
+                <p className="text-sm text-muted-foreground">{isSnbiData ? "No SNBI ratings found in session data." : "No NBI ratings found in session data."}</p>
               )}
             </div>
           </div>

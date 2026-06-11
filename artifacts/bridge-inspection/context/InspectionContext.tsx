@@ -730,6 +730,138 @@ const INITIAL_NBI_RATINGS: NbiRating[] = [
   },
 ];
 
+const INITIAL_SNBI_RATINGS: NbiRating[] = [
+  {
+    item: "BC01",
+    description: "Deck",
+    subComponents: [
+      { name: "Deck - Component Rating", desc: "", min: "1", rating: "", snbiIds: ["12","38"], comments: "", previousComments: "" },
+      { name: "Wearing Surface", desc: "", min: "6", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Drainage System", desc: "", min: "6", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Curbs & Sidewalks", desc: "", min: "6", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Delineation", desc: "", min: "7", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Other", desc: "", min: "-", rating: "", snbiIds: [], comments: "", previousComments: "" },
+    ],
+  },
+  {
+    item: "BC02",
+    description: "Superstructure",
+    subComponents: [
+      { name: "Main Members - Steel", desc: "", min: "0", rating: "", snbiIds: ["107"], comments: "", previousComments: "" },
+      { name: "Main Members - Concrete", desc: "", min: "0", rating: "", snbiIds: ["109"], comments: "", previousComments: "" },
+      { name: "Main Members - Timber", desc: "", min: "0", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Main Members - Connections", desc: "", min: "0", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Floor System Members", desc: "", min: "1", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Floor System Connections", desc: "", min: "1", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Secondary Members", desc: "", min: "5", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Secondary Mem. Connections", desc: "", min: "5", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Steel Protective Coating", desc: "", min: "6", rating: "", snbiIds: ["515"], comments: "", previousComments: "" },
+      { name: "Overall Component Rating", desc: "", min: "-", rating: "", snbiIds: ["107","109"], comments: "", previousComments: "" },
+    ],
+  },
+  {
+    item: "BC03",
+    description: "Substructure",
+    subComponents: [
+      { name: "Abutment Caps", desc: "", min: "0", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Above Ground", desc: "", min: "0", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Below Ground or Foundation", desc: "", min: "0", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Backwalls & WingWalls", desc: "", min: "0", rating: "", snbiIds: ["215"], comments: "", previousComments: "" },
+      { name: "Int. Supports: Caps - Concrete", desc: "", min: "-", rating: "", snbiIds: ["234"], comments: "", previousComments: "" },
+      { name: "Int. Supports: Caps - Steel", desc: "", min: "-", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Int. Supports: Caps - Timber", desc: "", min: "-", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Int. Supports: Above Ground - Concrete", desc: "", min: "-", rating: "", snbiIds: ["205"], comments: "", previousComments: "" },
+      { name: "Int. Supports: Above Ground - Steel", desc: "", min: "-", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Int. Supports: Above Ground - Timber", desc: "", min: "-", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Int. Supports: Above Ground - Masonry", desc: "", min: "-", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Int. Supports: Below Ground or Foundation", desc: "", min: "-", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Collision Protection System", desc: "", min: "5", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Steel Protective Coating", desc: "", min: "6", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Overall Component Rating", desc: "", min: "-", rating: "", snbiIds: ["205","215","234"], comments: "", previousComments: "" },
+    ],
+  },
+  {
+    item: "BC04",
+    description: "Culvert",
+    subComponents: [
+      { name: "Top Slabs", desc: "", min: "0", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Bottom Slab or Footing", desc: "", min: "0", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Abutments, Intermed. Supports", desc: "", min: "0", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Headwalls & WingWalls", desc: "", min: "0", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Other", desc: "", min: "-", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Overall Component Rating", desc: "", min: "-", rating: "", snbiIds: [], comments: "", previousComments: "" },
+    ],
+  },
+  {
+    item: "BC05",
+    description: "Railings",
+    subComponents: [
+      { name: "Median Barrier", desc: "", min: "6", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Railings", desc: "", min: "6", rating: "", snbiIds: ["331"], comments: "", previousComments: "" },
+      { name: "Pedestrian Railing", desc: "", min: "6", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Railing Protective Coating", desc: "", min: "7", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Other", desc: "", min: "-", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Overall Component Rating", desc: "", min: "-", rating: "", snbiIds: ["331"], comments: "", previousComments: "" },
+    ],
+  },
+  {
+    item: "BC06",
+    description: "Railing Transitions",
+    subComponents: [
+      { name: "Transition Railings", desc: "", min: "6", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Railing Transitions Protective Coating", desc: "", min: "7", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Other", desc: "", min: "-", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Overall Component Rating", desc: "", min: "-", rating: "", snbiIds: [], comments: "", previousComments: "" },
+    ],
+  },
+  {
+    item: "BC07",
+    description: "Bearings",
+    subComponents: [
+      { name: "Expansion Bearings", desc: "", min: "6", rating: "", snbiIds: ["310"], comments: "", previousComments: "" },
+      { name: "Fixed Bearings", desc: "", min: "6", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Other", desc: "", min: "-", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Overall Component Rating", desc: "", min: "-", rating: "", snbiIds: ["310"], comments: "", previousComments: "" },
+    ],
+  },
+  {
+    item: "BC08",
+    description: "Joints",
+    subComponents: [
+      { name: "Joints, Expansion, Open", desc: "", min: "6", rating: "", snbiIds: ["304"], comments: "", previousComments: "" },
+      { name: "Joints, Expansion, Sealed", desc: "", min: "6", rating: "", snbiIds: ["300"], comments: "", previousComments: "" },
+      { name: "Joints, Other", desc: "", min: "6", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Overall Component Rating", desc: "", min: "-", rating: "", snbiIds: ["300","304"], comments: "", previousComments: "" },
+    ],
+  },
+  {
+    item: "BC09",
+    description: "Channel",
+    subComponents: [
+      { name: "Channel Banks", desc: "", min: "0", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Channel Bed", desc: "", min: "0", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Rip Rap, Toe Walls & Apron", desc: "", min: "5", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Dikes", desc: "", min: "5", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Jetties", desc: "", min: "5", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Overall Component Rating", desc: "", min: "-", rating: "", snbiIds: [], comments: "", previousComments: "" },
+    ],
+  },
+  {
+    item: "BC10",
+    description: "Waterway",
+    subComponents: [
+      { name: "Waterway Adequacy", desc: "", min: "-", rating: "", snbiIds: [], comments: "", previousComments: "" },
+    ],
+  },
+  {
+    item: "BC11",
+    description: "Appr. Alignment",
+    subComponents: [
+      { name: "Approach Roadway Alignment", desc: "", min: "-", rating: "", snbiIds: [], comments: "", previousComments: "" },
+    ],
+  },
+];
+
 const INITIAL_CIF: CifData = {
   structureNumber: "",
   inspectionDate: new Date().toLocaleDateString("en-US"),
@@ -1268,6 +1400,7 @@ interface InspectionContextType {
   addExtraPhoto: () => void;
   setExtraPhotoSlot: (slotId: string, patch: Partial<StandardPhotoSlot>) => void;
   removeExtraPhoto: (slotId: string) => void;
+  isSnbiFormat: boolean;
 }
 
 export interface ElementSummaryRow {
@@ -1530,6 +1663,7 @@ const STORAGE_KEYS = {
   UC_CHANNEL_OVERRIDE: "@bridge_uc_channel_override",
   STANDARD_PHOTOS: "@bridge_standard_photos",
   EXTRA_PHOTOS: "@bridge_extra_photos",
+  IS_SNBI_FORMAT: "@bridge_is_snbi_format",
 };
 
 // ─── Shared header merge utility ─────────────────────────────────────────────
@@ -1642,6 +1776,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const [standardPhotos, setStandardPhotosState] = useState<StandardPhotoSlot[]>(TXDOT_REQUIRED_SLOTS);
   const [extraPhotos, setExtraPhotosState] = useState<StandardPhotoSlot[]>([]);
+  const [isSnbiFormat, setIsSnbiFormatState] = useState(false);
 
   // ── AsyncStorage load on mount ──
   useEffect(() => {
@@ -1657,7 +1792,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           ]);
           await AsyncStorage.setItem(STORAGE_KEYS.DEMO_CLEARED, "1");
         }
-        const [defects, nbi, nom, insType, superType, subType, superMat, subMat, structNum, uc, ch, sb, sn, spp, impSummary, lastJoint, lastSync, lastMod, pdfPath, pdfAnns, pdfUploadedStr, imgSz, aspectRatioStr, dateStampStr, finalizedAtStr, importAuditAckStr, criticalAckStr, stdPhotosStr, openAiKeyStr, aiRephraseStr, extraPhotosStr, ucChannelOverrideStr] = await Promise.all([
+        const [defects, nbi, nom, insType, superType, subType, superMat, subMat, structNum, uc, ch, sb, sn, spp, impSummary, lastJoint, lastSync, lastMod, pdfPath, pdfAnns, pdfUploadedStr, imgSz, aspectRatioStr, dateStampStr, finalizedAtStr, importAuditAckStr, criticalAckStr, stdPhotosStr, openAiKeyStr, aiRephraseStr, extraPhotosStr, ucChannelOverrideStr, isSnbiFormatStr] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.SAVED_DEFECTS),
           AsyncStorage.getItem(STORAGE_KEYS.NBI_RATINGS),
           AsyncStorage.getItem(STORAGE_KEYS.NOMENCLATURE),
@@ -1690,6 +1825,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           AsyncStorage.getItem(STORAGE_KEYS.AI_REPHRASE),
           AsyncStorage.getItem(STORAGE_KEYS.EXTRA_PHOTOS),
           AsyncStorage.getItem(STORAGE_KEYS.UC_CHANNEL_OVERRIDE),
+          AsyncStorage.getItem(STORAGE_KEYS.IS_SNBI_FORMAT),
         ]);
         if (lastJoint) setLastJointElementIdState(lastJoint);
         if (lastSync) setLastSynced(lastSync);
@@ -1704,6 +1840,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         if (importAuditAckStr === "1") setImportAuditAcknowledgedState(true);
         if (criticalAckStr === "1") setCriticalFindingsAcknowledgedState(true);
         if (ucChannelOverrideStr === "1") setUcChannelOverrideAcknowledgedState(true);
+        if (isSnbiFormatStr === "1") setIsSnbiFormatState(true);
         if (openAiKeyStr) setOpenAiKeyState(openAiKeyStr);
         if (aiRephraseStr !== null) setAiRephraseState(aiRephraseStr !== "0");
         if (stdPhotosStr) {
@@ -2091,6 +2228,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     AsyncStorage.setItem(STORAGE_KEYS.SAVED_DEFECTS, JSON.stringify([])).catch(() => {});
     setNbiRatingsState(INITIAL_NBI_RATINGS);
     AsyncStorage.setItem(STORAGE_KEYS.NBI_RATINGS, JSON.stringify(INITIAL_NBI_RATINGS)).catch(() => {});
+    setIsSnbiFormatState(false);
+    AsyncStorage.removeItem(STORAGE_KEYS.IS_SNBI_FORMAT).catch(() => {});
     setStructureNumber("");
     setImportSummary(null);
     setLastModifiedState(null);
@@ -2812,9 +2951,18 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           structureNumber: parsedNum,
           elements,
           nbi,
+          isSnbi: isSnbiParsed,
           underclearance: parsedUnderclearance,
           channelCrossSection: parsedChannelCrossSection,
         } = await parseReport(source);
+
+        setIsSnbiFormatState(isSnbiParsed);
+        AsyncStorage.setItem(STORAGE_KEYS.IS_SNBI_FORMAT, isSnbiParsed ? "1" : "0").catch(() => {});
+        const baseRatings = isSnbiParsed ? INITIAL_SNBI_RATINGS : INITIAL_NBI_RATINGS;
+        if (isSnbiParsed) {
+          setNbiRatingsState(INITIAL_SNBI_RATINGS);
+          AsyncStorage.setItem(STORAGE_KEYS.NBI_RATINGS, JSON.stringify(INITIAL_SNBI_RATINGS)).catch(() => {});
+        }
 
         if (parsedNum) {
           setStructureNumber(parsedNum);
@@ -2944,7 +3092,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         let nbiFilledCount = 0;
         let nbiTotalCount = 0;
         const sectionAudits: ImportSectionAudit[] = [];
-        for (const item of nbiRatings) {
+        for (const item of baseRatings) {
           let filled = 0;
           for (const sub of item.subComponents) {
             nbiTotalCount++;
@@ -2977,9 +3125,9 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         }
 
         if (nbi.length > 0) {
-          setNbiRatingsState((prevNbi) => {
+          setNbiRatingsState(() => {
             const usedIndices = new Set<number>();
-            const updated = prevNbi.map((item) => ({
+            const updated = baseRatings.map((item) => ({
               ...item,
               subComponents: item.subComponents.map((sub) => {
                 const result = findFuzzyNbiEntry(nbi, item.item, sub.name, usedIndices);
@@ -3391,6 +3539,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     addExtraPhoto,
     setExtraPhotoSlot,
     removeExtraPhoto,
+    isSnbiFormat,
   };
 
   return (
