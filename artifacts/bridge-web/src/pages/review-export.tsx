@@ -100,9 +100,16 @@ interface ReportHeader {
   inspectionDate: string;
   inspectors: string;
   inspectionType: string;
+  latitude: string;
+  longitude: string;
 }
 
-function generatePrintHtml(data: SessionData, header: ReportHeader): string {
+const EMPTY_HEADER: ReportHeader = {
+  facilityCarried: "", featureCrossed: "", inspectionDate: "",
+  inspectors: "", inspectionType: "", latitude: "", longitude: "",
+};
+
+function generatePrintHtml(data: SessionData, header: ReportHeader = EMPTY_HEADER): string {
   const defects = data.defects ?? [];
   const nbiRatings = data.nbiRatings ?? [];
   const importSummary = data.importSummary;
@@ -153,7 +160,36 @@ function generatePrintHtml(data: SessionData, header: ReportHeader): string {
       <div class="stat"><div class="val" style="color:#ca8a04">${needsVerify}</div><div class="lbl">Needs Verification</div></div>
     </div>`;
 
-  // ── 2. FOLLOW-UP ACTIONS ────────────────────────────────────────────────────
+  // ── 2. LOCATION MAP ─────────────────────────────────────────────────────────
+  const hasLocation = !!(header.latitude && header.longitude);
+  const lat = parseFloat(header.latitude);
+  const lon = parseFloat(header.longitude);
+  const locationSection = hasLocation && !isNaN(lat) && !isNaN(lon) ? (() => {
+    const mapUrl = `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lon}&zoom=14&size=600x300&markers=${lat},${lon},red-pushpin`;
+    return `
+    <h2>Location Map</h2>
+    <table style="border-collapse:collapse;margin-bottom:12px">
+      <tr>
+        <td style="padding:4px 20px 4px 0;color:#6b7280;font-weight:600;font-size:11px;white-space:nowrap">Latitude</td>
+        <td style="padding:4px 0;font-size:11px">${esc(String(lat))}</td>
+      </tr>
+      <tr>
+        <td style="padding:4px 20px 4px 0;color:#6b7280;font-weight:600;font-size:11px;white-space:nowrap">Longitude</td>
+        <td style="padding:4px 0;font-size:11px">${esc(String(lon))}</td>
+      </tr>
+    </table>
+    <div style="margin-bottom:8px">
+      <img
+        src="${esc(mapUrl)}"
+        alt="Location map for ${esc(structNum)}"
+        style="max-width:600px;width:100%;border:1px solid #e5e7eb;border-radius:6px;display:block"
+        onerror="this.replaceWith(document.createTextNode('(Map image unavailable \u2014 check internet connection)'))"
+      />
+    </div>
+    <p style="font-size:10px;color:#9ca3af;margin-top:4px">\u00a9 OpenStreetMap contributors</p>`;
+  })() : "";
+
+  // ── 3. FOLLOW-UP ACTIONS ────────────────────────────────────────────────────
   const fuaDefects = defects.filter((d) => d.isCritical || d.isMaintenance);
   const fuaPhotoNums = new Map<string, number[]>();
   for (const d of fuaDefects) {
@@ -418,6 +454,7 @@ function generatePrintHtml(data: SessionData, header: ReportHeader): string {
     <p class="meta">Generated: ${esc(now)} &nbsp;&middot;&nbsp; ${defects.length} defect records</p>
     <table style="border-collapse:collapse;margin-bottom:4px">${coverRows}</table>
     ${statsBlock}
+    ${locationSection}
     ${fuaSection}
     ${loadSection}
     ${nbiSection}
@@ -447,6 +484,8 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
       inspectionDate: "",
       inspectors: "",
       inspectionType: "Routine",
+      latitude: "",
+      longitude: "",
     };
     try {
       const raw = localStorage.getItem("bridge_report_header_last");
@@ -475,7 +514,7 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
     const rawAnns = (sessionDetail.pdfAnnotations ?? []) as Annotation[];
     setPdfAnnotations(rawAnns);
 
-    const html = generatePrintHtml(data);
+    const html = generatePrintHtml(data, reportHeader);
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const win = window.open(url, "_blank", "noopener");
@@ -701,7 +740,32 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
       }
       children.push(new Paragraph({ text: "" }));
 
-      // ── 2. FOLLOW-UP ACTIONS ──────────────────────────────────────────────
+      // ── 2. LOCATION MAP ───────────────────────────────────────────────────
+      const hasLoc = !!(reportHeader.latitude && reportHeader.longitude);
+      const wLat = parseFloat(reportHeader.latitude);
+      const wLon = parseFloat(reportHeader.longitude);
+      if (hasLoc && !isNaN(wLat) && !isNaN(wLon)) {
+        children.push(new Paragraph({ text: "Location Map", heading: HeadingLevel.HEADING_2 }));
+        children.push(new Paragraph({
+          children: [new TextRun({ text: "Latitude: ", bold: true }), new TextRun(String(wLat))],
+        }));
+        children.push(new Paragraph({
+          children: [new TextRun({ text: "Longitude: ", bold: true }), new TextRun(String(wLon))],
+        }));
+        const mapUrl = `https://staticmap.openstreetmap.de/staticmap.php?center=${wLat},${wLon}&zoom=14&size=600x300&markers=${wLat},${wLon},red-pushpin`;
+        const mapImgData = await fetchPhotoBase64(mapUrl);
+        if (mapImgData) {
+          children.push(new Paragraph({
+            children: [new ImageRun({ data: mapImgData.b64, transformation: { width: 480, height: 240 }, type: mapImgData.type })],
+          }));
+        } else {
+          children.push(new Paragraph({ children: [new TextRun({ text: "(Map image unavailable \u2014 check internet connection)", italics: true, color: "888888" })] }));
+        }
+        children.push(new Paragraph({ children: [new TextRun({ text: "\u00a9 OpenStreetMap contributors", color: "9ca3af", size: 16 })] }));
+        children.push(new Paragraph({ text: "" }));
+      }
+
+      // ── 3. FOLLOW-UP ACTIONS ──────────────────────────────────────────────
       const fuaDefects = defects.filter((d) => d.isCritical || d.isMaintenance);
       if (fuaDefects.length > 0) {
         children.push(new Paragraph({ text: "Bridge Inspection Follow-Up Actions", heading: HeadingLevel.HEADING_2 }));
@@ -1074,7 +1138,7 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
 
   const reopenReport = () => {
     if (!sessionData) return;
-    const html = generatePrintHtml(sessionData);
+    const html = generatePrintHtml(sessionData, reportHeader);
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const win = window.open(url, "_blank", "noopener");
@@ -1225,6 +1289,8 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
                 { key: "featureCrossed",  label: "Feature Crossed",  placeholder: "e.g. MUDDY CREEK" },
                 { key: "inspectionDate",  label: "Inspection Date",  placeholder: "e.g. 03/18/2023" },
                 { key: "inspectors",      label: "Inspected By",     placeholder: "e.g. Jane Smith, PE" },
+                { key: "latitude",        label: "Latitude",         placeholder: "e.g. 30.2672" },
+                { key: "longitude",       label: "Longitude",        placeholder: "e.g. -97.7431" },
               ] as const).map(({ key, label, placeholder }) => (
                 <div key={key}>
                   <label className="text-xs text-muted-foreground block mb-1">{label}</label>
