@@ -46,8 +46,12 @@ export default function PhotosScreen() {
 
   const pickPhotoResult = async (): Promise<{ uri: string; heading?: number } | null> => {
     if (Platform.OS === "web") {
-      Alert.alert("Info", "Camera not available in web preview.");
-      return null;
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.8,
+      });
+      if (result.canceled) return null;
+      return { uri: result.assets[0].uri };
     }
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
@@ -69,10 +73,6 @@ export default function PhotosScreen() {
   };
 
   const pickLibraryResult = async (): Promise<string | null> => {
-    if (Platform.OS === "web") {
-      Alert.alert("Info", "Photo library not supported in web preview. Use camera.");
-      return null;
-    }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.8,
@@ -83,7 +83,7 @@ export default function PhotosScreen() {
 
   const confirm = (message: string, onConfirm: () => void) => {
     if (Platform.OS === "web") {
-      if (window.confirm(message)) onConfirm();
+      onConfirm();
     } else {
       Alert.alert("Confirm", message, [
         { text: "Cancel", style: "cancel" },
