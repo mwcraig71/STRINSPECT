@@ -203,7 +203,12 @@ var scInsertIdx = 0;
 /* ── RN bridge ── */
 function postRN(msg) {
   try {
-    if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify(msg));
+    var data = JSON.stringify(msg);
+    if (window.ReactNativeWebView) {
+      window.ReactNativeWebView.postMessage(data);
+    } else if (window.parent && window.parent !== window) {
+      window.parent.postMessage(data, '*');
+    }
   } catch(e) {}
 }
 

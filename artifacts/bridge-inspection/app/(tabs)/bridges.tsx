@@ -270,20 +270,18 @@ export default function BridgesScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {Platform.OS !== "web" && (
-        <PDFAnnotatorModal
-          visible={annotatorOpen}
-          pdfPath={importedPdfPath}
-          annotations={pdfAnnotations}
-          onSave={(anns) => {
-            setPdfAnnotations(anns);
-            setAnnotatorOpen(false);
-            // Fire-and-forget sync so annotations reach server immediately
-            syncSession().catch(() => {});
-          }}
-          onClose={() => setAnnotatorOpen(false)}
-        />
-      )}
+      <PDFAnnotatorModal
+        visible={annotatorOpen}
+        pdfPath={importedPdfPath}
+        annotations={pdfAnnotations}
+        onSave={(anns) => {
+          setPdfAnnotations(anns);
+          setAnnotatorOpen(false);
+          // Fire-and-forget sync so annotations reach server immediately
+          syncSession().catch(() => {});
+        }}
+        onClose={() => setAnnotatorOpen(false)}
+      />
 
       <View style={[styles.header, { backgroundColor: c.headerBg, paddingTop: Platform.OS === "web" ? 67 : insets.top }]}>
         <View style={styles.headerRow}>
@@ -419,7 +417,7 @@ export default function BridgesScreen() {
                   </Text>
                 </TouchableOpacity>
 
-                {importedPdfPath && Platform.OS !== "web" && (
+                {(importedPdfPath || Platform.OS === "web") && (
                   <TouchableOpacity
                     style={[styles.newBtn, { backgroundColor: "#0c1a2e", borderColor: "#0284c7" }]}
                     onPress={() => setAnnotatorOpen(true)}
