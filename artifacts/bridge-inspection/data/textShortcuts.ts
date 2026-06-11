@@ -135,3 +135,15 @@ export const TEXT_SHORTCUTS: TextShortcut[] = [
   { id: "rec_09", category: "Recommendations", label: "Repair project", text: "Recommend programming a repair project to address deterioration before it advances further." },
   { id: "rec_10", category: "Recommendations", label: "No action needed", text: "No maintenance or engineering action required at this time based on current conditions." },
 ];
+
+export const SC_FAVORITES_KEY = "@bridge_sc_favorites";
+export const CUSTOM_SHORTCUTS_KEY = "@bridge_custom_shortcuts";
+
+export function mergeShortcuts(customRaw: string | null): TextShortcut[] {
+  try {
+    const custom: TextShortcut[] = customRaw ? JSON.parse(customRaw) : [];
+    return [...TEXT_SHORTCUTS, ...custom];
+  } catch {
+    return [...TEXT_SHORTCUTS];
+  }
+}

@@ -13,9 +13,7 @@ import { Feather } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { WebView } from "react-native-webview";
 import { getPdfAnnotatorHtml } from "./pdfAnnotatorHtml";
-import { TEXT_SHORTCUTS } from "@/data/textShortcuts";
-
-const SC_FAVORITES_KEY = "@bridge_sc_favorites";
+import { SC_FAVORITES_KEY, CUSTOM_SHORTCUTS_KEY, mergeShortcuts } from "@/data/textShortcuts";
 
 const HTML = getPdfAnnotatorHtml();
 
@@ -60,11 +58,12 @@ export default function PDFAnnotatorModal({ visible, pdfPath, annotations, onSav
     );
     const savedFavs = await AsyncStorage.getItem(SC_FAVORITES_KEY).catch(() => null);
     const favIds: string[] = savedFavs ? JSON.parse(savedFavs) : scFavorites;
+    const customRaw = await AsyncStorage.getItem(CUSTOM_SHORTCUTS_KEY).catch(() => null);
     return JSON.stringify({
       type: "init",
       pdfBase64: base64Uri,
       annotations: existingAnnotations,
-      shortcuts: TEXT_SHORTCUTS,
+      shortcuts: mergeShortcuts(customRaw),
       scFavorites: favIds,
     });
   }, [annotations, scFavorites]);

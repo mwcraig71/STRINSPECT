@@ -1,5 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import React from "react";
 import {
   ActivityIndicator,
@@ -14,6 +15,7 @@ import {
   View,
 } from "react-native";
 
+import { CUSTOM_SHORTCUTS_KEY, SC_FAVORITES_KEY, TEXT_SHORTCUTS, TextShortcut } from "@/data/textShortcuts";
 import { useColors } from "@/hooks/useColors";
 import {
   INSPECTION_TYPES,
@@ -65,6 +67,62 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
 
   const [keyInput, setKeyInput] = React.useState("");
   const [keyVisible, setKeyVisible] = React.useState(false);
+
+  const [scExpanded, setScExpanded] = React.useState(false);
+  const [customShortcuts, setCustomShortcuts] = React.useState<TextShortcut[]>([]);
+  const [scFavs, setScFavs] = React.useState<string[]>([]);
+  const [newLabel, setNewLabel] = React.useState("");
+  const [newText, setNewText] = React.useState("");
+  const [editingId, setEditingId] = React.useState<string | null>(null);
+  const [editLabel, setEditLabel] = React.useState("");
+  const [editText, setEditText] = React.useState("");
+
+  React.useEffect(() => {
+    if (!visible) return;
+    AsyncStorage.getItem(CUSTOM_SHORTCUTS_KEY).then((raw) => {
+      try { setCustomShortcuts(raw ? JSON.parse(raw) : []); } catch { setCustomShortcuts([]); }
+    }).catch(() => {});
+    AsyncStorage.getItem(SC_FAVORITES_KEY).then((raw) => {
+      try { setScFavs(raw ? JSON.parse(raw) : []); } catch { setScFavs([]); }
+    }).catch(() => {});
+  }, [visible]);
+
+  const saveCustom = (list: TextShortcut[]) => {
+    setCustomShortcuts(list);
+    AsyncStorage.setItem(CUSTOM_SHORTCUTS_KEY, JSON.stringify(list)).catch(() => {});
+  };
+  const saveFavs = (list: string[]) => {
+    setScFavs(list);
+    AsyncStorage.setItem(SC_FAVORITES_KEY, JSON.stringify(list)).catch(() => {});
+  };
+  const toggleFav = (id: string) => {
+    const next = scFavs.includes(id) ? scFavs.filter((f) => f !== id) : [...scFavs, id];
+    saveFavs(next);
+  };
+  const addSc = () => {
+    const lbl = newLabel.trim();
+    const txt = newText.trim();
+    if (!lbl || !txt) return;
+    saveCustom([...customShortcuts, { id: "custom_" + Date.now(), category: "Custom", label: lbl, text: txt }]);
+    setNewLabel("");
+    setNewText("");
+  };
+  const deleteSc = (id: string) => {
+    saveCustom(customShortcuts.filter((s) => s.id !== id));
+    saveFavs(scFavs.filter((f) => f !== id));
+  };
+  const startEdit = (s: TextShortcut) => {
+    setEditingId(s.id);
+    setEditLabel(s.label);
+    setEditText(s.text);
+  };
+  const commitEdit = (id: string) => {
+    const lbl = editLabel.trim();
+    const txt = editText.trim();
+    if (!lbl || !txt) { setEditingId(null); return; }
+    saveCustom(customShortcuts.map((s) => (s.id === id ? { ...s, label: lbl, text: txt } : s)));
+    setEditingId(null);
+  };
 
   const hasInspectionData =
     savedDefects.length > 0 || !!structureNumber || !!importSummary;
@@ -631,6 +689,148 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
             </View>
           </View>
 
+          {/* Text Shortcuts */}
+          <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
+            <TouchableOpacity
+              style={styles.cardHeader}
+              onPress={() => setScExpanded((v) => !v)}
+              activeOpacity={0.7}
+            >
+              <Feather name="type" size={15} color={c.mutedForeground} />
+              <Text style={[styles.cardTitle, { color: c.foreground, flex: 1 }]}>Text Shortcuts</Text>
+              <Feather name={scExpanded ? "chevron-up" : "chevron-down"} size={14} color={c.mutedForeground} />
+            </TouchableOpacity>
+            <Text style={[styles.cardDesc, { color: c.mutedForeground }]}>
+              {scExpanded
+                ? "Tap \u2606 to favorite a shortcut for quick toolbar access."
+                : "Manage snippets used in the PDF annotator. Tap \u2606 to favorite for quick access."}
+            </Text>
+            {scExpanded && (
+              <>
+                {/* Add custom shortcut */}
+                <View style={[styles.scAddForm, { backgroundColor: c.background, borderColor: c.border }]}>
+                  <Text style={[styles.scSectionTitle, { color: c.foreground, marginBottom: 4 }]}>Add Custom Shortcut</Text>
+                  <TextInput
+                    style={[styles.scInput, { color: c.foreground, borderColor: c.border, backgroundColor: c.secondary }]}
+                    value={newLabel}
+                    onChangeText={setNewLabel}
+                    placeholder="Label (e.g. Hairline cracks observed)"
+                    placeholderTextColor={c.mutedForeground}
+                    autoCapitalize="sentences"
+                  />
+                  <TextInput
+                    style={[styles.scInput, styles.scTextArea, { color: c.foreground, borderColor: c.border, backgroundColor: c.secondary }]}
+                    value={newText}
+                    onChangeText={setNewText}
+                    placeholder="Full inspection text..."
+                    placeholderTextColor={c.mutedForeground}
+                    multiline
+                    numberOfLines={3}
+                    autoCapitalize="sentences"
+                  />
+                  <TouchableOpacity
+                    style={[styles.scAddBtn, { backgroundColor: "#0c4a6e", borderColor: "#0284c7", opacity: (!newLabel.trim() || !newText.trim()) ? 0.45 : 1 }]}
+                    onPress={addSc}
+                    disabled={!newLabel.trim() || !newText.trim()}
+                  >
+                    <Feather name="plus" size={13} color="#38bdf8" />
+                    <Text style={[styles.keyBtnText, { color: "#38bdf8" }]}>Add Shortcut</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Custom shortcuts list */}
+                {customShortcuts.length > 0 && (
+                  <View style={styles.scSection}>
+                    <Text style={[styles.scSectionTitle, { color: "#a78bfa" }]}>Custom ({customShortcuts.length})</Text>
+                    {customShortcuts.map((s) => (
+                      <View key={s.id} style={[styles.scRow, { borderColor: c.border, backgroundColor: c.background }]}>
+                        {editingId === s.id ? (
+                          <View style={{ flex: 1, gap: 6 }}>
+                            <TextInput
+                              style={[styles.scInput, { color: c.foreground, borderColor: "#38bdf8", backgroundColor: c.secondary }]}
+                              value={editLabel}
+                              onChangeText={setEditLabel}
+                              autoFocus
+                              autoCapitalize="sentences"
+                            />
+                            <TextInput
+                              style={[styles.scInput, styles.scTextArea, { color: c.foreground, borderColor: "#38bdf8", backgroundColor: c.secondary }]}
+                              value={editText}
+                              onChangeText={setEditText}
+                              multiline
+                              numberOfLines={3}
+                              autoCapitalize="sentences"
+                            />
+                            <View style={{ flexDirection: "row", gap: 8 }}>
+                              <TouchableOpacity
+                                style={[styles.scAddBtn, { backgroundColor: "#022c22", borderColor: "#064e3b", flex: 1 }]}
+                                onPress={() => commitEdit(s.id)}
+                              >
+                                <Feather name="check" size={13} color="#34d399" />
+                                <Text style={[styles.keyBtnText, { color: "#34d399" }]}>Save</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={[styles.scAddBtn, { backgroundColor: c.secondary, borderColor: c.border }]}
+                                onPress={() => setEditingId(null)}
+                              >
+                                <Feather name="x" size={13} color={c.mutedForeground} />
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        ) : (
+                          <>
+                            <View style={{ flex: 1 }}>
+                              <Text style={[styles.scLabel, { color: c.foreground }]}>{s.label}</Text>
+                              <Text style={[styles.scText, { color: c.mutedForeground }]} numberOfLines={1}>{s.text}</Text>
+                            </View>
+                            <TouchableOpacity onPress={() => toggleFav(s.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                              <Text style={{ fontSize: 16, color: scFavs.includes(s.id) ? "#a78bfa" : c.muted }}>
+                                {scFavs.includes(s.id) ? "\u2605" : "\u2606"}
+                              </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => startEdit(s)} style={styles.scIconBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                              <Feather name="edit-2" size={13} color="#38bdf8" />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              onPress={() =>
+                                Alert.alert("Delete Shortcut", `Delete "${s.label}"?`, [
+                                  { text: "Cancel", style: "cancel" },
+                                  { text: "Delete", style: "destructive", onPress: () => deleteSc(s.id) },
+                                ])
+                              }
+                              style={styles.scIconBtn}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            >
+                              <Feather name="trash-2" size={13} color="#f87171" />
+                            </TouchableOpacity>
+                          </>
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {/* Built-in shortcuts */}
+                <View style={styles.scSection}>
+                  <Text style={[styles.scSectionTitle, { color: c.mutedForeground }]}>Built-in ({TEXT_SHORTCUTS.length})</Text>
+                  {TEXT_SHORTCUTS.map((s) => (
+                    <View key={s.id} style={[styles.scRow, { borderColor: c.border, backgroundColor: c.background }]}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.scLabel, { color: c.foreground }]}>{s.label}</Text>
+                        <Text style={[styles.scText, { color: c.mutedForeground }]} numberOfLines={1}>{s.text}</Text>
+                      </View>
+                      <TouchableOpacity onPress={() => toggleFav(s.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                        <Text style={{ fontSize: 16, color: scFavs.includes(s.id) ? "#a78bfa" : c.muted }}>
+                          {scFavs.includes(s.id) ? "\u2605" : "\u2606"}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              </>
+            )}
+          </View>
+
           {/* Cloud Sync */}
           <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
             <View style={styles.cardHeader}>
@@ -895,4 +1095,43 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   keyBtnText: { fontSize: 12, fontWeight: "800" as const, textTransform: "uppercase" as const },
+  scAddForm: {
+    borderRadius: 10,
+    borderWidth: 1,
+    padding: 12,
+    gap: 8,
+  },
+  scSection: { gap: 4 },
+  scSectionTitle: { fontSize: 10, fontWeight: "800" as const, textTransform: "uppercase" as const, letterSpacing: 0.5 },
+  scRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    gap: 8,
+  },
+  scLabel: { fontSize: 12, fontWeight: "700" as const },
+  scText: { fontSize: 10, fontWeight: "500" as const, marginTop: 1 },
+  scIconBtn: { padding: 2 },
+  scInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    fontSize: 12,
+    fontWeight: "500" as const,
+  },
+  scTextArea: { minHeight: 60, textAlignVertical: "top" as const },
+  scAddBtn: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
 });

@@ -43,6 +43,7 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
 #err-txt{display:none;color:#f87171;font-size:12px;text-align:center;padding:0 20px;max-width:280px}
 #text-input-wrap{display:none;position:fixed;z-index:300;background:#1e293b;border:2px solid #38bdf8;border-radius:8px;padding:6px}
 #text-input{background:transparent;border:none;outline:none;font-size:16px;color:#fff;min-width:120px;max-width:220px}
+#pending-hint{display:none;position:fixed;top:40px;left:0;right:0;z-index:150;background:rgba(124,58,237,0.18);border-bottom:1px solid #7c3aed;padding:6px 12px;text-align:center;color:#a78bfa;font-size:11px;font-weight:700;letter-spacing:0.1px;cursor:pointer;-webkit-user-select:none;user-select:none}
 </style>
 </head>
 <body>
@@ -81,6 +82,7 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
 <div id="text-input-wrap">
   <input id="text-input" placeholder="Type here..." autocomplete="off" autocorrect="off" spellcheck="false">
 </div>
+<div id="pending-hint"></div>
 
 <script>
 ${PDFJS_INLINE_SCRIPT}
@@ -146,6 +148,20 @@ var zoomLevel = 1.0;
 var ZOOM_STEPS = [0.5,0.75,1.0,1.25,1.5,2.0,2.5,3.0];
 var scList = [];
 var scFavorites = [];
+var pendingShortcut = null;
+function setPendingShortcut(text) {
+  pendingShortcut = text;
+  var hint = document.getElementById('pending-hint');
+  if (!hint) return;
+  if (text) {
+    var preview = text.length > 45 ? text.slice(0, 45) + '...' : text;
+    hint.textContent = 'Tap the PDF to place: "' + preview + '" \u2014 tap here to cancel';
+    hint.style.display = 'block';
+  } else {
+    hint.style.display = 'none';
+    hint.textContent = '';
+  }
+}
 
 function postBridge(msg) {
   var s = JSON.stringify(msg);
@@ -288,7 +304,9 @@ function onDown(e, cv, pn) {
     textPendingPage = pn;
     textPendingX = pt[0];
     textPendingY = pt[1];
-    showTextInput(e.clientX, e.clientY, pn);
+    var preText = pendingShortcut || '';
+    setPendingShortcut(null);
+    showTextInput(e.clientX, e.clientY, pn, preText);
     return;
   }
 
@@ -325,7 +343,7 @@ function onUp(e, cv, pn) {
   redrawPage(targetPn);
 }
 
-function showTextInput(clientX, clientY, pn) {
+function showTextInput(clientX, clientY, pn, preText) {
   var wrap = document.getElementById('text-input-wrap');
   var inp = document.getElementById('text-input');
   var x = Math.min(clientX, window.innerWidth - 250);
@@ -333,7 +351,8 @@ function showTextInput(clientX, clientY, pn) {
   wrap.style.left = x + 'px';
   wrap.style.top = y + 'px';
   wrap.style.display = 'block';
-  inp.value = '';
+  inp.value = preText || '';
+  if (preText) { inp.select(); }
   inp.focus();
 
   function commit() {
@@ -464,27 +483,8 @@ function renderSC() {
         inp.focus();
         return;
       }
-      var area = document.getElementById('scroll-area');
-      var scrollTop = area ? area.scrollTop : 0;
-      var vh = window.innerHeight;
-      var vw = window.innerWidth;
-      var cy = scrollTop + vh / 2;
-      var targetPn = 1;
-      var minDist = Infinity;
-      Object.keys(pageLayout).forEach(function(pn) {
-        var L = pageLayout[pn];
-        var z = zoomLevel || 1;
-        var pageCenter = L.top * z + L.h * z / 2;
-        var dist = Math.abs(pageCenter - cy);
-        if (dist < minDist) { minDist = dist; targetPn = parseInt(pn, 10); }
-      });
-      var L = pageLayout[targetPn];
-      var z = zoomLevel || 1;
-      var annX = Math.max(10, (vw / 2 - (L ? L.left * z : 0)) / z);
-      var annY = Math.max(20, (cy - (L ? L.top * z : 0)) / z);
-      annotations.push({ type: 'text', page: targetPn, x: annX, y: annY, text: s.text, fontSize: (penSize * 4 + 10) * 0.25, color: penColor });
-      autoSave();
-      redrawPage(targetPn);
+      setPendingShortcut(s.text);
+      setTool('text');
     };
     row.appendChild(btn);
   });
