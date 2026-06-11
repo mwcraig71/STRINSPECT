@@ -27,6 +27,7 @@ export function TabletSplitLayout({ children }: Props) {
   const { importedPdfPath, importFromPdf, pdfAnnotations, setPdfAnnotations } = useInspection();
   const [pdfExpanded, setPdfExpanded] = useState(false);
   const [splitRatio, setSplitRatioState] = useState(DEFAULT_RATIO);
+  const [dragging, setDragging] = useState(false);
   const splitRatioRef = useRef(DEFAULT_RATIO);
   const totalWidthRef = useRef(0);
   const dragStartRatioRef = useRef(DEFAULT_RATIO);
@@ -42,6 +43,7 @@ export function TabletSplitLayout({ children }: Props) {
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: () => {
         dragStartRatioRef.current = splitRatioRef.current;
+        setDragging(true);
       },
       onPanResponderMove: (_, gs) => {
         if (totalWidthRef.current === 0) return;
@@ -58,6 +60,10 @@ export function TabletSplitLayout({ children }: Props) {
         ));
         splitRatioRef.current = next;
         setSplitRatioState(next);
+        setDragging(false);
+      },
+      onPanResponderTerminate: () => {
+        setDragging(false);
       },
     }),
   ).current;
@@ -115,6 +121,11 @@ export function TabletSplitLayout({ children }: Props) {
           annotations={pdfAnnotations}
           onAnnotationsSave={setPdfAnnotations}
         />
+        {/* Transparent drag-capture overlay — prevents the PDF iframe from
+            swallowing pointer events while the user is dragging the divider */}
+        {dragging && Platform.OS === "web" && (
+          <View style={styles.dragOverlay} pointerEvents="auto" />
+        )}
       </View>
 
       {/* ── Draggable divider ── */}
@@ -221,4 +232,13 @@ const styles = StyleSheet.create({
   inspectionPanelHidden: {
     flex: 0,
   },
+  dragOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 50,
+    backgroundColor: "transparent",
+  } as never,
 });

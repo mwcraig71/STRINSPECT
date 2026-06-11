@@ -9,6 +9,10 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { getPdfReadOnlyHtml } from "./pdfReadOnlyHtml";
+import { TEXT_SHORTCUTS } from "@/data/textShortcuts";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const SC_FAVORITES_KEY = "@bridge_sc_favorites";
 
 const HTML = getPdfReadOnlyHtml();
 
@@ -24,11 +28,18 @@ export function PdfReadOnlyPanel({ pdfPath, style, onImportPress, annotations, o
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [sessionKey, setSessionKey] = useState(0);
+  const [scFavorites, setScFavorites] = useState<string[]>([]);
   const injectedRef = useRef(false);
   const webViewRef = useRef<import("react-native-webview").WebView>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const onAnnotationsSaveRef = useRef(onAnnotationsSave);
   onAnnotationsSaveRef.current = onAnnotationsSave;
+
+  useEffect(() => {
+    AsyncStorage.getItem(SC_FAVORITES_KEY).then((raw) => {
+      if (raw) { try { setScFavorites(JSON.parse(raw)); } catch {} }
+    });
+  }, []);
 
   useEffect(() => {
     setSessionKey((k) => k + 1);
@@ -70,13 +81,15 @@ export function PdfReadOnlyPanel({ pdfPath, style, onImportPress, annotations, o
       const existingAnns = (annotations ?? []).filter(
         (a) => (a as { type?: string } | null)?.type !== "_meta",
       );
-      const msg = JSON.stringify({ type: "init", pdfBase64: base64Uri, annotations: existingAnns });
+      const savedFavs = await AsyncStorage.getItem(SC_FAVORITES_KEY).catch(() => null);
+      const favIds: string[] = savedFavs ? JSON.parse(savedFavs) : scFavorites;
+      const msg = JSON.stringify({ type: "init", pdfBase64: base64Uri, annotations: existingAnns, shortcuts: TEXT_SHORTCUTS, scFavorites: favIds });
       const js = `(function(){var e=new MessageEvent('message',{data:${JSON.stringify(msg)}});window.dispatchEvent(e);document.dispatchEvent(e);})();true;`;
       webViewRef.current?.injectJavaScript(js);
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : "Failed to load PDF");
     }
-  }, [pdfPath, annotations]);
+  }, [pdfPath, annotations, scFavorites]);
 
   const onWebViewLoad = useCallback(() => {
     setReady(true);
@@ -99,12 +112,14 @@ export function PdfReadOnlyPanel({ pdfPath, style, onImportPress, annotations, o
       const existingAnns = (annotations ?? []).filter(
         (a) => (a as { type?: string } | null)?.type !== "_meta",
       );
-      const msg = JSON.stringify({ type: "init", pdfBase64: dataUrl, annotations: existingAnns });
+      const savedFavs = await AsyncStorage.getItem(SC_FAVORITES_KEY).catch(() => null);
+      const favIds: string[] = savedFavs ? JSON.parse(savedFavs) : scFavorites;
+      const msg = JSON.stringify({ type: "init", pdfBase64: dataUrl, annotations: existingAnns, shortcuts: TEXT_SHORTCUTS, scFavorites: favIds });
       (iframeRef.current as HTMLIFrameElement | null)?.contentWindow?.postMessage(msg, "*");
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : "Failed to load PDF");
     }
-  }, [pdfPath, annotations]);
+  }, [pdfPath, annotations, scFavorites]);
 
   const onWebIframeLoad = useCallback(() => {
     setReady(true);

@@ -13,7 +13,7 @@ export function getPdfReadOnlyHtml(): string {
 body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;overflow:hidden;height:100vh}
 #topbar{position:fixed;top:0;left:0;right:0;z-index:200;height:40px;background:#0f172a;border-bottom:1px solid #334155;display:flex;align-items:center;padding:0 12px;gap:8px}
 #page-info{color:#94a3b8;font-size:11px;font-weight:700;flex:1;white-space:nowrap;overflow:hidden}
-#scroll-area{position:absolute;top:40px;bottom:104px;left:0;right:0;overflow-y:auto;overflow-x:auto;-webkit-overflow-scrolling:auto;background:#1e293b}
+#scroll-area{position:absolute;top:40px;bottom:140px;left:0;right:0;overflow-y:auto;overflow-x:auto;-webkit-overflow-scrolling:auto;background:#1e293b}
 #scroll-area.drawing{overflow:hidden}
 .page-wrap{position:relative;margin:8px auto;display:block;box-shadow:0 2px 12px rgba(0,0,0,.6)}
 .pdf-canvas{display:block;width:100%}
@@ -32,6 +32,9 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
 .sz-btn{background:#1e293b;border:1.5px solid #334155;border-radius:7px;color:#94a3b8;padding:4px 9px;font-size:10px;font-weight:700;cursor:pointer;flex-shrink:0;-webkit-user-select:none;user-select:none}
 .sz-btn.active{border-color:#38bdf8;color:#38bdf8}
 .sep{width:1px;background:#334155;height:18px;flex-shrink:0;margin:0 2px}
+#shortcuts-row{display:none;gap:6px;align-items:center;overflow-x:auto;-webkit-overflow-scrolling:auto;scrollbar-width:none;min-height:34px;padding-bottom:1px}
+#shortcuts-row::-webkit-scrollbar{display:none}
+.sc-btn{background:#1e293b;border:1.5px solid #7c3aed;border-radius:8px;color:#a78bfa;padding:4px 10px;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;-webkit-user-select:none;user-select:none}
 #loading{position:fixed;inset:0;background:#0f172a;z-index:500;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
 .spinner{width:36px;height:36px;border:3px solid #334155;border-top-color:#38bdf8;border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -71,6 +74,7 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
   <div id="opt-row">
     <div id="opt-dynamic"></div>
   </div>
+  <div id="shortcuts-row"></div>
 </div>
 
 <div id="text-input-wrap">
@@ -139,6 +143,8 @@ var COLORS_PEN = ['#ef4444','#2563eb'];
 var SIZES = [2,4,8];
 var zoomLevel = 1.0;
 var ZOOM_STEPS = [0.5,0.75,1.0,1.25,1.5,2.0,2.5,3.0];
+var scList = [];
+var scFavorites = [];
 
 function postBridge(msg) {
   var s = JSON.stringify(msg);
@@ -172,6 +178,8 @@ function onMsg(e) {
     if (Array.isArray(data.annotations) && data.annotations.length > 0) {
       annotations = data.annotations;
     }
+    if (Array.isArray(data.shortcuts)) scList = data.shortcuts;
+    if (Array.isArray(data.scFavorites)) scFavorites = data.scFavorites;
     loadPdf(data.pdfBase64);
   }
 }
@@ -426,6 +434,54 @@ function undoLast() {
   redrawPage(last.page);
 }
 
+function renderSC() {
+  var row = document.getElementById('shortcuts-row');
+  if (!row) return;
+  row.innerHTML = '';
+  if (tool !== 'text') { row.style.display = 'none'; return; }
+  var favItems = scList.filter(function(s) { return scFavorites.indexOf(s.id) >= 0; });
+  if (favItems.length === 0) { row.style.display = 'none'; return; }
+  row.style.display = 'flex';
+  favItems.forEach(function(s) {
+    var btn = document.createElement('button');
+    btn.className = 'sc-btn';
+    btn.textContent = s.label || s.text;
+    btn.title = s.text;
+    btn.onmousedown = function(e) { e.preventDefault(); };
+    btn.onclick = function() {
+      var inp = document.getElementById('text-input');
+      var wrap = document.getElementById('text-input-wrap');
+      if (wrap && wrap.style.display !== 'none' && inp) {
+        inp.value = inp.value ? inp.value + ' ' + s.text : s.text;
+        inp.focus();
+        return;
+      }
+      var area = document.getElementById('scroll-area');
+      var scrollTop = area ? area.scrollTop : 0;
+      var vh = window.innerHeight;
+      var vw = window.innerWidth;
+      var cy = scrollTop + vh / 2;
+      var targetPn = 1;
+      var minDist = Infinity;
+      Object.keys(pageLayout).forEach(function(pn) {
+        var L = pageLayout[pn];
+        var z = zoomLevel || 1;
+        var pageCenter = L.top * z + L.h * z / 2;
+        var dist = Math.abs(pageCenter - cy);
+        if (dist < minDist) { minDist = dist; targetPn = parseInt(pn, 10); }
+      });
+      var L = pageLayout[targetPn];
+      var z = zoomLevel || 1;
+      var annX = Math.max(10, (vw / 2 - (L ? L.left * z : 0)) / z);
+      var annY = Math.max(20, (cy - (L ? L.top * z : 0)) / z);
+      annotations.push({ type: 'text', page: targetPn, x: annX, y: annY, text: s.text, fontSize: (penSize * 4 + 10) * 0.25, color: penColor });
+      autoSave();
+      redrawPage(targetPn);
+    };
+    row.appendChild(btn);
+  });
+}
+
 function setTool(t) {
   tool = t;
   if (t === 'text' && penSize < 4) penSize = 4;
@@ -441,6 +497,7 @@ function setTool(t) {
     if (t !== 'pan') cvs[j].classList.add('draw-active'); else cvs[j].classList.remove('draw-active');
   }
   renderOptRow();
+  renderSC();
 }
 
 function renderOptRow() {
