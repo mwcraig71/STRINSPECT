@@ -1252,6 +1252,8 @@ interface InspectionContextType {
   acknowledgeImportAudit: () => void;
   criticalFindingsAcknowledged: boolean;
   acknowledgeCriticalFindings: () => void;
+  ucChannelOverrideAcknowledged: boolean;
+  acknowledgeUcChannelOverride: () => void;
   // ── Standard Photos ──
   standardPhotos: StandardPhotoSlot[];
   setStandardPhotoSlot: (slotId: string, patch: Partial<StandardPhotoSlot>) => void;
@@ -1516,6 +1518,7 @@ const STORAGE_KEYS = {
   FINALIZED_AT: "@bridge_finalized_at",
   IMPORT_AUDIT_ACK: "@bridge_import_audit_ack",
   CRITICAL_FINDINGS_ACK: "@bridge_critical_findings_ack",
+  UC_CHANNEL_OVERRIDE: "@bridge_uc_channel_override",
   STANDARD_PHOTOS: "@bridge_standard_photos",
   EXTRA_PHOTOS: "@bridge_extra_photos",
 };
@@ -1571,6 +1574,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const [finalizedAt, setFinalizedAtState] = useState<string | null>(null);
   const [importAuditAcknowledged, setImportAuditAcknowledgedState] = useState(false);
   const [criticalFindingsAcknowledged, setCriticalFindingsAcknowledgedState] = useState(false);
+  const [ucChannelOverrideAcknowledged, setUcChannelOverrideAcknowledgedState] = useState(false);
   const [savedDefects, setSavedDefectsState] = useState<DefectRecord[]>([]);
   const [nbiRatings, setNbiRatingsState] = useState<NbiRating[]>(INITIAL_NBI_RATINGS);
   const [structureNumber, setStructureNumberState] = useState("");
@@ -1643,7 +1647,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           ]);
           await AsyncStorage.setItem(STORAGE_KEYS.DEMO_CLEARED, "1");
         }
-        const [defects, nbi, nom, insType, superType, subType, superMat, subMat, structNum, uc, ch, sb, sn, spp, impSummary, lastJoint, lastSync, lastMod, pdfPath, pdfAnns, pdfUploadedStr, imgSz, dateStampStr, finalizedAtStr, importAuditAckStr, criticalAckStr, stdPhotosStr, openAiKeyStr, aiRephraseStr, extraPhotosStr] = await Promise.all([
+        const [defects, nbi, nom, insType, superType, subType, superMat, subMat, structNum, uc, ch, sb, sn, spp, impSummary, lastJoint, lastSync, lastMod, pdfPath, pdfAnns, pdfUploadedStr, imgSz, dateStampStr, finalizedAtStr, importAuditAckStr, criticalAckStr, stdPhotosStr, openAiKeyStr, aiRephraseStr, extraPhotosStr, ucChannelOverrideStr] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.SAVED_DEFECTS),
           AsyncStorage.getItem(STORAGE_KEYS.NBI_RATINGS),
           AsyncStorage.getItem(STORAGE_KEYS.NOMENCLATURE),
@@ -1674,6 +1678,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           AsyncStorage.getItem(STORAGE_KEYS.OPENAI_KEY),
           AsyncStorage.getItem(STORAGE_KEYS.AI_REPHRASE),
           AsyncStorage.getItem(STORAGE_KEYS.EXTRA_PHOTOS),
+          AsyncStorage.getItem(STORAGE_KEYS.UC_CHANNEL_OVERRIDE),
         ]);
         if (lastJoint) setLastJointElementIdState(lastJoint);
         if (lastSync) setLastSynced(lastSync);
@@ -1686,6 +1691,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         if (finalizedAtStr) setFinalizedAtState(finalizedAtStr);
         if (importAuditAckStr === "1") setImportAuditAcknowledgedState(true);
         if (criticalAckStr === "1") setCriticalFindingsAcknowledgedState(true);
+        if (ucChannelOverrideStr === "1") setUcChannelOverrideAcknowledgedState(true);
         if (openAiKeyStr) setOpenAiKeyState(openAiKeyStr);
         if (aiRephraseStr !== null) setAiRephraseState(aiRephraseStr !== "0");
         if (stdPhotosStr) {
@@ -2013,6 +2019,11 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     }
   }, [structureNumber, savedDefects, nbiRatings, importSummary, pdfAnnotations, importedPdfPath, pdfUploaded, finalizedAt, standardPhotos]);
 
+  const acknowledgeUcChannelOverride = useCallback(() => {
+    setUcChannelOverrideAcknowledgedState(true);
+    AsyncStorage.setItem(STORAGE_KEYS.UC_CHANNEL_OVERRIDE, "1").catch(() => {});
+  }, []);
+
   const acknowledgeImportAudit = useCallback(() => {
     setImportAuditAcknowledgedState(true);
     AsyncStorage.setItem(STORAGE_KEYS.IMPORT_AUDIT_ACK, "1").catch(() => {});
@@ -2078,6 +2089,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     AsyncStorage.removeItem(STORAGE_KEYS.IMPORT_AUDIT_ACK).catch(() => {});
     setCriticalFindingsAcknowledgedState(false);
     AsyncStorage.removeItem(STORAGE_KEYS.CRITICAL_FINDINGS_ACK).catch(() => {});
+    setUcChannelOverrideAcknowledgedState(false);
+    AsyncStorage.removeItem(STORAGE_KEYS.UC_CHANNEL_OVERRIDE).catch(() => {});
     clearUploadedPhotoIds().catch(() => {});
   }, [setStructureNumber, setImportSummary]);
 
@@ -2487,6 +2500,27 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
       target: { screen: "photos" },
     });
 
+    // 8. At least one underclearance record OR channel cross-section measurement
+    const ucHasData = underclearanceData.entries.some((e) =>
+      e.psn.trim() ||
+      e.rightLateral.data.trim() || e.leftLateral.data.trim() ||
+      e.totalHorizontal.data.trim() || e.maxPracticalVert.data.trim() ||
+      e.minMeasuredVert.data.trim() || e.signedVertData.trim()
+    );
+    const chHasData =
+      channelData.upstream.some((r) => r.totalHoriz.trim() || r.vertDist.trim() || r.notes.trim()) ||
+      channelData.downstream.some((r) => r.totalHoriz.trim() || r.vertDist.trim() || r.notes.trim());
+    const ucChannelPass = ucHasData || chHasData || ucChannelOverrideAcknowledged;
+    checks.push({
+      id: "ucChannel",
+      label: "Clearance record present",
+      passed: ucChannelPass,
+      reason: ucChannelPass
+        ? ""
+        : "Every bridge requires an Underclearance Record or Channel Cross-Section. Add one, or tap Override if not applicable.",
+      target: { screen: "inspection" },
+    });
+
     return checks;
   }, [
     structureNumber,
@@ -2497,6 +2531,9 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     criticalFindingsSummary,
     criticalFindingsAcknowledged,
     standardPhotos,
+    underclearanceData,
+    channelData,
+    ucChannelOverrideAcknowledged,
   ]);
 
   const isReady = useMemo(() => readiness.every((c) => c.passed), [readiness]);
@@ -3303,6 +3340,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     acknowledgeImportAudit,
     criticalFindingsAcknowledged,
     acknowledgeCriticalFindings,
+    ucChannelOverrideAcknowledged,
+    acknowledgeUcChannelOverride,
     standardPhotos,
     setStandardPhotoSlot,
     standardPhotosComplete,

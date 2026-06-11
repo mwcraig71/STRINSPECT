@@ -46,6 +46,8 @@ export default function SummaryScreen() {
     acknowledgeImportAudit,
     criticalFindingsAcknowledged,
     acknowledgeCriticalFindings,
+    ucChannelOverrideAcknowledged,
+    acknowledgeUcChannelOverride,
     standardPhotos,
     standardPhotosComplete,
   } = useInspection();
@@ -260,13 +262,30 @@ export default function SummaryScreen() {
                 </Text>
               </View>
               {!check.passed && (
-                <TouchableOpacity
-                  style={[styles.fixBtn, { borderColor: "#fca5a5", backgroundColor: "#fef2f2" }]}
-                  onPress={() => goToTarget(check.target)}
-                >
-                  <Text style={styles.fixBtnText}>Fix</Text>
-                  <Feather name="arrow-right" size={12} color="#dc2626" />
-                </TouchableOpacity>
+                <View style={styles.checkActions}>
+                  <TouchableOpacity
+                    style={[styles.fixBtn, { borderColor: "#fca5a5", backgroundColor: "#fef2f2" }]}
+                    onPress={() => goToTarget(check.target)}
+                  >
+                    <Text style={styles.fixBtnText}>Fix</Text>
+                    <Feather name="arrow-right" size={12} color="#dc2626" />
+                  </TouchableOpacity>
+                  {check.id === "ucChannel" && (
+                    <TouchableOpacity
+                      style={[styles.overrideBtn, { borderColor: "#fbbf24", backgroundColor: "#fffbeb" }]}
+                      onPress={acknowledgeUcChannelOverride}
+                    >
+                      <Feather name="slash" size={11} color="#b45309" />
+                      <Text style={styles.overrideBtnText}>Override</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+              {check.id === "ucChannel" && check.passed && ucChannelOverrideAcknowledged && (
+                <View style={[styles.overrideDoneBadge, { borderColor: "#fcd34d", backgroundColor: "#fef9c3" }]}>
+                  <Feather name="slash" size={10} color="#b45309" />
+                  <Text style={styles.overrideDoneText}>Overridden</Text>
+                </View>
               )}
             </View>
           ))}
@@ -763,6 +782,27 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   fixBtnText: { fontSize: 11, fontWeight: "900", color: "#dc2626", textTransform: "uppercase", letterSpacing: 0.3 },
+  checkActions: { flexDirection: "column", alignItems: "flex-end", gap: 4 },
+  overrideBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  overrideBtnText: { fontSize: 10, fontWeight: "800", color: "#b45309", textTransform: "uppercase", letterSpacing: 0.3 },
+  overrideDoneBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  overrideDoneText: { fontSize: 9, fontWeight: "800", color: "#92400e", textTransform: "uppercase", letterSpacing: 0.3 },
   finalizeFooter: { padding: 14, borderTopWidth: 1 },
   finalizeBtn: {
     flexDirection: "row",
