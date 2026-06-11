@@ -34,7 +34,8 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
 .sep{width:1px;background:#334155;height:18px;flex-shrink:0;margin:0 2px}
 #shortcuts-row{display:none;gap:6px;align-items:center;overflow-x:auto;-webkit-overflow-scrolling:auto;scrollbar-width:none;min-height:34px;padding-bottom:1px}
 #shortcuts-row::-webkit-scrollbar{display:none}
-.sc-btn{background:#1e293b;border:1.5px solid #7c3aed;border-radius:8px;color:#a78bfa;padding:4px 10px;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;-webkit-user-select:none;user-select:none}
+.sc-btn{background:#1e293b;border:1.5px solid #334155;border-radius:8px;color:#94a3b8;padding:4px 10px;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;-webkit-user-select:none;user-select:none}
+.sc-btn.sc-fav{border-color:#7c3aed;color:#a78bfa}
 #loading{position:fixed;inset:0;background:#0f172a;z-index:500;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
 .spinner{width:36px;height:36px;border:3px solid #334155;border-top-color:#38bdf8;border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -439,13 +440,20 @@ function renderSC() {
   if (!row) return;
   row.innerHTML = '';
   if (tool !== 'text') { row.style.display = 'none'; return; }
-  var favItems = scList.filter(function(s) { return scFavorites.indexOf(s.id) >= 0; });
-  if (favItems.length === 0) { row.style.display = 'none'; return; }
+  if (scList.length === 0) { row.style.display = 'none'; return; }
   row.style.display = 'flex';
-  favItems.forEach(function(s) {
+  var favSet = {};
+  scFavorites.forEach(function(id) { favSet[id] = true; });
+  var sorted = scList.slice().sort(function(a, b) {
+    var af = favSet[a.id] ? 0 : 1;
+    var bf = favSet[b.id] ? 0 : 1;
+    return af - bf;
+  });
+  sorted.forEach(function(s) {
+    var isFav = favSet[s.id];
     var btn = document.createElement('button');
-    btn.className = 'sc-btn';
-    btn.textContent = s.label || s.text;
+    btn.className = 'sc-btn' + (isFav ? ' sc-fav' : '');
+    btn.textContent = (isFav ? '\u2605 ' : '') + (s.label || s.text);
     btn.title = s.text;
     btn.onmousedown = function(e) { e.preventDefault(); };
     btn.onclick = function() {
