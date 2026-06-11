@@ -2381,8 +2381,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
       target: { screen: "bridges" },
     });
 
-    // 2. No imported defects awaiting verification
-    const unverified = savedDefects.filter((d) => d.needsVerification);
+    // 2. No imported defects awaiting verification (CS1 defects pass through automatically)
+    const unverified = savedDefects.filter((d) => d.needsVerification && d.cs !== "CS1");
     checks.push({
       id: "unverifiedDefects",
       label: "Imported defects verified",
@@ -2460,15 +2460,16 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
       target: { screen: "inspection", focusId: incomplete[0]?.id },
     });
 
-    // 6. Critical findings acknowledged
-    const critPass = criticalFindingsSummary.length === 0 || criticalFindingsAcknowledged;
+    // 6. Critical findings acknowledged (CS1 defects do not require acknowledgement)
+    const nonCS1Criticals = criticalFindingsSummary.filter((d) => d.cs !== "CS1");
+    const critPass = nonCS1Criticals.length === 0 || criticalFindingsAcknowledged;
     checks.push({
       id: "criticalFindings",
       label: "Critical findings reviewed",
       passed: critPass,
       reason: critPass
         ? ""
-        : `${criticalFindingsSummary.length} critical finding(s) require review and acknowledgement.`,
+        : `${nonCS1Criticals.length} critical finding(s) require review and acknowledgement.`,
       target: { screen: "summary", focusId: "criticalFindings" },
     });
 

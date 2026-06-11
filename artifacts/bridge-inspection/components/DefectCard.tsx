@@ -98,7 +98,7 @@ export function DefectCard({ record, isLegacy, onEdit }: DefectCardProps) {
                 <Text style={[styles.flagText, { color: "#f97316" }]}>Imported</Text>
               </View>
             )}
-            {record.needsVerification && (
+            {record.needsVerification && record.cs !== "CS1" && (
               <Feather name="shield" size={14} color="#d97706" />
             )}
             {record.photosCount > 0 && (
@@ -136,7 +136,7 @@ export function DefectCard({ record, isLegacy, onEdit }: DefectCardProps) {
           </View>
         ) : (
           <View style={styles.actions}>
-            {record.needsVerification && (
+            {record.needsVerification && record.cs !== "CS1" && (
               <TouchableOpacity
                 style={[styles.actionBtn, { backgroundColor: "#dcfce7" }]}
                 onPress={() => verifyDefect(record.id)}
