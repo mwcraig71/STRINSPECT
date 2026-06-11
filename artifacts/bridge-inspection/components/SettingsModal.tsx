@@ -1,5 +1,4 @@
 import { Feather } from "@expo/vector-icons";
-import * as DocumentPicker from "expo-document-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React from "react";
 import {
@@ -18,7 +17,6 @@ import {
 import { CUSTOM_SHORTCUTS_KEY, SC_FAVORITES_KEY, TEXT_SHORTCUTS, TextShortcut } from "@/data/textShortcuts";
 import { useColors } from "@/hooks/useColors";
 import {
-  INSPECTION_TYPES,
   MATERIAL_OPTIONS,
   NOMENCLATURES,
   SUBSTRUCTURE_TYPES,
@@ -36,18 +34,14 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
   const {
     nomenclature,
     setNomenclature,
-    inspectionType,
-    setInspectionType,
-    superstructureType,
-    setSuperstructureType,
-    substructureType,
-    setSubstructureType,
-    superstructureMaterial,
-    setSuperstructureMaterial,
-    substructureMaterial,
-    setSubstructureMaterial,
-    importFromPdf,
-    parsingActive,
+    superstructureTypes,
+    setSuperstructureTypes,
+    substructureTypes,
+    setSubstructureTypes,
+    superstructureMaterials,
+    setSuperstructureMaterials,
+    substructureMaterials,
+    setSubstructureMaterials,
     clearInspection,
     savedDefects,
     structureNumber,
@@ -55,6 +49,8 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
     lastSynced,
     syncSession,
     pendingSyncCount,
+    aspectRatio,
+    setAspectRatio,
     imageSize,
     setImageSize,
     dateStampEnabled,
@@ -64,6 +60,9 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
     aiRephrase,
     setAiRephrase,
   } = useInspection();
+
+  const [aspectRatioInput, setAspectRatioInput] = React.useState(aspectRatio);
+  React.useEffect(() => { setAspectRatioInput(aspectRatio); }, [aspectRatio]);
 
   const [keyInput, setKeyInput] = React.useState("");
   const [keyVisible, setKeyVisible] = React.useState(false);
@@ -173,22 +172,6 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
     );
   };
 
-  const handleImport = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: "application/pdf",
-        copyToCacheDirectory: true,
-      });
-      if (result.canceled || !result.assets?.length) return;
-      const asset = result.assets[0];
-      onClose();
-      await importFromPdf({ uri: asset.uri, name: asset.name });
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Could not open document picker.";
-      Alert.alert("Error", message);
-    }
-  };
-
   return (
     <Modal
       visible={visible}
@@ -275,68 +258,6 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
             </View>
           </View>
 
-          {/* Inspection Type */}
-          <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
-            <View style={styles.cardHeader}>
-              <Feather name="layers" size={15} color={c.mutedForeground} />
-              <Text style={[styles.cardTitle, { color: c.foreground }]}>Inspection Module</Text>
-            </View>
-            <Text style={[styles.cardDesc, { color: c.mutedForeground }]}>
-              Sets the active inspection perspective and filters available structural locations accordingly.
-            </Text>
-            <View style={styles.optionGroup}>
-              <TouchableOpacity
-                style={[
-                  styles.optionBtn,
-                  inspectionType === INSPECTION_TYPES.TOPSIDE
-                    ? { backgroundColor: "#0f172a", borderColor: "#38bdf8" }
-                    : { backgroundColor: c.secondary, borderColor: c.border },
-                ]}
-                onPress={() => setInspectionType(INSPECTION_TYPES.TOPSIDE)}
-              >
-                <View style={styles.optionInner}>
-                  <View style={[styles.optionIcon, { backgroundColor: inspectionType === INSPECTION_TYPES.TOPSIDE ? "#1e293b" : c.card }]}>
-                    <Feather name="arrow-up" size={16} color={inspectionType === INSPECTION_TYPES.TOPSIDE ? "#38bdf8" : c.mutedForeground} />
-                  </View>
-                  <View style={styles.optionText}>
-                    <Text style={[styles.optionTitle, { color: inspectionType === INSPECTION_TYPES.TOPSIDE ? "#f8fafc" : c.foreground }]}>Topside</Text>
-                    <Text style={[styles.optionSub, { color: inspectionType === INSPECTION_TYPES.TOPSIDE ? "#94a3b8" : c.mutedForeground }]}>
-                      Deck · Joints · Approaches
-                    </Text>
-                  </View>
-                  {inspectionType === INSPECTION_TYPES.TOPSIDE && (
-                    <Feather name="check-circle" size={18} color="#38bdf8" />
-                  )}
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.optionBtn,
-                  inspectionType === INSPECTION_TYPES.UNDERSIDE
-                    ? { backgroundColor: "#0f172a", borderColor: "#38bdf8" }
-                    : { backgroundColor: c.secondary, borderColor: c.border },
-                ]}
-                onPress={() => setInspectionType(INSPECTION_TYPES.UNDERSIDE)}
-              >
-                <View style={styles.optionInner}>
-                  <View style={[styles.optionIcon, { backgroundColor: inspectionType === INSPECTION_TYPES.UNDERSIDE ? "#1e293b" : c.card }]}>
-                    <Feather name="arrow-down" size={16} color={inspectionType === INSPECTION_TYPES.UNDERSIDE ? "#38bdf8" : c.mutedForeground} />
-                  </View>
-                  <View style={styles.optionText}>
-                    <Text style={[styles.optionTitle, { color: inspectionType === INSPECTION_TYPES.UNDERSIDE ? "#f8fafc" : c.foreground }]}>Underside</Text>
-                    <Text style={[styles.optionSub, { color: inspectionType === INSPECTION_TYPES.UNDERSIDE ? "#94a3b8" : c.mutedForeground }]}>
-                      Superstructure · Substructure · Bearings
-                    </Text>
-                  </View>
-                  {inspectionType === INSPECTION_TYPES.UNDERSIDE && (
-                    <Feather name="check-circle" size={18} color="#38bdf8" />
-                  )}
-                </View>
-              </TouchableOpacity>
-            </View>
-          </View>
-
           {/* Structural Build */}
           <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
             <View style={styles.cardHeader}>
@@ -355,7 +276,7 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
               </View>
               <View style={styles.typeGrid}>
                 {SUPERSTRUCTURE_TYPES.map((t) => {
-                  const active = superstructureType === t.id;
+                  const active = superstructureTypes.includes(t.id);
                   return (
                     <TouchableOpacity
                       key={t.id}
@@ -366,7 +287,15 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
                           borderColor: active ? "#38bdf8" : c.border,
                         },
                       ]}
-                      onPress={() => setSuperstructureType(t.id)}
+                      onPress={() => {
+                        if (t.id === "OTHER") {
+                          setSuperstructureTypes(["OTHER"]);
+                        } else {
+                          const without = superstructureTypes.filter((x) => x !== "OTHER" && x !== t.id);
+                          const next = active ? without : [...without, t.id];
+                          setSuperstructureTypes(next.length > 0 ? next : ["OTHER"]);
+                        }
+                      }}
                     >
                       <Text style={[styles.typeChipLabel, { color: active ? "#f8fafc" : c.foreground }]}>
                         {t.label}
@@ -383,10 +312,13 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
                   );
                 })}
               </View>
-              <Text style={[styles.matLabel, { color: c.mutedForeground }]}>Material</Text>
+              <Text style={[styles.matLabel, { color: c.mutedForeground }]}>Material (select all that apply)</Text>
               <View style={styles.matRow}>
                 {MATERIAL_OPTIONS.map((m) => {
-                  const active = superstructureMaterial === m.id;
+                  const isNone = m.id === "";
+                  const active = isNone
+                    ? superstructureMaterials.length === 0
+                    : superstructureMaterials.includes(m.id);
                   return (
                     <TouchableOpacity
                       key={m.id || "not-set"}
@@ -397,7 +329,14 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
                           borderColor: active ? "#38bdf8" : c.border,
                         },
                       ]}
-                      onPress={() => setSuperstructureMaterial(m.id)}
+                      onPress={() => {
+                        if (isNone) {
+                          setSuperstructureMaterials([]);
+                        } else {
+                          const without = superstructureMaterials.filter((x) => x !== m.id);
+                          setSuperstructureMaterials(active ? without : [...without, m.id]);
+                        }
+                      }}
                     >
                       <Text style={[styles.matChipText, { color: active ? "#38bdf8" : c.mutedForeground }]}>
                         {m.label}
@@ -419,7 +358,7 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
               </View>
               <View style={styles.typeGrid}>
                 {SUBSTRUCTURE_TYPES.map((t) => {
-                  const active = substructureType === t.id;
+                  const active = substructureTypes.includes(t.id);
                   return (
                     <TouchableOpacity
                       key={t.id}
@@ -430,7 +369,15 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
                           borderColor: active ? "#a78bfa" : c.border,
                         },
                       ]}
-                      onPress={() => setSubstructureType(t.id)}
+                      onPress={() => {
+                        if (t.id === "OTHER") {
+                          setSubstructureTypes(["OTHER"]);
+                        } else {
+                          const without = substructureTypes.filter((x) => x !== "OTHER" && x !== t.id);
+                          const next = active ? without : [...without, t.id];
+                          setSubstructureTypes(next.length > 0 ? next : ["OTHER"]);
+                        }
+                      }}
                     >
                       <Text style={[styles.typeChipLabel, { color: active ? "#f8fafc" : c.foreground }]}>
                         {t.label}
@@ -447,10 +394,13 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
                   );
                 })}
               </View>
-              <Text style={[styles.matLabel, { color: c.mutedForeground }]}>Material</Text>
+              <Text style={[styles.matLabel, { color: c.mutedForeground }]}>Material (select all that apply)</Text>
               <View style={styles.matRow}>
                 {MATERIAL_OPTIONS.map((m) => {
-                  const active = substructureMaterial === m.id;
+                  const isNone = m.id === "";
+                  const active = isNone
+                    ? substructureMaterials.length === 0
+                    : substructureMaterials.includes(m.id);
                   return (
                     <TouchableOpacity
                       key={m.id || "not-set"}
@@ -461,7 +411,14 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
                           borderColor: active ? "#a78bfa" : c.border,
                         },
                       ]}
-                      onPress={() => setSubstructureMaterial(m.id)}
+                      onPress={() => {
+                        if (isNone) {
+                          setSubstructureMaterials([]);
+                        } else {
+                          const without = substructureMaterials.filter((x) => x !== m.id);
+                          setSubstructureMaterials(active ? without : [...without, m.id]);
+                        }
+                      }}
                     >
                       <Text style={[styles.matChipText, { color: active ? "#a78bfa" : c.mutedForeground }]}>
                         {m.label}
@@ -476,21 +433,25 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
             <View style={[styles.buildSummary, { backgroundColor: c.secondary, borderColor: c.border }]}>
               <View style={styles.buildSummaryItem}>
                 <Text style={[styles.buildSummaryLabel, { color: c.mutedForeground }]}>Super</Text>
-                <Text style={[styles.buildSummaryValue, { color: "#38bdf8" }]}>
-                  {SUPERSTRUCTURE_TYPES.find((t) => t.id === superstructureType)?.label ?? "—"}
+                <Text style={[styles.buildSummaryValue, { color: "#38bdf8" }]} numberOfLines={2}>
+                  {superstructureTypes
+                    .map((id) => SUPERSTRUCTURE_TYPES.find((t) => t.id === id)?.label ?? id)
+                    .join(", ") || "—"}
                 </Text>
                 <Text style={[styles.buildSummaryMat, { color: c.mutedForeground }]}>
-                  {superstructureMaterial || "Any material"}
+                  {superstructureMaterials.length > 0 ? superstructureMaterials.join(", ") : "Any material"}
                 </Text>
               </View>
               <View style={[styles.buildSummaryDivider, { backgroundColor: c.border }]} />
               <View style={styles.buildSummaryItem}>
                 <Text style={[styles.buildSummaryLabel, { color: c.mutedForeground }]}>Sub</Text>
-                <Text style={[styles.buildSummaryValue, { color: "#a78bfa" }]}>
-                  {SUBSTRUCTURE_TYPES.find((t) => t.id === substructureType)?.label ?? "—"}
+                <Text style={[styles.buildSummaryValue, { color: "#a78bfa" }]} numberOfLines={2}>
+                  {substructureTypes
+                    .map((id) => SUBSTRUCTURE_TYPES.find((t) => t.id === id)?.label ?? id)
+                    .join(", ") || "—"}
                 </Text>
                 <Text style={[styles.buildSummaryMat, { color: c.mutedForeground }]}>
-                  {substructureMaterial || "Any material"}
+                  {substructureMaterials.length > 0 ? substructureMaterials.join(", ") : "Any material"}
                 </Text>
               </View>
             </View>
@@ -533,6 +494,33 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
               })}
             </View>
             <View style={[styles.clearDivider, { borderTopColor: c.border }]} />
+            <Text style={[styles.matLabel, { color: c.mutedForeground }]}>Aspect Ratio</Text>
+            <Text style={[styles.cardDesc, { color: c.mutedForeground, marginBottom: 8 }]}>
+              Optional crop ratio for camera captures (e.g. 4:3, 16:9). Leave blank for free-form.
+            </Text>
+            <View style={[styles.keyRow, { borderColor: c.border, backgroundColor: c.background }]}>
+              <TextInput
+                style={[styles.keyInput, { color: c.foreground }]}
+                value={aspectRatioInput}
+                onChangeText={setAspectRatioInput}
+                onBlur={() => setAspectRatio(aspectRatioInput.trim())}
+                onSubmitEditing={() => setAspectRatio(aspectRatioInput.trim())}
+                placeholder="e.g. 4:3"
+                placeholderTextColor={c.mutedForeground}
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="done"
+              />
+              {aspectRatioInput.trim() ? (
+                <TouchableOpacity
+                  onPress={() => { setAspectRatioInput(""); setAspectRatio(""); }}
+                  style={styles.keyEye}
+                >
+                  <Feather name="x" size={14} color={c.mutedForeground} />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            <View style={[styles.clearDivider, { borderTopColor: c.border }]} />
             <View style={styles.photoToggleRow}>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.optionTitle, { color: c.foreground }]}>Date Stamp</Text>
@@ -552,28 +540,12 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
             </View>
           </View>
 
-          {/* Import */}
+          {/* Data Management */}
           <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
             <View style={styles.cardHeader}>
-              <Feather name="upload" size={15} color={c.mutedForeground} />
-              <Text style={[styles.cardTitle, { color: c.foreground }]}>Previous Report Import</Text>
+              <Feather name="trash-2" size={15} color={c.mutedForeground} />
+              <Text style={[styles.cardTitle, { color: c.foreground }]}>Data Management</Text>
             </View>
-            <Text style={[styles.cardDesc, { color: c.mutedForeground }]}>
-              Select a TxDOT bridge inspection PDF to extract ELEMENTS table data, NBI ratings, and the structure number. Imported defects appear in the legacy manifest and require verification.
-            </Text>
-            <TouchableOpacity
-              style={[styles.importBtn, { backgroundColor: parsingActive ? c.muted : c.headerBg, borderColor: "#334155" }]}
-              onPress={handleImport}
-              disabled={parsingActive}
-            >
-              <Feather name={parsingActive ? "loader" : "file-text"} size={16} color={parsingActive ? c.mutedForeground : "#38bdf8"} />
-              <Text style={[styles.importBtnText, { color: parsingActive ? c.mutedForeground : "#f8fafc" }]}>
-                {parsingActive ? "Parsing PDF..." : "Import Previous Report (PDF)"}
-              </Text>
-            </TouchableOpacity>
-
-            <View style={[styles.clearDivider, { borderTopColor: c.border }]} />
-
             <Text style={[styles.cardDesc, { color: c.mutedForeground }]}>
               Discard all imported and recorded inspection data to start a fresh session. This cannot be undone.
             </Text>

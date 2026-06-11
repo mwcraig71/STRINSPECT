@@ -1091,14 +1091,14 @@ interface InspectionContextType {
   setNomenclature: (v: string) => void;
   inspectionType: string;
   setInspectionType: (v: string) => void;
-  superstructureType: string;
-  setSuperstructureType: (v: string) => void;
-  substructureType: string;
-  setSubstructureType: (v: string) => void;
-  superstructureMaterial: string;
-  setSuperstructureMaterial: (v: string) => void;
-  substructureMaterial: string;
-  setSubstructureMaterial: (v: string) => void;
+  superstructureTypes: string[];
+  setSuperstructureTypes: (v: string[]) => void;
+  substructureTypes: string[];
+  setSubstructureTypes: (v: string[]) => void;
+  superstructureMaterials: string[];
+  setSuperstructureMaterials: (v: string[]) => void;
+  substructureMaterials: string[];
+  setSubstructureMaterials: (v: string[]) => void;
   elementSearch: string;
   setElementSearch: (v: string) => void;
   supportCount: number;
@@ -1184,6 +1184,8 @@ interface InspectionContextType {
   setRangeMax: (v: string) => void;
   syncToCurrentLoc: boolean;
   setSyncToCurrentLoc: (v: boolean) => void;
+  aspectRatio: string;
+  setAspectRatio: (v: string) => void;
   imageSize: string;
   setImageSize: (v: string) => void;
   dateStampEnabled: boolean;
@@ -1353,8 +1355,8 @@ function locationCategoryElements(location: string): readonly SnbiElement[] {
 // Location + structure-type narrowed candidate list (the default, pre-material view).
 function locationTypeElements(
   location: string,
-  superTypeId: string,
-  subTypeId: string
+  superTypeIds: string[],
+  subTypeIds: string[]
 ): readonly SnbiElement[] {
   if (!location) return [];
 
@@ -1362,21 +1364,27 @@ function locationTypeElements(
     return locationCategoryElements(location);
 
   if (location.includes("Span")) {
-    const sType = SUPERSTRUCTURE_TYPES.find((t) => t.id === superTypeId);
-    if (!sType || superTypeId === "OTHER") return locationCategoryElements(location);
-    const allowedIds = new Set<string>([
-      ...(sType.deckId ? [sType.deckId] : []),
-      ...sType.elementIds,
-      "331",
-      "310",
-    ]);
+    const active = superTypeIds.filter((id) => id !== "OTHER");
+    if (active.length === 0) return locationCategoryElements(location);
+    const allowedIds = new Set<string>(["331", "310"]);
+    for (const id of active) {
+      const sType = SUPERSTRUCTURE_TYPES.find((t) => t.id === id);
+      if (sType) {
+        if (sType.deckId) allowedIds.add(sType.deckId);
+        sType.elementIds.forEach((eid) => allowedIds.add(eid));
+      }
+    }
     return SNBI_ELEMENTS.filter((e) => allowedIds.has(e.id));
   }
 
   if (isSubstructureLocation(location)) {
-    const sType = SUBSTRUCTURE_TYPES.find((t) => t.id === subTypeId);
-    if (!sType || subTypeId === "OTHER") return locationCategoryElements(location);
-    const allowedIds = new Set<string>([...sType.elementIds, "310"]);
+    const active = subTypeIds.filter((id) => id !== "OTHER");
+    if (active.length === 0) return locationCategoryElements(location);
+    const allowedIds = new Set<string>(["310"]);
+    for (const id of active) {
+      const sType = SUBSTRUCTURE_TYPES.find((t) => t.id === id);
+      if (sType) sType.elementIds.forEach((eid) => allowedIds.add(eid));
+    }
     return SNBI_ELEMENTS.filter((e) => allowedIds.has(e.id));
   }
 
@@ -1385,10 +1393,10 @@ function locationTypeElements(
 
 function getFilteredElements(
   location: string,
-  superTypeId: string,
-  subTypeId: string,
-  superMaterial: string,
-  subMaterial: string,
+  superTypeIds: string[],
+  subTypeIds: string[],
+  superMaterials: string[],
+  subMaterials: string[],
   search: string,
   inspectionType: string
 ): readonly SnbiElement[] {
@@ -1405,10 +1413,10 @@ function getFilteredElements(
     );
   }
 
-  // Material that applies to this location: substructure → sub material; otherwise super.
-  const material = isSubstructureLocation(location) ? subMaterial : superMaterial;
+  // Materials that apply to this location: substructure → sub materials; otherwise super.
+  const materials = isSubstructureLocation(location) ? subMaterials : superMaterials;
   const materialApplies =
-    !!material &&
+    materials.length > 0 &&
     (location.includes("Span") || isSubstructureLocation(location));
 
   // Topside inspection: only the riding surface, railings and wearing surface are
@@ -1417,7 +1425,7 @@ function getFilteredElements(
   // structural material; decks/railings still honor the selected material.
   if (inspectionType === INSPECTION_TYPES.TOPSIDE && location.includes("Span")) {
     let topList = SNBI_ELEMENTS.filter((e) => ["Deck", "Railing"].includes(e.category));
-    if (material) topList = topList.filter((e) => e.material === material);
+    if (materials.length > 0) topList = topList.filter((e) => materials.includes(e.material));
     const base = topList.filter((e) => e.core);
     const wearing = SNBI_ELEMENTS.filter((e) => e.id === "510");
     const seen = new Set<string>();
@@ -1427,9 +1435,9 @@ function getFilteredElements(
   }
 
   // No search: honor the selected structure type for this location.
-  let list: readonly SnbiElement[] = locationTypeElements(location, superTypeId, subTypeId);
+  let list: readonly SnbiElement[] = locationTypeElements(location, superTypeIds, subTypeIds);
 
-  if (materialApplies) list = list.filter((e) => e.material === material);
+  if (materialApplies) list = list.filter((e) => materials.includes(e.material));
 
   // Joints are a small, fixed set — show every joint element, not just core ones.
   if (location.includes("Joint")) return list;
@@ -1512,6 +1520,7 @@ const STORAGE_KEYS = {
   PDF_ANNOTATIONS: "@bridge_pdf_annotations",
   PDF_UPLOADED: "@bridge_pdf_uploaded",
   IMAGE_SIZE: "@bridge_image_size",
+  ASPECT_RATIO: "@bridge_aspect_ratio",
   DATE_STAMP: "@bridge_date_stamp",
   OPENAI_KEY: "@bridge_openai_key",
   AI_REPHRASE: "@bridge_ai_rephrase",
@@ -1564,10 +1573,10 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
 
   const [nomenclature, setNomenclatureState] = useState(NOMENCLATURES.TXDOT);
   const [inspectionType, setInspectionTypeState] = useState(INSPECTION_TYPES.TOPSIDE);
-  const [superstructureType, setSuperstructureTypeState] = useState("OTHER");
-  const [substructureType, setSubstructureTypeState] = useState("OTHER");
-  const [superstructureMaterial, setSuperstructureMaterialState] = useState("");
-  const [substructureMaterial, setSubstructureMaterialState] = useState("");
+  const [superstructureTypes, setSuperstructureTypesState] = useState<string[]>(["OTHER"]);
+  const [substructureTypes, setSubstructureTypesState] = useState<string[]>(["OTHER"]);
+  const [superstructureMaterials, setSuperstructureMaterialsState] = useState<string[]>([]);
+  const [substructureMaterials, setSubstructureMaterialsState] = useState<string[]>([]);
   const [elementSearch, setElementSearch] = useState("");
   const [lastSynced, setLastSynced] = useState<string | null>(null);
   const [lastModified, setLastModifiedState] = useState<string | null>(null);
@@ -1620,6 +1629,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const [rangeMin, setRangeMin] = useState("");
   const [rangeMax, setRangeMax] = useState("");
   const [syncToCurrentLoc, setSyncToCurrentLoc] = useState(false);
+  const [aspectRatio, setAspectRatioState] = useState("");
   const [imageSize, setImageSizeState] = useState("original");
   const [dateStampEnabled, setDateStampEnabledState] = useState(false);
   const [openAiKey, setOpenAiKeyState] = useState("");
@@ -1647,7 +1657,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           ]);
           await AsyncStorage.setItem(STORAGE_KEYS.DEMO_CLEARED, "1");
         }
-        const [defects, nbi, nom, insType, superType, subType, superMat, subMat, structNum, uc, ch, sb, sn, spp, impSummary, lastJoint, lastSync, lastMod, pdfPath, pdfAnns, pdfUploadedStr, imgSz, dateStampStr, finalizedAtStr, importAuditAckStr, criticalAckStr, stdPhotosStr, openAiKeyStr, aiRephraseStr, extraPhotosStr, ucChannelOverrideStr] = await Promise.all([
+        const [defects, nbi, nom, insType, superType, subType, superMat, subMat, structNum, uc, ch, sb, sn, spp, impSummary, lastJoint, lastSync, lastMod, pdfPath, pdfAnns, pdfUploadedStr, imgSz, aspectRatioStr, dateStampStr, finalizedAtStr, importAuditAckStr, criticalAckStr, stdPhotosStr, openAiKeyStr, aiRephraseStr, extraPhotosStr, ucChannelOverrideStr] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.SAVED_DEFECTS),
           AsyncStorage.getItem(STORAGE_KEYS.NBI_RATINGS),
           AsyncStorage.getItem(STORAGE_KEYS.NOMENCLATURE),
@@ -1670,6 +1680,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           AsyncStorage.getItem(STORAGE_KEYS.PDF_ANNOTATIONS),
           AsyncStorage.getItem(STORAGE_KEYS.PDF_UPLOADED),
           AsyncStorage.getItem(STORAGE_KEYS.IMAGE_SIZE),
+          AsyncStorage.getItem(STORAGE_KEYS.ASPECT_RATIO),
           AsyncStorage.getItem(STORAGE_KEYS.DATE_STAMP),
           AsyncStorage.getItem(STORAGE_KEYS.FINALIZED_AT),
           AsyncStorage.getItem(STORAGE_KEYS.IMPORT_AUDIT_ACK),
@@ -1687,6 +1698,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         if (pdfAnns) { try { setPdfAnnotationsState(JSON.parse(pdfAnns) as unknown[]); } catch {} }
         if (pdfUploadedStr === "1") setPdfUploadedState(true);
         if (imgSz) setImageSizeState(imgSz);
+        if (aspectRatioStr) setAspectRatioState(aspectRatioStr);
         if (dateStampStr === "1") setDateStampEnabledState(true);
         if (finalizedAtStr) setFinalizedAtState(finalizedAtStr);
         if (importAuditAckStr === "1") setImportAuditAcknowledgedState(true);
@@ -1719,10 +1731,30 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         }
         if (nom) setNomenclatureState(nom);
         if (insType) setInspectionTypeState(insType);
-        if (superType) setSuperstructureTypeState(superType);
-        if (subType) setSubstructureTypeState(subType);
-        if (superMat !== null) setSuperstructureMaterialState(superMat);
-        if (subMat !== null) setSubstructureMaterialState(subMat);
+        if (superType) {
+          try {
+            const p = JSON.parse(superType);
+            setSuperstructureTypesState(Array.isArray(p) ? p : [p]);
+          } catch { setSuperstructureTypesState([superType]); }
+        }
+        if (subType) {
+          try {
+            const p = JSON.parse(subType);
+            setSubstructureTypesState(Array.isArray(p) ? p : [p]);
+          } catch { setSubstructureTypesState([subType]); }
+        }
+        if (superMat !== null) {
+          try {
+            const p = JSON.parse(superMat);
+            setSuperstructureMaterialsState(Array.isArray(p) ? p : superMat ? [superMat] : []);
+          } catch { setSuperstructureMaterialsState(superMat ? [superMat] : []); }
+        }
+        if (subMat !== null) {
+          try {
+            const p = JSON.parse(subMat);
+            setSubstructureMaterialsState(Array.isArray(p) ? p : subMat ? [subMat] : []);
+          } catch { setSubstructureMaterialsState(subMat ? [subMat] : []); }
+        }
         if (structNum) {
           setStructureNumberState(structNum);
           setCifData((prev) => ({ ...prev, structureNumber: structNum }));
@@ -1888,24 +1920,24 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     AsyncStorage.setItem(STORAGE_KEYS.INSPECTION_TYPE, v).catch(() => {});
   }, []);
 
-  const setSuperstructureType = useCallback((v: string) => {
-    setSuperstructureTypeState(v);
-    AsyncStorage.setItem(STORAGE_KEYS.SUPERSTRUCTURE_TYPE, v).catch(() => {});
+  const setSuperstructureTypes = useCallback((v: string[]) => {
+    setSuperstructureTypesState(v);
+    AsyncStorage.setItem(STORAGE_KEYS.SUPERSTRUCTURE_TYPE, JSON.stringify(v)).catch(() => {});
   }, []);
 
-  const setSubstructureType = useCallback((v: string) => {
-    setSubstructureTypeState(v);
-    AsyncStorage.setItem(STORAGE_KEYS.SUBSTRUCTURE_TYPE, v).catch(() => {});
+  const setSubstructureTypes = useCallback((v: string[]) => {
+    setSubstructureTypesState(v);
+    AsyncStorage.setItem(STORAGE_KEYS.SUBSTRUCTURE_TYPE, JSON.stringify(v)).catch(() => {});
   }, []);
 
-  const setSuperstructureMaterial = useCallback((v: string) => {
-    setSuperstructureMaterialState(v);
-    AsyncStorage.setItem(STORAGE_KEYS.SUPERSTRUCTURE_MATERIAL, v).catch(() => {});
+  const setSuperstructureMaterials = useCallback((v: string[]) => {
+    setSuperstructureMaterialsState(v);
+    AsyncStorage.setItem(STORAGE_KEYS.SUPERSTRUCTURE_MATERIAL, JSON.stringify(v)).catch(() => {});
   }, []);
 
-  const setSubstructureMaterial = useCallback((v: string) => {
-    setSubstructureMaterialState(v);
-    AsyncStorage.setItem(STORAGE_KEYS.SUBSTRUCTURE_MATERIAL, v).catch(() => {});
+  const setSubstructureMaterials = useCallback((v: string[]) => {
+    setSubstructureMaterialsState(v);
+    AsyncStorage.setItem(STORAGE_KEYS.SUBSTRUCTURE_MATERIAL, JSON.stringify(v)).catch(() => {});
   }, []);
 
   const syncSession = useCallback(async (
@@ -2273,19 +2305,19 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     () =>
       getFilteredElements(
         currentLocation,
-        superstructureType,
-        substructureType,
-        superstructureMaterial,
-        substructureMaterial,
+        superstructureTypes,
+        substructureTypes,
+        superstructureMaterials,
+        substructureMaterials,
         elementSearch,
         inspectionType
       ),
     [
       currentLocation,
-      superstructureType,
-      substructureType,
-      superstructureMaterial,
-      substructureMaterial,
+      superstructureTypes,
+      substructureTypes,
+      superstructureMaterials,
+      substructureMaterials,
       elementSearch,
       inspectionType,
     ]
@@ -3194,14 +3226,14 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     setNomenclature,
     inspectionType,
     setInspectionType,
-    superstructureType,
-    setSuperstructureType,
-    substructureType,
-    setSubstructureType,
-    superstructureMaterial,
-    setSuperstructureMaterial,
-    substructureMaterial,
-    setSubstructureMaterial,
+    superstructureTypes,
+    setSuperstructureTypes,
+    substructureTypes,
+    setSubstructureTypes,
+    superstructureMaterials,
+    setSuperstructureMaterials,
+    substructureMaterials,
+    setSubstructureMaterials,
     elementSearch,
     setElementSearch,
     supportCount,
@@ -3279,6 +3311,11 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     setRangeMax,
     syncToCurrentLoc,
     setSyncToCurrentLoc,
+    aspectRatio,
+    setAspectRatio: (v: string) => {
+      setAspectRatioState(v);
+      AsyncStorage.setItem(STORAGE_KEYS.ASPECT_RATIO, v).catch(() => {});
+    },
     imageSize,
     setImageSize: (v: string) => {
       setImageSizeState(v);
