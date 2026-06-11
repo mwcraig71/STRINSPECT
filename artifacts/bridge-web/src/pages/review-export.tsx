@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import {
   FileSpreadsheet, FileText, RefreshCw, Database, FileDown, X,
   ChevronDown, ChevronUp, ExternalLink, PenLine,
@@ -440,12 +440,19 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
   const [exporting, setExporting] = useState<"excel" | "word" | "pdf" | "redline" | "annotations" | null>(null);
   const [showReportHeader, setShowReportHeader] = useState(false);
   const [pdfAnnotations, setPdfAnnotations] = useState<Annotation[]>([]);
-  const [reportHeader, setReportHeader] = useState({
-    facilityCarried: "",
-    featureCrossed: "",
-    inspectionDate: "",
-    inspectors: "",
-    inspectionType: "Routine",
+  const [reportHeader, setReportHeader] = useState(() => {
+    const DEFAULTS = {
+      facilityCarried: "",
+      featureCrossed: "",
+      inspectionDate: "",
+      inspectors: "",
+      inspectionType: "Routine",
+    };
+    try {
+      const raw = localStorage.getItem("bridge_report_header_last");
+      if (raw) return { ...DEFAULTS, ...JSON.parse(raw) };
+    } catch { /* ignore */ }
+    return DEFAULTS;
   });
 
   const { data: sessions, isLoading: listLoading, isError: listError, refetch, isFetching } =
@@ -481,6 +488,35 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
 
     setSelectedId("");
   }, [sessionDetail, setSessionData]);
+
+  const hydratedStructureRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("bridge_report_header_last", JSON.stringify(reportHeader));
+      if (
+        sessionData?.structureNumber &&
+        hydratedStructureRef.current === sessionData.structureNumber
+      ) {
+        localStorage.setItem(
+          `bridge_report_header_${sessionData.structureNumber}`,
+          JSON.stringify(reportHeader),
+        );
+      }
+    } catch { /* ignore quota errors */ }
+  }, [reportHeader, sessionData?.structureNumber]);
+
+  useEffect(() => {
+    if (!sessionData?.structureNumber) return;
+    try {
+      const raw = localStorage.getItem(`bridge_report_header_${sessionData.structureNumber}`);
+      if (raw) {
+        const saved = JSON.parse(raw);
+        setReportHeader((prev) => ({ ...prev, ...saved }));
+      }
+    } catch { /* ignore */ }
+    hydratedStructureRef.current = sessionData.structureNumber;
+  }, [sessionData?.structureNumber]);
 
   const defects = sessionData?.defects ?? [];
   const nbiRatings = sessionData?.nbiRatings ?? [];
