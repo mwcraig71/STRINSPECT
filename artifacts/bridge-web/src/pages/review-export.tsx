@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import {
-  FileSpreadsheet, FileText, Search, AlertTriangle, CheckCircle,
-  RefreshCw, Camera, Compass, Database, FileDown, X, ChevronDown, ChevronUp,
+  FileSpreadsheet, FileText, RefreshCw, Database, FileDown, X,
+  ChevronDown, ChevronUp, ExternalLink, PenLine,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import {
@@ -13,6 +13,52 @@ import {
   useListSessions, useGetSession,
   getListSessionsQueryKey, getGetSessionQueryKey,
 } from "@workspace/api-client-react";
+
+type Annotation = {
+  type: "stroke" | "highlight" | "text" | "_meta";
+  page: number;
+  color?: string;
+  width?: number;
+  points?: [number, number][];
+  x?: number;
+  y?: number;
+  text?: string;
+  fontSize?: number;
+  pageDimensions?: Record<string, { w: number; h: number }>;
+};
+
+const FALLBACK_MOBILE_CANVAS_WIDTH = 386;
+
+function drawStroke(ctx: CanvasRenderingContext2D, ann: Annotation, sx: number, sy: number) {
+  const pts = ann.points;
+  if (!pts || pts.length < 2) return;
+  ctx.save();
+  ctx.strokeStyle = ann.color ?? "#ef4444";
+  ctx.lineWidth = (ann.width ?? 4) * sx;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  if (ann.type === "highlight") ctx.globalAlpha = 0.38;
+  ctx.beginPath();
+  ctx.moveTo(pts[0][0] * sx, pts[0][1] * sy);
+  for (let i = 1; i < pts.length - 1; i++) {
+    const mx = ((pts[i][0] + pts[i + 1][0]) / 2) * sx;
+    const my = ((pts[i][1] + pts[i + 1][1]) / 2) * sy;
+    ctx.quadraticCurveTo(pts[i][0] * sx, pts[i][1] * sy, mx, my);
+  }
+  ctx.lineTo(pts[pts.length - 1][0] * sx, pts[pts.length - 1][1] * sy);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawText(ctx: CanvasRenderingContext2D, ann: Annotation, sx: number, sy: number) {
+  if (!ann.text || ann.x == null || ann.y == null) return;
+  ctx.save();
+  ctx.fillStyle = ann.color ?? "#ef4444";
+  const fontSize = (ann.fontSize ?? 18) * Math.min(sx, sy);
+  ctx.font = `bold ${fontSize}px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif`;
+  ctx.fillText(ann.text, ann.x * sx, ann.y * sy);
+  ctx.restore();
+}
 
 const CS_COLORS: Record<string, string> = {
   CS1: "#22c55e", CS2: "#eab308", CS3: "#f97316", CS4: "#ef4444",
@@ -278,14 +324,9 @@ interface Props {
 
 export default function ReviewExport({ sessionData, setSessionData }: Props) {
   const [selectedId, setSelectedId] = useState("");
-  const [activeTab, setActiveTab] = useState<"defects" | "nbi" | "summary">("defects");
-  const [search, setSearch] = useState("");
-  const [csFilter, setCsFilter] = useState("All");
-  const [locationFilter, setLocationFilter] = useState("All");
-  const [showFlagged, setShowFlagged] = useState(false);
-  const [exporting, setExporting] = useState<"excel" | "word" | "pdf" | null>(null);
-  const [expandedNbi, setExpandedNbi] = useState<string | null>(null);
+  const [exporting, setExporting] = useState<"excel" | "word" | "pdf" | "redline" | "annotations" | null>(null);
   const [showReportHeader, setShowReportHeader] = useState(false);
+  const [pdfAnnotations, setPdfAnnotations] = useState<Annotation[]>([]);
   const [reportHeader, setReportHeader] = useState({
     facilityCarried: "",
     featureCrossed: "",
@@ -302,33 +343,37 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
   });
 
   useEffect(() => {
-    if (sessionDetail) {
-      setSessionData({
-        structureNumber: sessionDetail.structureNumber,
-        defects: sessionDetail.defects as DefectRecord[],
-        nbiRatings: sessionDetail.nbiRatings as NbiRating[],
-        importSummary: (sessionDetail.importSummary as ImportSummary | null) ?? null,
-      });
-      setSelectedId("");
+    if (!sessionDetail) return;
+    const data: SessionData = {
+      structureNumber: sessionDetail.structureNumber,
+      defects: sessionDetail.defects as DefectRecord[],
+      nbiRatings: sessionDetail.nbiRatings as NbiRating[],
+      importSummary: (sessionDetail.importSummary as ImportSummary | null) ?? null,
+    };
+    setSessionData(data);
+
+    const rawAnns = (sessionDetail.pdfAnnotations ?? []) as Annotation[];
+    setPdfAnnotations(rawAnns);
+
+    const html = generatePrintHtml(data);
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const win = window.open(url, "_blank", "noopener");
+    if (!win) {
+      const a = document.createElement("a");
+      a.href = url; a.target = "_blank"; a.rel = "noopener";
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
     }
+    setTimeout(() => URL.revokeObjectURL(url), 30_000);
+
+    setSelectedId("");
   }, [sessionDetail, setSessionData]);
 
   const defects = sessionData?.defects ?? [];
   const nbiRatings = sessionData?.nbiRatings ?? [];
-  const importSummary = sessionData?.importSummary;
-  const locations = ["All", ...sortedLocations(defects)];
 
-  const filtered = defects.filter((d) => {
-    if (csFilter !== "All" && d.cs !== csFilter) return false;
-    if (locationFilter !== "All" && d.location !== locationFilter) return false;
-    if (showFlagged && !d.needsVerification && !d.isCritical && !d.isMaintenance) return false;
-    if (search) {
-      const q = search.toLowerCase();
-      if (!`${d.element} ${d.defect} ${d.location} ${d.locationDesc} ${d.elementId}`.toLowerCase().includes(q))
-        return false;
-    }
-    return true;
-  });
+  const hasRedlinePdf = pdfAnnotations.some((a) => a.type !== "_meta");
+  const pdfAvailable = !!sessionData?.structureNumber;
 
   const exportExcel = useCallback(() => {
     setExporting("excel");
@@ -696,21 +741,201 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
     }
   }, [sessionData]);
 
+  const exportRedlinePdf = useCallback(async () => {
+    if (!sessionData?.structureNumber) return;
+    setExporting("redline");
+    try {
+      const structNum = sessionData.structureNumber;
+      const pdfUrl = `/api/sessions/pdf/${encodeURIComponent(structNum)}`;
+      const resp = await fetch(pdfUrl);
+      if (!resp.ok) throw new Error(`Could not fetch PDF: ${resp.status}`);
+      const arrayBuffer = await resp.arrayBuffer();
+
+      const pdfjsLib = await import("pdfjs-dist");
+      pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+        "pdfjs-dist/build/pdf.worker.min.mjs",
+        import.meta.url,
+      ).href;
+
+      const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+
+      const metaEntry = pdfAnnotations.find((a) => a.type === "_meta");
+      const pageDims = metaEntry?.pageDimensions ?? {};
+      const realAnns = pdfAnnotations.filter((a) => a.type !== "_meta");
+
+      const pageDataUrls: string[] = [];
+      const RENDER_WIDTH = 1200;
+
+      for (let pn = 1; pn <= pdfDoc.numPages; pn++) {
+        const page = await pdfDoc.getPage(pn);
+        const baseVp = page.getViewport({ scale: 1 });
+        const scale = RENDER_WIDTH / baseVp.width;
+        const vp = page.getViewport({ scale });
+
+        const canvas = document.createElement("canvas");
+        canvas.width = vp.width;
+        canvas.height = vp.height;
+        const ctx = canvas.getContext("2d")!;
+        await page.render({ canvasContext: ctx, viewport: vp }).promise;
+
+        const stored = pageDims[String(pn)];
+        const mobileW = stored?.w ?? FALLBACK_MOBILE_CANVAS_WIDTH;
+        const mobileH = stored?.h ?? (FALLBACK_MOBILE_CANVAS_WIDTH / baseVp.width) * baseVp.height;
+        const sx = vp.width / mobileW;
+        const sy = vp.height / mobileH;
+
+        for (const ann of realAnns.filter((a) => a.page === pn)) {
+          if (ann.type === "text") drawText(ctx, ann, sx, sy);
+          else drawStroke(ctx, ann, sx, sy);
+        }
+
+        pageDataUrls.push(canvas.toDataURL("image/png"));
+      }
+
+      const imgTags = pageDataUrls
+        .map((url, i) =>
+          `<img src="${url}" style="width:100%;display:block;margin-bottom:16px;box-shadow:0 2px 12px rgba(0,0,0,.2);page-break-after:always" alt="Page ${i + 1}" />`,
+        )
+        .join("");
+
+      const html = `<!DOCTYPE html><html><head>
+        <meta charset="UTF-8"/>
+        <title>Redline PDF \u2014 ${esc(structNum)}</title>
+        <style>
+          *{box-sizing:border-box;margin:0;padding:0}
+          body{background:#e5e7eb;font-family:Arial,sans-serif}
+          .bar{background:#1e293b;color:#fff;padding:12px 24px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:10}
+          .print-btn{background:#3b82f6;color:#fff;border:none;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600}
+          .print-btn:hover{background:#2563eb}
+          .content{max-width:900px;margin:0 auto;padding:24px}
+          @media print{.bar{display:none!important}body{background:#fff}.content{padding:0;max-width:100%}}
+        </style>
+      </head><body>
+        <div class="bar">
+          <button class="print-btn" onclick="window.print()">&#128424; Save / Print as PDF</button>
+          <span style="font-size:13px">Redline PDF \u2014 ${esc(structNum)} (${pageDataUrls.length} page${pageDataUrls.length !== 1 ? "s" : ""})</span>
+        </div>
+        <div class="content">${imgTags}</div>
+      </body></html>`;
+
+      const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const win = window.open(url, "_blank", "noopener");
+      if (!win) {
+        const a = document.createElement("a");
+        a.href = url; a.target = "_blank"; a.rel = "noopener";
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (e) {
+      alert("Could not generate redline PDF: " + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setExporting(null);
+    }
+  }, [sessionData, pdfAnnotations]);
+
+  const exportAnnotationsWord = useCallback(async () => {
+    if (!sessionData?.structureNumber) return;
+    setExporting("annotations");
+    try {
+      const structNum = sessionData.structureNumber;
+      const realAnns = pdfAnnotations.filter((a) => a.type !== "_meta");
+
+      if (realAnns.length === 0) {
+        alert("No annotations found for this inspection.");
+        return;
+      }
+
+      const byPage = new Map<number, Annotation[]>();
+      for (const ann of realAnns) {
+        const pg = ann.page ?? 1;
+        if (!byPage.has(pg)) byPage.set(pg, []);
+        byPage.get(pg)!.push(ann);
+      }
+
+      const children: (Paragraph | Table)[] = [];
+
+      children.push(new Paragraph({ text: "PDF Annotation Report", heading: HeadingLevel.HEADING_1 }));
+      children.push(new Paragraph({
+        children: [new TextRun({ text: "Structure Number: ", bold: true }), new TextRun(structNum)],
+      }));
+      children.push(new Paragraph({
+        children: [new TextRun({ text: "Total Annotations: ", bold: true }), new TextRun(String(realAnns.length))],
+      }));
+      children.push(new Paragraph({
+        children: [new TextRun({ text: "Generated: ", bold: true }), new TextRun(new Date().toLocaleString())],
+      }));
+      children.push(new Paragraph({ text: "" }));
+
+      const sortedPages = Array.from(byPage.keys()).sort((a, b) => a - b);
+
+      for (const pg of sortedPages) {
+        const anns = byPage.get(pg)!;
+        children.push(new Paragraph({ text: `Page ${pg}`, heading: HeadingLevel.HEADING_2 }));
+        children.push(new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          rows: [
+            new TableRow({
+              children: ["#", "Type", "Color", "Content"].map(
+                (h) => new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: h, bold: true })] })] }),
+              ),
+            }),
+            ...anns.map((ann, i) => {
+              const typeLabel = ann.type === "highlight" ? "Highlight" : ann.type === "text" ? "Text label" : "Freehand stroke";
+              const content = ann.text
+                ? ann.text
+                : ann.type === "stroke" || ann.type === "highlight"
+                  ? `${(ann.points ?? []).length} point stroke`
+                  : "\u2014";
+              return new TableRow({
+                children: [String(i + 1), typeLabel, ann.color ?? "(red)", content].map(
+                  (v) => new TableCell({ children: [new Paragraph(v)] }),
+                ),
+              });
+            }),
+          ],
+        }));
+        children.push(new Paragraph({ text: "" }));
+      }
+
+      const doc = new Document({ sections: [{ children }] });
+      const blob = await Packer.toBlob(doc);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${structNum || "bridge"}_annotations.docx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(null);
+    }
+  }, [sessionData, pdfAnnotations]);
+
   const loadSession = (id: string) => {
     setSelectedId(id);
-    setActiveTab("defects");
-    setSearch("");
-    setCsFilter("All");
-    setLocationFilter("All");
-    setShowFlagged(false);
   };
 
   const clearSession = () => {
     setSessionData(null);
+    setPdfAnnotations([]);
     setSelectedId("");
   };
 
-  const isLoading = detailLoading && !!selectedId;
+  const reopenReport = () => {
+    if (!sessionData) return;
+    const html = generatePrintHtml(sessionData);
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const win = window.open(url, "_blank", "noopener");
+    if (!win) {
+      const a = document.createElement("a");
+      a.href = url; a.target = "_blank"; a.rel = "noopener";
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 30_000);
+  };
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -719,18 +944,27 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
           <h1 className="text-2xl font-bold text-foreground">Review & Export</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             {sessionData
-              ? <>Structure: <span className="text-foreground font-semibold">{sessionData.structureNumber}</span></>
-              : "Select a synced session to review and export."}
+              ? <>Structure: <span className="text-foreground font-semibold">{sessionData.structureNumber}</span> — report opened in new window</>
+              : "Select a synced session to open its report and download exports."}
           </p>
         </div>
         {sessionData && (
-          <button
-            onClick={clearSession}
-            className="flex-shrink-0 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground border border-border rounded-md px-3 py-1.5 transition-colors"
-          >
-            <X className="h-3 w-3" />
-            Change
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={reopenReport}
+              className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 border border-primary/40 rounded-md px-3 py-1.5 transition-colors"
+            >
+              <ExternalLink className="h-3 w-3" />
+              Re-open Report
+            </button>
+            <button
+              onClick={clearSession}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground border border-border rounded-md px-3 py-1.5 transition-colors"
+            >
+              <X className="h-3 w-3" />
+              Change
+            </button>
+          </div>
         )}
       </div>
 
@@ -773,7 +1007,7 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
           <div className="divide-y divide-border/50">
             {sessions.map((s) => {
               const isSelected = sessionData?.structureNumber === s.structureNumber;
-              const isLoading = detailLoading && selectedId === s.id;
+              const isRowLoading = detailLoading && selectedId === s.id;
               return (
                 <div
                   key={s.id}
@@ -793,14 +1027,20 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
                   </div>
                   <button
                     onClick={() => loadSession(s.id)}
-                    disabled={isLoading || (isSelected && !detailLoading)}
-                    className={`ml-4 flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-md transition-colors ${
+                    disabled={isRowLoading || (isSelected && !detailLoading)}
+                    className={`ml-4 flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-md transition-colors ${
                       isSelected
                         ? "bg-primary/10 text-primary"
                         : "bg-secondary hover:bg-secondary/80 text-foreground"
                     } disabled:opacity-50`}
                   >
-                    {isLoading ? "Loading…" : isSelected ? "Loaded" : "Load"}
+                    {isRowLoading ? (
+                      "Loading…"
+                    ) : isSelected ? (
+                      <><ExternalLink className="h-3 w-3" /> Opened</>
+                    ) : (
+                      <><ExternalLink className="h-3 w-3" /> Open</>
+                    )}
                   </button>
                 </div>
               );
@@ -864,383 +1104,80 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
         </div>
       )}
 
-      {/* Export buttons — below Report Header so the header is filled in first */}
+      {/* Export buttons */}
       {sessionData && (
-        <div className="flex items-center justify-end gap-2 mb-5">
-          <button
-            data-testid="button-export-excel"
-            onClick={exportExcel}
-            disabled={exporting !== null}
-            className="flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white px-3 py-1.5 rounded-md text-xs font-semibold transition-colors"
-          >
-            <FileSpreadsheet className="h-3.5 w-3.5" />
-            {exporting === "excel" ? "Exporting…" : "Excel"}
-          </button>
-          <button
-            data-testid="button-export-word"
-            onClick={exportWord}
-            disabled={exporting !== null}
-            className="flex items-center gap-1.5 bg-blue-700 hover:bg-blue-600 disabled:opacity-50 text-white px-3 py-1.5 rounded-md text-xs font-semibold transition-colors"
-          >
-            <FileText className="h-3.5 w-3.5" />
-            {exporting === "word" ? "Exporting…" : "Word (.docx)"}
-          </button>
-          <button
-            data-testid="button-export-pdf"
-            onClick={exportPdf}
-            disabled={exporting !== null}
-            className="flex items-center gap-1.5 bg-red-700 hover:bg-red-600 disabled:opacity-50 text-white px-3 py-1.5 rounded-md text-xs font-semibold transition-colors"
-          >
-            <FileDown className="h-3.5 w-3.5" />
-            {exporting === "pdf" ? "Opening…" : "Print PDF"}
-          </button>
-        </div>
-      )}
+        <div className="bg-card border border-border rounded-lg p-4">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Downloads</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              data-testid="button-export-excel"
+              onClick={exportExcel}
+              disabled={exporting !== null}
+              className="flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white px-3 py-1.5 rounded-md text-xs font-semibold transition-colors"
+            >
+              <FileSpreadsheet className="h-3.5 w-3.5" />
+              {exporting === "excel" ? "Exporting…" : "Excel"}
+            </button>
+            <button
+              data-testid="button-export-word"
+              onClick={exportWord}
+              disabled={exporting !== null}
+              className="flex items-center gap-1.5 bg-blue-700 hover:bg-blue-600 disabled:opacity-50 text-white px-3 py-1.5 rounded-md text-xs font-semibold transition-colors"
+            >
+              <FileText className="h-3.5 w-3.5" />
+              {exporting === "word" ? "Exporting…" : "Word (.docx)"}
+            </button>
+            <button
+              data-testid="button-export-pdf"
+              onClick={exportPdf}
+              disabled={exporting !== null}
+              className="flex items-center gap-1.5 bg-slate-600 hover:bg-slate-500 disabled:opacity-50 text-white px-3 py-1.5 rounded-md text-xs font-semibold transition-colors"
+            >
+              <FileDown className="h-3.5 w-3.5" />
+              {exporting === "pdf" ? "Opening…" : "Print PDF"}
+            </button>
 
-      {/* Review panel */}
-      {sessionData && (
-        <>
-          {/* Stats */}
-          <div className="grid grid-cols-4 gap-3 mb-4">
+            {/* Divider */}
+            <div className="w-px h-5 bg-border mx-1" />
+
+            <button
+              data-testid="button-export-redline"
+              onClick={exportRedlinePdf}
+              disabled={exporting !== null || !pdfAvailable}
+              title={!pdfAvailable ? "No PDF uploaded for this session" : hasRedlinePdf ? "Render PDF with annotations" : "No annotations — renders clean PDF pages"}
+              className="flex items-center gap-1.5 bg-red-700 hover:bg-red-600 disabled:opacity-50 text-white px-3 py-1.5 rounded-md text-xs font-semibold transition-colors"
+            >
+              <PenLine className="h-3.5 w-3.5" />
+              {exporting === "redline" ? "Rendering…" : "Redline PDF"}
+            </button>
+            <button
+              data-testid="button-export-annotations"
+              onClick={exportAnnotationsWord}
+              disabled={exporting !== null || !hasRedlinePdf}
+              title={!hasRedlinePdf ? "No annotations recorded for this session" : "Download annotation log as Word document"}
+              className="flex items-center gap-1.5 bg-violet-700 hover:bg-violet-600 disabled:opacity-50 text-white px-3 py-1.5 rounded-md text-xs font-semibold transition-colors"
+            >
+              <FileText className="h-3.5 w-3.5" />
+              {exporting === "annotations" ? "Exporting…" : "Annotations (.docx)"}
+            </button>
+          </div>
+
+          {/* Quick stats row */}
+          <div className="mt-4 pt-3 border-t border-border/50 flex flex-wrap gap-4">
             {[
-              { label: "Total Defects", value: defects.length, color: "text-foreground" },
+              { label: "Defects", value: defects.length, color: "text-foreground" },
               { label: "CS4", value: defects.filter((d) => d.cs === "CS4").length, color: "text-red-400" },
               { label: "Critical", value: defects.filter((d) => d.isCritical).length, color: "text-orange-400" },
               { label: "NBI Ratings", value: nbiRatings.length, color: "text-blue-400" },
+              { label: "Annotations", value: pdfAnnotations.filter((a) => a.type !== "_meta").length, color: "text-violet-400" },
             ].map(({ label, value, color }) => (
-              <div key={label} className="bg-card border border-border rounded-lg p-3">
-                <p className={`text-2xl font-bold ${color}`}>{value}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
+              <div key={label}>
+                <span className={`text-lg font-bold ${color}`}>{value}</span>
+                <span className="text-xs text-muted-foreground ml-1">{label}</span>
               </div>
             ))}
           </div>
-
-          {/* Tabs */}
-          <div className="flex gap-1 mb-3 border-b border-border">
-            {([
-              { key: "defects", label: `Defects (${defects.length})` },
-              { key: "nbi", label: `NBI Ratings (${nbiRatings.length})` },
-              ...(importSummary ? [{ key: "summary", label: "Import Audit" }] : []),
-            ] as const).map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => setActiveTab(key as typeof activeTab)}
-                className={`px-4 py-2 text-xs font-semibold border-b-2 transition-colors -mb-px ${
-                  activeTab === key
-                    ? "border-primary text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          {/* Defects tab */}
-          {activeTab === "defects" && (
-            <>
-              <div className="bg-card border border-border rounded-lg p-3 mb-3 flex flex-wrap items-center gap-3">
-                <div className="flex items-center gap-2 flex-1 min-w-44">
-                  <Search className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                  <input
-                    data-testid="input-search"
-                    className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none w-full"
-                    placeholder="Search element, defect, location…"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                  {search && (
-                    <button onClick={() => setSearch("")} className="text-muted-foreground hover:text-foreground text-xs">
-                      Clear
-                    </button>
-                  )}
-                </div>
-                <select
-                  data-testid="select-cs-filter"
-                  className="bg-secondary border border-border rounded-md text-xs px-2 py-1.5 text-foreground focus:outline-none"
-                  value={csFilter}
-                  onChange={(e) => setCsFilter(e.target.value)}
-                >
-                  <option value="All">All CS</option>
-                  {["CS1", "CS2", "CS3", "CS4"].map((cs) => <option key={cs} value={cs}>{cs}</option>)}
-                </select>
-                <select
-                  data-testid="select-location-filter"
-                  className="bg-secondary border border-border rounded-md text-xs px-2 py-1.5 text-foreground focus:outline-none max-w-44 truncate"
-                  value={locationFilter}
-                  onChange={(e) => setLocationFilter(e.target.value)}
-                >
-                  {locations.map((l) => <option key={l} value={l}>{l}</option>)}
-                </select>
-                <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
-                  <input
-                    data-testid="checkbox-flagged"
-                    type="checkbox"
-                    checked={showFlagged}
-                    onChange={(e) => setShowFlagged(e.target.checked)}
-                    className="accent-primary"
-                  />
-                  Flagged only
-                </label>
-                <span className="text-xs text-muted-foreground ml-auto">
-                  {filtered.length} of {defects.length}
-                </span>
-              </div>
-
-              <div className="bg-card border border-border rounded-lg overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border bg-secondary/40">
-                        {["Location", "Element", "Defect", "CS", "Qty", "Notes", "Photos", "Flags"].map((h) => (
-                          <th
-                            key={h}
-                            className={`px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide ${
-                              ["CS", "Qty", "Photos", "Flags"].includes(h) ? "text-center" : "text-left"
-                            }`}
-                          >
-                            {h}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filtered.length === 0 ? (
-                        <tr>
-                          <td colSpan={8} className="py-16 text-center text-sm text-muted-foreground">
-                            No records match the current filters.
-                          </td>
-                        </tr>
-                      ) : (
-                        filtered.map((d) => {
-                          const photos = d.photos ?? [];
-                          return (
-                            <tr
-                              key={d.id}
-                              data-testid={`row-defect-${d.id}`}
-                              className="border-b border-border/40 hover:bg-secondary/20 transition-colors"
-                            >
-                              <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">{d.location}</td>
-                              <td className="px-3 py-2.5 text-xs whitespace-nowrap">
-                                <span className="text-muted-foreground">{d.elementId}</span>
-                                <span className="text-foreground font-medium ml-1">— {d.element}</span>
-                              </td>
-                              <td className="px-3 py-2.5 text-xs text-muted-foreground max-w-36 truncate">{d.defect}</td>
-                              <td className="px-3 py-2.5 text-center">
-                                <span
-                                  className="inline-block px-1.5 py-0.5 rounded text-xs font-bold tracking-wide"
-                                  style={{ color: CS_COLORS[d.cs], backgroundColor: CS_BG[d.cs] }}
-                                >
-                                  {d.cs}
-                                </span>
-                              </td>
-                              <td className="px-3 py-2.5 text-xs text-center text-muted-foreground">
-                                {d.quantityValue || d.quantity}
-                              </td>
-                              <td className="px-3 py-2.5 text-xs text-muted-foreground max-w-40 truncate" title={d.locationDesc}>
-                                {d.locationDesc}
-                              </td>
-                              <td className="px-3 py-2.5 text-center">
-                                {photos.length > 0 ? (
-                                  <span className="inline-flex items-center gap-1 text-xs text-blue-400">
-                                    <Camera className="h-3 w-3" />
-                                    {photos.length}
-                                    {photos.some((p) => p.heading != null) && (
-                                      <span title="Has direction data"><Compass className="h-3 w-3 text-muted-foreground" /></span>
-                                    )}
-                                  </span>
-                                ) : (
-                                  <span className="text-muted-foreground/30 text-xs">—</span>
-                                )}
-                              </td>
-                              <td className="px-3 py-2.5 text-center">
-                                <div className="flex items-center justify-center gap-1.5">
-                                  {d.isCritical && (
-                                    <span title="Critical finding">
-                                      <AlertTriangle className="h-3 w-3 text-red-400" />
-                                    </span>
-                                  )}
-                                  {d.needsVerification && (
-                                    <span title="Needs verification">
-                                      <CheckCircle className="h-3 w-3 text-yellow-400" />
-                                    </span>
-                                  )}
-                                  {d.isLegacy && (
-                                    <span title="Legacy / imported" className="text-muted-foreground/50 text-xs">L</span>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* NBI Ratings tab */}
-          {activeTab === "nbi" && (
-            <div className="bg-card border border-border rounded-lg overflow-hidden">
-              {nbiRatings.length === 0 ? (
-                <div className="py-16 text-center text-sm text-muted-foreground">
-                  No NBI ratings in this session.
-                </div>
-              ) : (
-                <div className="divide-y divide-border/50">
-                  {nbiRatings.map((n) => {
-                    const isExpanded = expandedNbi === n.item;
-                    const sub = n.subComponents[0];
-                    const rating = sub?.rating ?? "—";
-                    return (
-                      <div key={n.item}>
-                        <button
-                          className="w-full flex items-center justify-between px-4 py-3 hover:bg-secondary/20 transition-colors text-left"
-                          onClick={() => setExpandedNbi(isExpanded ? null : n.item)}
-                        >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <span
-                              className="flex-shrink-0 text-base font-bold w-8 text-center"
-                              style={{
-                                color: rating === "N" || rating === "—" ? "#6b7280" : Number(rating) <= 3 ? "#ef4444" : Number(rating) <= 5 ? "#f97316" : "#22c55e",
-                              }}
-                            >
-                              {rating}
-                            </span>
-                            <div className="min-w-0">
-                              <p className="text-xs font-semibold text-foreground">
-                                {n.item} — {n.description}
-                              </p>
-                              {sub?.comments && (
-                                <p className="text-xs text-muted-foreground truncate mt-0.5">{sub.comments}</p>
-                              )}
-                            </div>
-                          </div>
-                          {n.subComponents.length > 1 && (
-                            isExpanded
-                              ? <ChevronUp className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                              : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                          )}
-                        </button>
-                        {isExpanded && n.subComponents.length > 1 && (
-                          <div className="bg-secondary/20 px-4 pb-3">
-                            <table className="w-full text-xs">
-                              <thead>
-                                <tr className="border-b border-border/50">
-                                  {["Sub-Component", "Rating", "Min", "Comments"].map((h) => (
-                                    <th key={h} className="pb-1.5 pt-2 text-left text-muted-foreground font-semibold uppercase tracking-wide text-[10px]">{h}</th>
-                                  ))}
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {n.subComponents.map((sc, i) => (
-                                  <tr key={i} className="border-b border-border/20">
-                                    <td className="py-1.5 pr-4 text-foreground">{sc.name}</td>
-                                    <td className="py-1.5 pr-4 font-bold text-foreground">{sc.rating || "—"}</td>
-                                    <td className="py-1.5 pr-4 text-muted-foreground">{sc.min || "—"}</td>
-                                    <td className="py-1.5 text-muted-foreground">{sc.comments || "—"}</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Import audit tab */}
-          {activeTab === "summary" && importSummary && (
-            <div className="bg-card border border-border rounded-lg p-5 space-y-4">
-              <div>
-                <p className="text-xs text-muted-foreground mb-3">
-                  Previous report imported on{" "}
-                  <span className="text-foreground">{new Date(importSummary.timestamp).toLocaleString()}</span>
-                  {" "}for structure{" "}
-                  <span className="text-foreground font-semibold">{importSummary.structureNumber}</span>
-                </p>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  {[
-                    { label: "Structure # Found", value: importSummary.structureNumberFound ? "Yes" : "No" },
-                    { label: "Elements Found", value: importSummary.elementsFound },
-                    { label: "Records Created", value: importSummary.elementRecordsCreated },
-                    { label: "NBI Filled", value: `${importSummary.nbiFilledCount} / ${importSummary.nbiTotalCount}` },
-                  ].map(({ label, value }) => (
-                    <div key={label} className="bg-secondary/40 rounded-lg p-3">
-                      <p className="text-lg font-bold text-foreground">{value}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {importSummary.sections.length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                    Matched Sections ({importSummary.sections.length})
-                  </p>
-                  <div className="bg-card border border-border rounded overflow-hidden">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="bg-secondary/40 border-b border-border">
-                          {["Item", "Description", "Filled", "Total"].map((h) => (
-                            <th key={h} className="px-3 py-2 text-left text-muted-foreground font-semibold uppercase tracking-wide text-[10px]">{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {importSummary.sections.map((s, i) => (
-                          <tr key={i} className="border-b border-border/40">
-                            <td className="px-3 py-2 text-muted-foreground">{s.item}</td>
-                            <td className="px-3 py-2 text-foreground">{s.description}</td>
-                            <td className="px-3 py-2 text-center">{s.filled}</td>
-                            <td className="px-3 py-2 text-center">{s.total}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {importSummary.unmatchedComponents.length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-red-400 uppercase tracking-wide mb-2">
-                    Unmatched Components ({importSummary.unmatchedComponents.length})
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {importSummary.unmatchedComponents.map((c, i) => (
-                      <span key={i} className="text-xs bg-red-500/10 text-red-400 px-2 py-1 rounded">
-                        {c}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {importSummary.emptySections.length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                    Empty Sections ({importSummary.emptySections.length})
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {importSummary.emptySections.map((s, i) => (
-                      <span key={i} className="text-xs bg-secondary text-muted-foreground px-2 py-1 rounded">
-                        {s.item} — {s.description}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </>
+        </div>
       )}
     </div>
   );
