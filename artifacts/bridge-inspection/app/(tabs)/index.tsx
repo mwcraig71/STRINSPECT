@@ -28,9 +28,11 @@ import {
   DEFECTS_BY_ELEMENT,
   INSPECTION_TYPES,
   NOMENCLATURES,
+  SNBI_ELEMENTS,
   PhotoItem,
   useInspection,
 } from "@/context/InspectionContext";
+
 import { DefectCard } from "@/components/DefectCard";
 import { CIFModal } from "@/components/CIFModal";
 import { FUAModal } from "@/components/FUAModal";
@@ -44,6 +46,13 @@ import { SpeechToTextButton } from "@/components/SpeechToTextButton";
 import colors from "@/constants/colors";
 
 const CS_OPTIONS = ["CS1", "CS2", "CS3", "CS4"] as const;
+
+const TOPSIDE_CATS = new Set(["Deck", "Railing", "Joint"]);
+const UNDERSIDE_CATS = new Set(["Superstructure", "Substructure", "Bearing"]);
+
+const ELEMENT_CATEGORY_BY_ID: Record<string, string> = Object.fromEntries(
+  SNBI_ELEMENTS.map((el) => [el.id, el.category])
+);
 const CS_COLORS: Record<string, string> = {
   CS1: colors.light.cs1,
   CS2: colors.light.cs2,
@@ -135,6 +144,8 @@ export default function InspectionScreen() {
   const [elementPickerOpen, setElementPickerOpen] = useState(false);
   const [defectPickerOpen, setDefectPickerOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [showLegacyCS1, setShowLegacyCS1] = useState(false);
+  const [showAllLegacySides, setShowAllLegacySides] = useState(false);
   const addPhoto = async () => {
     if (Platform.OS === "web") {
       Alert.alert("Info", "Photo library not supported in web preview. Use camera.");
@@ -215,6 +226,33 @@ export default function InspectionScreen() {
   };
 
   const availableDefects = element ? DEFECTS_BY_ELEMENT[element.id] || [] : [];
+
+  const filteredLegacyManifest = React.useMemo(() => {
+    return legacyManifest.filter((d) => {
+      if (!showLegacyCS1 && d.cs === "CS1") return false;
+      if (!showAllLegacySides) {
+        const cat = ELEMENT_CATEGORY_BY_ID[d.elementId];
+        if (inspectionType === INSPECTION_TYPES.TOPSIDE && cat && UNDERSIDE_CATS.has(cat)) return false;
+        if (inspectionType === INSPECTION_TYPES.UNDERSIDE && cat && TOPSIDE_CATS.has(cat)) return false;
+      }
+      return true;
+    });
+  }, [legacyManifest, showLegacyCS1, showAllLegacySides, inspectionType]);
+
+  const legacyCS1Count = React.useMemo(
+    () => legacyManifest.filter((d) => d.cs === "CS1").length,
+    [legacyManifest]
+  );
+
+  const legacyHiddenBySide = React.useMemo(() => {
+    if (showAllLegacySides) return 0;
+    return legacyManifest.filter((d) => {
+      const cat = ELEMENT_CATEGORY_BY_ID[d.elementId];
+      if (inspectionType === INSPECTION_TYPES.TOPSIDE && cat && UNDERSIDE_CATS.has(cat)) return true;
+      if (inspectionType === INSPECTION_TYPES.UNDERSIDE && cat && TOPSIDE_CATS.has(cat)) return true;
+      return false;
+    }).length;
+  }, [legacyManifest, showAllLegacySides, inspectionType]);
 
   return (
     <View style={[styles.container, { backgroundColor: c.background }]}>
@@ -906,21 +944,72 @@ export default function InspectionScreen() {
 
         {/* ── Legacy Manifest ── */}
         {legacyManifest.length > 0 && (
-          <View style={[styles.manifestSection, { opacity: 0.85 }]}>
+          <View style={[styles.manifestSection, { opacity: 0.9 }]}>
             <View style={styles.manifestHeader}>
               <Feather name="clock" size={14} color={c.mutedForeground} />
-              <Text style={[styles.manifestTitle, { color: c.mutedForeground }]}>
-                Previous Reported Defects ({legacyManifest.length})
+              <Text style={[styles.manifestTitle, { color: c.mutedForeground, flex: 1 }]}>
+                Previous Defects ({filteredLegacyManifest.length}/{legacyManifest.length})
               </Text>
             </View>
-            {legacyManifest.map((d) => (
-              <DefectCard
-                key={d.id}
-                record={d}
-                isLegacy
-                onEdit={() => startEdit(d)}
-              />
-            ))}
+
+            {/* Filter toggles */}
+            <View style={styles.legacyFilterRow}>
+              {/* CS1 toggle */}
+              <TouchableOpacity
+                style={[
+                  styles.legacyFilterBtn,
+                  showLegacyCS1
+                    ? { backgroundColor: colors.light.cs1 + "30", borderColor: colors.light.cs1 }
+                    : { backgroundColor: c.secondary, borderColor: c.border },
+                ]}
+                onPress={() => setShowLegacyCS1(!showLegacyCS1)}
+              >
+                <View style={[styles.legacyFilterDot, { backgroundColor: colors.light.cs1 }]} />
+                <Text style={[styles.legacyFilterText, { color: showLegacyCS1 ? colors.light.cs1 : c.mutedForeground }]}>
+                  {showLegacyCS1 ? "CS1 Shown" : `CS1 Hidden${legacyCS1Count > 0 ? ` (${legacyCS1Count})` : ""}`}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Side filter toggle */}
+              <TouchableOpacity
+                style={[
+                  styles.legacyFilterBtn,
+                  showAllLegacySides
+                    ? { backgroundColor: c.primary + "20", borderColor: c.primary }
+                    : { backgroundColor: c.secondary, borderColor: c.border },
+                ]}
+                onPress={() => setShowAllLegacySides(!showAllLegacySides)}
+              >
+                <Feather
+                  name={showAllLegacySides ? "layers" : (inspectionType === INSPECTION_TYPES.TOPSIDE ? "arrow-up" : "arrow-down")}
+                  size={11}
+                  color={showAllLegacySides ? c.primary : c.mutedForeground}
+                />
+                <Text style={[styles.legacyFilterText, { color: showAllLegacySides ? c.primary : c.mutedForeground }]}>
+                  {showAllLegacySides
+                    ? "All Sides"
+                    : `${inspectionType} Only${legacyHiddenBySide > 0 ? ` (${legacyHiddenBySide} hidden)` : ""}`}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {filteredLegacyManifest.length === 0 ? (
+              <View style={[styles.emptyState, { backgroundColor: c.card, borderColor: c.border }]}>
+                <Feather name="filter" size={20} color={c.mutedForeground} />
+                <Text style={[styles.emptyText, { color: c.mutedForeground }]}>
+                  All previous defects are hidden by current filters
+                </Text>
+              </View>
+            ) : (
+              filteredLegacyManifest.map((d) => (
+                <DefectCard
+                  key={d.id}
+                  record={d}
+                  isLegacy
+                  onEdit={() => startEdit(d)}
+                />
+              ))
+            )}
           </View>
         )}
 
@@ -1157,8 +1246,21 @@ const styles = StyleSheet.create({
   filterTypeBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1 },
   filterTypeBtnText: { fontSize: 11, fontWeight: "800" },
   manifestSection: { gap: 4 },
-  manifestHeader: { flexDirection: "row", alignItems: "center", gap: 6, paddingLeft: 2, marginBottom: 4 },
+  manifestHeader: { flexDirection: "row", alignItems: "center", gap: 6, paddingLeft: 2, marginBottom: 2 },
   manifestTitle: { fontSize: 10, fontWeight: "900", textTransform: "uppercase", letterSpacing: 0.5 },
+  legacyFilterRow: { flexDirection: "row", gap: 6, marginBottom: 4 },
+  legacyFilterBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+  },
+  legacyFilterDot: { width: 7, height: 7, borderRadius: 4 },
+  legacyFilterText: { fontSize: 10, fontWeight: "800", flex: 1 },
   emptyState: {
     alignItems: "center",
     gap: 8,
