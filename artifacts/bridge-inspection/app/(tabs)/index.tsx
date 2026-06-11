@@ -120,6 +120,16 @@ export default function InspectionScreen() {
     dateStampEnabled,
   } = useInspection();
 
+  const scrollRef = React.useRef<ScrollView>(null);
+
+  const handleEdit = React.useCallback(
+    (record: Parameters<typeof startEdit>[0]) => {
+      startEdit(record);
+      scrollRef.current?.scrollTo({ y: 0, animated: true });
+    },
+    [startEdit],
+  );
+
   const { focus, focusTs } = useLocalSearchParams<{ focus?: string; focusTs?: string }>();
   const handledFocusRef = React.useRef<string | undefined>(undefined);
   React.useEffect(() => {
@@ -482,6 +492,7 @@ export default function InspectionScreen() {
       </Modal>
 
       <KeyboardAwareScrollViewCompat
+        ref={scrollRef}
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
@@ -936,7 +947,7 @@ export default function InspectionScreen() {
               <DefectCard
                 key={d.id}
                 record={d}
-                onEdit={() => startEdit(d)}
+                onEdit={() => handleEdit(d)}
               />
             ))
           )}
@@ -1006,7 +1017,7 @@ export default function InspectionScreen() {
                   key={d.id}
                   record={d}
                   isLegacy
-                  onEdit={() => startEdit(d)}
+                  onEdit={() => handleEdit(d)}
                 />
               ))
             )}
