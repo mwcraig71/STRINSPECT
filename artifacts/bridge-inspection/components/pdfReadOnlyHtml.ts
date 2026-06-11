@@ -162,6 +162,15 @@ function setPendingShortcut(text) {
     hint.textContent = '';
   }
 }
+function findTextAnnotation(page, ptX, ptY) {
+  var hitRadius = 50;
+  for (var i = annotations.length - 1; i >= 0; i--) {
+    var a = annotations[i];
+    if (a.type !== 'text' || a.page !== page) continue;
+    if (Math.abs(ptX - a.x) < hitRadius && Math.abs(ptY - a.y) < hitRadius) return i;
+  }
+  return -1;
+}
 
 function postBridge(msg) {
   var s = JSON.stringify(msg);
@@ -306,7 +315,8 @@ function onDown(e, cv, pn) {
     textPendingY = pt[1];
     var preText = pendingShortcut || '';
     setPendingShortcut(null);
-    showTextInput(e.clientX, e.clientY, pn, preText);
+    var hitIdx = findTextAnnotation(pn, pt[0], pt[1]);
+    showTextInput(e.clientX, e.clientY, pn, preText, hitIdx);
     return;
   }
 
@@ -343,7 +353,7 @@ function onUp(e, cv, pn) {
   redrawPage(targetPn);
 }
 
-function showTextInput(clientX, clientY, pn, preText) {
+function showTextInput(clientX, clientY, pn, preText, editIdx) {
   var wrap = document.getElementById('text-input-wrap');
   var inp = document.getElementById('text-input');
   var x = Math.min(clientX, window.innerWidth - 250);
@@ -351,23 +361,29 @@ function showTextInput(clientX, clientY, pn, preText) {
   wrap.style.left = x + 'px';
   wrap.style.top = y + 'px';
   wrap.style.display = 'block';
-  inp.value = preText || '';
-  if (preText) { inp.select(); }
+  inp.value = (editIdx >= 0 && annotations[editIdx]) ? annotations[editIdx].text : (preText || '');
+  if (inp.value) { inp.select(); }
   inp.focus();
+  var cancelled = false;
 
   function commit() {
+    if (cancelled) return;
     var txt = inp.value.trim();
     wrap.style.display = 'none';
     inp.removeEventListener('keydown', onKey);
     inp.removeEventListener('blur', onBlur);
-    if (txt) {
+    if (editIdx >= 0 && annotations[editIdx] !== undefined) {
+      if (txt) { annotations[editIdx].text = txt; } else { annotations.splice(editIdx, 1); }
+      autoSave();
+      redrawPage(textPendingPage);
+    } else if (txt) {
       annotations.push({ type:'text', page: textPendingPage, x: textPendingX, y: textPendingY, text: txt, fontSize: (penSize * 4 + 10) * 0.25, color: penColor });
       autoSave();
       redrawPage(textPendingPage);
     }
   }
 
-  function onKey(e) { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { inp.value=''; wrap.style.display='none'; inp.removeEventListener('keydown',onKey); inp.removeEventListener('blur',onBlur); } }
+  function onKey(e) { if (e.key === 'Enter') { commit(); } if (e.key === 'Escape') { cancelled = true; wrap.style.display = 'none'; inp.removeEventListener('keydown', onKey); inp.removeEventListener('blur', onBlur); } }
   function onBlur() { setTimeout(commit, 100); }
   inp.addEventListener('keydown', onKey);
   inp.addEventListener('blur', onBlur);
