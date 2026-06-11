@@ -423,6 +423,13 @@ export interface PhotoItem {
   capturedAt?: string;
 }
 
+export interface AdditionalPhoto {
+  uri: string;
+  capturedAt: string;
+  directionTags: string[];
+  subjectTags: string[];
+}
+
 export interface StandardPhotoSlot {
   slotId: string;
   label: string;
@@ -430,6 +437,8 @@ export interface StandardPhotoSlot {
   capturedAt?: string;
   directionTags: string[];
   subjectTags: string[];
+  additionalPhotos?: AdditionalPhoto[];
+  notNeeded?: boolean;
 }
 
 export const TXDOT_REQUIRED_SLOTS: StandardPhotoSlot[] = [
@@ -1243,6 +1252,9 @@ interface InspectionContextType {
   standardPhotos: StandardPhotoSlot[];
   setStandardPhotoSlot: (slotId: string, patch: Partial<StandardPhotoSlot>) => void;
   standardPhotosComplete: boolean;
+  addStandardPhotoAdditional: (slotId: string, photo: AdditionalPhoto) => void;
+  removeStandardPhotoAdditional: (slotId: string, index: number) => void;
+  updateStandardPhotoAdditionalTags: (slotId: string, index: number, directionTags: string[], subjectTags: string[]) => void;
   // ── Extra Photos ──
   extraPhotos: StandardPhotoSlot[];
   addExtraPhoto: () => void;
@@ -2071,6 +2083,43 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     });
   }, []);
 
+  const addStandardPhotoAdditional = useCallback((slotId: string, photo: AdditionalPhoto) => {
+    setStandardPhotosState((prev) => {
+      const next = prev.map((s) => {
+        if (s.slotId !== slotId) return s;
+        return { ...s, additionalPhotos: [...(s.additionalPhotos ?? []), photo] };
+      });
+      AsyncStorage.setItem(STORAGE_KEYS.STANDARD_PHOTOS, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  }, []);
+
+  const removeStandardPhotoAdditional = useCallback((slotId: string, index: number) => {
+    setStandardPhotosState((prev) => {
+      const next = prev.map((s) => {
+        if (s.slotId !== slotId) return s;
+        const additionalPhotos = (s.additionalPhotos ?? []).filter((_, i) => i !== index);
+        return { ...s, additionalPhotos };
+      });
+      AsyncStorage.setItem(STORAGE_KEYS.STANDARD_PHOTOS, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  }, []);
+
+  const updateStandardPhotoAdditionalTags = useCallback((slotId: string, index: number, directionTags: string[], subjectTags: string[]) => {
+    setStandardPhotosState((prev) => {
+      const next = prev.map((s) => {
+        if (s.slotId !== slotId) return s;
+        const additionalPhotos = (s.additionalPhotos ?? []).map((p, i) =>
+          i === index ? { ...p, directionTags, subjectTags } : p
+        );
+        return { ...s, additionalPhotos };
+      });
+      AsyncStorage.setItem(STORAGE_KEYS.STANDARD_PHOTOS, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  }, []);
+
   const addExtraPhoto = useCallback(() => {
     setExtraPhotosState((prev) => {
       const slotId = `extra_${Date.now()}`;
@@ -2097,7 +2146,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     });
   }, []);
 
-  const standardPhotosComplete = standardPhotos.every((s) => !!s.photoUri);
+  const standardPhotosComplete = standardPhotos.every((s) => !!s.photoUri || !!s.notNeeded);
 
   const setPdfAnnotations = useCallback((a: unknown[] | null) => {
     setPdfAnnotationsState(a);
@@ -2421,13 +2470,13 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
       target: { screen: "summary", focusId: "criticalFindings" },
     });
 
-    // 7. Standard photos complete
-    const missingCount = standardPhotos.filter((s) => !s.photoUri).length;
+    // 7. Standard photos complete (waived "not needed" slots count as satisfied)
+    const missingCount = standardPhotos.filter((s) => !s.photoUri && !s.notNeeded).length;
     checks.push({
       id: "standardPhotos",
       label: "Standard photos",
       passed: missingCount === 0,
-      reason: missingCount === 0 ? "" : `${missingCount} of 8 required photo${missingCount !== 1 ? "s" : ""} missing`,
+      reason: missingCount === 0 ? "" : `${missingCount} required photo${missingCount !== 1 ? "s" : ""} still needed`,
       target: { screen: "photos" },
     });
 
@@ -3248,6 +3297,9 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     standardPhotos,
     setStandardPhotoSlot,
     standardPhotosComplete,
+    addStandardPhotoAdditional,
+    removeStandardPhotoAdditional,
+    updateStandardPhotoAdditionalTags,
     extraPhotos,
     addExtraPhoto,
     setExtraPhotoSlot,
