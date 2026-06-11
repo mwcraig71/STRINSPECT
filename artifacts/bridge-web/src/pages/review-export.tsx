@@ -94,7 +94,15 @@ function esc(s: string | null | undefined): string {
   return (s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-function generatePrintHtml(data: SessionData): string {
+interface ReportHeader {
+  facilityCarried: string;
+  featureCrossed: string;
+  inspectionDate: string;
+  inspectors: string;
+  inspectionType: string;
+}
+
+function generatePrintHtml(data: SessionData, header: ReportHeader): string {
   const defects = data.defects ?? [];
   const nbiRatings = data.nbiRatings ?? [];
   const importSummary = data.importSummary;
@@ -104,104 +112,249 @@ function generatePrintHtml(data: SessionData): string {
   const cs4 = defects.filter((d) => d.cs === "CS4").length;
   const critical = defects.filter((d) => d.isCritical).length;
   const needsVerify = defects.filter((d) => d.needsVerification).length;
+
+  let globalPhotoIdx = 0;
+
+  function photoImgCell(p: { uri?: string; description?: string; heading?: number | null }, num: number): string {
+    const accessible =
+      p.uri?.startsWith("http://") ||
+      p.uri?.startsWith("https://") ||
+      p.uri?.startsWith("data:");
+    return accessible
+      ? `<img src="${esc(p.uri)}" style="max-width:240px;max-height:160px;border-radius:4px;display:block" onerror="this.replaceWith(document.createTextNode('(image unavailable)'))" />`
+      : `<span style="color:#94a3b8;font-style:italic">Stored on device</span>`;
+  }
+
+  // ── 1. COVER ────────────────────────────────────────────────────────────────
+  const coverFields: [string, string][] = [
+    ["Structure Number", structNum],
+    ["Facility Carried", header.facilityCarried],
+    ["Feature Crossed", header.featureCrossed],
+    ["Inspection Date", header.inspectionDate],
+    ["Inspected By", header.inspectors],
+    ["Inspection Type(s)", header.inspectionType],
+    ["Report Generated", now],
+  ];
+  const coverRows = coverFields
+    .filter(([, v]) => v)
+    .map(([label, value]) =>
+      `<tr>
+        <td style="padding:5px 16px 5px 0;color:#6b7280;white-space:nowrap;font-weight:600;font-size:11px">${esc(label)}</td>
+        <td style="padding:5px 0;font-size:11px">${esc(value)}</td>
+      </tr>`
+    )
+    .join("");
+
+  const statsBlock = `
+    <div class="stats">
+      <div class="stat"><div class="val">${defects.length}</div><div class="lbl">Total Defects</div></div>
+      <div class="stat"><div class="val" style="color:#ef4444">${cs4}</div><div class="lbl">CS4 Defects</div></div>
+      <div class="stat"><div class="val" style="color:#f97316">${critical}</div><div class="lbl">Critical Findings</div></div>
+      <div class="stat"><div class="val" style="color:#ca8a04">${needsVerify}</div><div class="lbl">Needs Verification</div></div>
+    </div>`;
+
+  // ── 2. FOLLOW-UP ACTIONS ────────────────────────────────────────────────────
+  const fuaDefects = defects.filter((d) => d.isCritical || d.isMaintenance);
+  const fuaPhotoNums = new Map<string, number[]>();
+  for (const d of fuaDefects) {
+    const nums: number[] = [];
+    for (const _p of (d.photos ?? [])) { globalPhotoIdx++; nums.push(globalPhotoIdx); }
+    fuaPhotoNums.set(d.id, nums);
+  }
+
+  const fuaSection = fuaDefects.length === 0 ? "" : `
+    <h2>Bridge Inspection Follow-Up Actions</h2>
+    ${fuaDefects.map((d) => {
+      const typeLabel = d.isCritical ? "&#9888; Critical Finding" : "&#128295; Maintenance Item";
+      const typeColor = d.isCritical ? "#ef4444" : "#f97316";
+      const nums = fuaPhotoNums.get(d.id) ?? [];
+      const fuaPhotos = (d.photos ?? []).map((p, i) => {
+        const num = nums[i];
+        return `<div style="margin-top:12px;page-break-inside:avoid">
+          <div style="font-size:11px;font-weight:700;margin-bottom:4px">PHOTO ${num}</div>
+          <div style="font-size:10px;color:#64748b;margin-bottom:4px">
+            ${esc(d.element)} &mdash; ${esc(d.defect)}
+            ${p.description ? ` &nbsp;&middot;&nbsp; ${esc(p.description)}` : ""}
+            ${p.heading != null ? ` &nbsp;&middot;&nbsp; ${esc(headingLabel(p.heading))}` : ""}
+          </div>
+          ${photoImgCell(p, num)}
+        </div>`;
+      }).join("");
+
+      return `<div style="margin-bottom:24px;page-break-inside:avoid">
+        <p style="font-size:12px;font-weight:700;color:${typeColor};margin-bottom:8px">${typeLabel}</p>
+        <table style="border-collapse:collapse;width:100%;max-width:640px;font-size:11px">
+          <tr><td style="padding:4px 16px 4px 0;color:#6b7280;font-weight:600;white-space:nowrap">Bridge Component</td><td style="padding:4px 0">${esc(d.element)}</td></tr>
+          <tr><td style="padding:4px 16px 4px 0;color:#6b7280;font-weight:600;white-space:nowrap">Defect Type</td><td style="padding:4px 0">${esc(d.defect)}</td></tr>
+          <tr><td style="padding:4px 16px 4px 0;color:#6b7280;font-weight:600;white-space:nowrap">Condition State</td><td style="padding:4px 0;font-weight:700;color:${CS_COLORS[d.cs] ?? "#000"}">${d.cs}</td></tr>
+          <tr><td style="padding:4px 16px 4px 0;color:#6b7280;font-weight:600;white-space:nowrap">Location</td><td style="padding:4px 0">${esc(d.location)}</td></tr>
+          ${d.locationDesc ? `<tr><td style="padding:4px 16px 4px 0;color:#6b7280;font-weight:600;white-space:nowrap">Description / Notes</td><td style="padding:4px 0">${esc(d.locationDesc)}</td></tr>` : ""}
+          <tr><td style="padding:4px 16px 4px 0;color:#6b7280;font-weight:600;white-space:nowrap">Recommendation</td><td style="padding:4px 0">&nbsp;</td></tr>
+        </table>
+        ${fuaPhotos}
+      </div>`;
+    }).join("")}`;
+
+  // ── 3. LOAD POSTING INFORMATION ─────────────────────────────────────────────
+  const LOAD_CODES = ["58", "59", "60", "62"];
+  const loadRatings = nbiRatings.filter((n) => LOAD_CODES.some((c) => n.item.includes(c)));
+  const loadRows = loadRatings.map((n) => {
+    const sub = n.subComponents[0];
+    return `<tr>
+      <td style="padding:5px 8px">${esc(n.item)}</td>
+      <td style="padding:5px 8px">${esc(n.description)}</td>
+      <td style="padding:5px 8px;text-align:center;font-weight:700">${esc(sub?.rating ?? "—")}</td>
+      <td style="padding:5px 8px">${esc(sub?.comments ?? "")}</td>
+    </tr>`;
+  }).join("");
+
+  const loadSection = `
+    <h2>Load Posting Information</h2>
+    ${loadRatings.length > 0
+      ? `<table style="border-collapse:collapse;width:100%">
+           <thead><tr style="background:#f9fafb">
+             <th style="padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;color:#6b7280">Item</th>
+             <th style="padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;color:#6b7280">Description</th>
+             <th style="padding:6px 8px;text-align:center;font-size:10px;text-transform:uppercase;color:#6b7280">Rating</th>
+             <th style="padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;color:#6b7280">Comments</th>
+           </tr></thead>
+           <tbody>${loadRows}</tbody>
+         </table>`
+      : `<p style="color:#6b7280;font-style:italic;font-size:11px">N/A &mdash; No deck, superstructure, substructure, or culvert ratings recorded.</p>`
+    }`;
+
+  // ── 4. BRIDGE INSPECTION RECORD (NBI) ───────────────────────────────────────
+  const nbiRows = nbiRatings.map((n) => {
+    const sub = n.subComponents[0];
+    return `<tr>
+      <td style="padding:5px 8px">${esc(n.item)}</td>
+      <td style="padding:5px 8px">${esc(n.description)}</td>
+      <td style="padding:5px 8px;text-align:center;font-weight:700">${esc(sub?.rating ?? "—")}</td>
+      <td style="padding:5px 8px">${esc(sub?.comments ?? "")}</td>
+    </tr>`;
+  }).join("");
+
+  const nbiSection = nbiRatings.length === 0 ? "" : `
+    <h2>Bridge Inspection Record</h2>
+    <table style="border-collapse:collapse;width:100%">
+      <thead><tr style="background:#f9fafb">
+        <th style="padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;color:#6b7280">Item</th>
+        <th style="padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;color:#6b7280">Description</th>
+        <th style="padding:6px 8px;text-align:center;font-size:10px;text-transform:uppercase;color:#6b7280">Rating</th>
+        <th style="padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;color:#6b7280">Comments</th>
+      </tr></thead>
+      <tbody>${nbiRows}</tbody>
+    </table>`;
+
+  // ── 5. DEFECT RECORDS BY LOCATION ───────────────────────────────────────────
   const locations = sortedLocations(defects);
 
-  const nbiRows = nbiRatings
-    .map((n) => {
-      const sub = n.subComponents[0];
+  const defectPhotoNums = new Map<string, number[]>();
+  for (const d of defects) {
+    if (fuaPhotoNums.has(d.id)) {
+      defectPhotoNums.set(d.id, fuaPhotoNums.get(d.id)!);
+    } else {
+      const nums: number[] = [];
+      for (const _p of (d.photos ?? [])) { globalPhotoIdx++; nums.push(globalPhotoIdx); }
+      defectPhotoNums.set(d.id, nums);
+    }
+  }
+
+  const defectSections = locations.map((loc) => {
+    const locDefects = defects.filter((d) => d.location === loc);
+    const rows = locDefects.map((d) => {
+      const flags = [
+        d.isCritical ? `<span style="color:#ef4444">&#9888; Critical</span>` : "",
+        d.isMaintenance ? `<span style="color:#f97316">&#128295; Maint</span>` : "",
+        d.needsVerification ? `<span style="color:#ca8a04">&#10003; Verify</span>` : "",
+        d.isLegacy ? `<span style="color:#94a3b8">Legacy</span>` : "",
+      ].filter(Boolean).join(" &nbsp;");
+
+      const photos = d.photos ?? [];
+      const nums = defectPhotoNums.get(d.id) ?? [];
+      const photoBlock = photos.length
+        ? `<tr><td colspan="7" style="padding:8px 12px 12px 24px;background:#f8fafc">
+            <strong style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#64748b">Photos (${photos.length})</strong>
+            <table style="width:100%;margin-top:6px;border-collapse:collapse;font-size:10px">
+              <tr style="background:#e2e8f0">
+                <th style="padding:4px 8px;text-align:left">#</th>
+                <th style="padding:4px 8px;text-align:left">Description</th>
+                <th style="padding:4px 8px;text-align:left">Direction</th>
+                <th style="padding:4px 8px;text-align:left">Image</th>
+              </tr>
+              ${photos.map((p, i) => `<tr>
+                <td style="padding:4px 8px;vertical-align:top">PHOTO ${nums[i] ?? (i + 1)}</td>
+                <td style="padding:4px 8px;vertical-align:top">${esc(p.description || "—")}</td>
+                <td style="padding:4px 8px;vertical-align:top;white-space:nowrap">${p.heading != null ? headingLabel(p.heading) : "—"}</td>
+                <td style="padding:4px 8px;vertical-align:top">${photoImgCell(p, nums[i] ?? (i + 1))}</td>
+              </tr>`).join("")}
+            </table>
+          </td></tr>`
+        : "";
+
       return `<tr>
-        <td style="padding:5px 8px">${esc(n.item)}</td>
-        <td style="padding:5px 8px">${esc(n.description)}</td>
-        <td style="padding:5px 8px;text-align:center;font-weight:700">${esc(sub?.rating ?? "—")}</td>
-        <td style="padding:5px 8px">${esc(sub?.comments ?? "")}</td>
-      </tr>`;
-    })
-    .join("");
+        <td style="padding:6px 8px;white-space:nowrap;font-size:11px">
+          <span style="color:#94a3b8">${esc(d.elementId)}</span>
+          <span style="font-weight:500"> &mdash; ${esc(d.element)}</span>
+        </td>
+        <td style="padding:6px 8px;font-size:11px">${esc(d.defect)}</td>
+        <td style="padding:6px 8px;text-align:center;font-weight:700;color:${CS_COLORS[d.cs] ?? "#000"};font-size:11px">${d.cs}</td>
+        <td style="padding:6px 8px;text-align:center;font-size:11px">${esc(d.quantityValue || d.quantity)}</td>
+        <td style="padding:6px 8px;font-size:11px;color:#64748b">${esc(d.locationDesc || "")}</td>
+        <td style="padding:6px 8px;font-size:10px">${flags || "—"}</td>
+        <td style="padding:6px 8px;text-align:center">
+          ${photos.length ? `<span style="background:#dbeafe;color:#1d4ed8;padding:2px 7px;border-radius:9999px;font-size:10px">${photos.length}</span>` : "—"}
+        </td>
+      </tr>${photoBlock}`;
+    }).join("");
 
-  const defectSections = locations
-    .map((loc) => {
-      const locDefects = defects.filter((d) => d.location === loc);
-      const rows = locDefects
-        .map((d) => {
-          const flags = [
-            d.isCritical ? `<span style="color:#ef4444">&#9888; Critical</span>` : "",
-            d.isMaintenance ? `<span style="color:#f97316">&#128295; Maint</span>` : "",
-            d.needsVerification ? `<span style="color:#ca8a04">&#10003; Verify</span>` : "",
-            d.isLegacy ? `<span style="color:#94a3b8">Legacy</span>` : "",
-          ].filter(Boolean).join(" &nbsp;");
+    return `
+      <h3 style="margin:24px 0 8px;font-size:13px;font-weight:600;color:#374151;border-bottom:1px solid #e5e7eb;padding-bottom:4px">${esc(loc)}</h3>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:4px">
+        <thead><tr style="background:#f9fafb">
+          <th style="padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280">Element</th>
+          <th style="padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280">Defect</th>
+          <th style="padding:6px 8px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280">CS</th>
+          <th style="padding:6px 8px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280">Qty</th>
+          <th style="padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280">Notes</th>
+          <th style="padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280">Flags</th>
+          <th style="padding:6px 8px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280">Photos</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }).join("");
 
-          const photos = d.photos ?? [];
-          const photoBlock = photos.length
-            ? `<tr><td colspan="7" style="padding:8px 12px 12px 24px;background:#f8fafc">
-                <strong style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#64748b">
-                  Photos (${photos.length})
-                </strong>
-                <table style="width:100%;margin-top:6px;border-collapse:collapse;font-size:10px">
-                  <tr style="background:#e2e8f0">
-                    <th style="padding:4px 8px;text-align:left">#</th>
-                    <th style="padding:4px 8px;text-align:left">Description</th>
-                    <th style="padding:4px 8px;text-align:left">Direction</th>
-                    <th style="padding:4px 8px;text-align:left">Image</th>
-                  </tr>
-                  ${photos
-                    .map((p, i) => {
-                      const accessible =
-                        p.uri?.startsWith("http://") ||
-                        p.uri?.startsWith("https://") ||
-                        p.uri?.startsWith("data:");
-                      const imgCell = accessible
-                        ? `<img src="${esc(p.uri)}" style="max-width:200px;max-height:130px;border-radius:4px;display:block" onerror="this.replaceWith(document.createTextNode('(image unavailable)'))" />`
-                        : `<span style="color:#94a3b8;font-style:italic">Stored on device</span>`;
-                      return `<tr>
-                        <td style="padding:4px 8px;vertical-align:top">${i + 1}</td>
-                        <td style="padding:4px 8px;vertical-align:top">${esc(p.description || "—")}</td>
-                        <td style="padding:4px 8px;vertical-align:top;white-space:nowrap">${p.heading != null ? headingLabel(p.heading) : "—"}</td>
-                        <td style="padding:4px 8px;vertical-align:top">${imgCell}</td>
-                      </tr>`;
-                    })
-                    .join("")}
-                </table>
-              </td></tr>`
-            : "";
+  // ── 6. PHOTOS ────────────────────────────────────────────────────────────────
+  type PhotoEntry = { photo: { uri?: string; description?: string; heading?: number | null }; element: string; defect: string; num: number };
+  const photoInventory: PhotoEntry[] = [];
+  let allPhotoIdx = 0;
+  for (const d of defects) {
+    for (const p of (d.photos ?? [])) {
+      allPhotoIdx++;
+      photoInventory.push({ photo: p, element: d.element, defect: d.defect, num: allPhotoIdx });
+    }
+  }
 
-          return `<tr>
-            <td style="padding:6px 8px;white-space:nowrap;font-size:11px">
-              <span style="color:#94a3b8">${esc(d.elementId)}</span>
-              <span style="font-weight:500"> — ${esc(d.element)}</span>
-            </td>
-            <td style="padding:6px 8px;font-size:11px">${esc(d.defect)}</td>
-            <td style="padding:6px 8px;text-align:center;font-weight:700;color:${CS_COLORS[d.cs] ?? "#000"};font-size:11px">${d.cs}</td>
-            <td style="padding:6px 8px;text-align:center;font-size:11px">${esc(d.quantityValue || d.quantity)}</td>
-            <td style="padding:6px 8px;font-size:11px;color:#64748b">${esc(d.locationDesc || "")}</td>
-            <td style="padding:6px 8px;font-size:10px">${flags || "—"}</td>
-            <td style="padding:6px 8px;text-align:center">
-              ${photos.length ? `<span style="background:#dbeafe;color:#1d4ed8;padding:2px 7px;border-radius:9999px;font-size:10px">${photos.length}</span>` : "—"}
-            </td>
-          </tr>${photoBlock}`;
-        })
-        .join("");
+  const photosSection = photoInventory.length === 0 ? "" : `
+    <h2>Photos</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px">
+      ${photoInventory.map((e) => {
+        const dir = e.photo.heading != null ? headingLabel(e.photo.heading) : "";
+        const desc = [e.photo.description, dir].filter(Boolean).join(", ");
+        return `<div style="page-break-inside:avoid;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden">
+          <div style="padding:10px 12px;background:#f9fafb;border-bottom:1px solid #e5e7eb">
+            <div style="font-size:11px;font-weight:700">PHOTO ${e.num}</div>
+            <div style="font-size:10px;color:#64748b;margin-top:1px">${esc(e.element)} &mdash; ${esc(e.defect)}</div>
+            ${desc ? `<div style="font-size:10px;color:#6b7280;margin-top:1px">${esc(desc)}</div>` : ""}
+          </div>
+          <div style="padding:10px 12px">
+            ${photoImgCell(e.photo, e.num)}
+          </div>
+        </div>`;
+      }).join("")}
+    </div>`;
 
-      return `
-        <h3 style="margin:24px 0 8px;font-size:13px;font-weight:600;color:#374151;border-bottom:1px solid #e5e7eb;padding-bottom:4px">
-          ${esc(loc)}
-        </h3>
-        <table style="width:100%;border-collapse:collapse;margin-bottom:4px">
-          <thead>
-            <tr style="background:#f9fafb">
-              <th style="padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280">Element</th>
-              <th style="padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280">Defect</th>
-              <th style="padding:6px 8px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280">CS</th>
-              <th style="padding:6px 8px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280">Qty</th>
-              <th style="padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280">Notes</th>
-              <th style="padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280">Flags</th>
-              <th style="padding:6px 8px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280">Photos</th>
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>`;
-    })
-    .join("");
-
+  // ── IMPORT AUDIT (appended at end if present) ────────────────────────────────
   const importBlock = importSummary
     ? `<div style="margin-top:36px;padding-top:24px;border-top:2px solid #e5e7eb">
         <h2 style="font-size:15px;font-weight:700;color:#1f2937;margin-bottom:4px">Previous Report Import Audit</h2>
@@ -262,55 +415,15 @@ function generatePrintHtml(data: SessionData): string {
   </div>
   <div class="content">
     <h1>Bridge Inspection Report</h1>
-    <p class="meta">Structure: <strong>${esc(structNum)}</strong> &nbsp;&middot;&nbsp; Generated: ${esc(now)} &nbsp;&middot;&nbsp; ${defects.length} defect records</p>
-
-    <div class="stats">
-      <div class="stat"><div class="val">${defects.length}</div><div class="lbl">Total Defects</div></div>
-      <div class="stat"><div class="val" style="color:#ef4444">${cs4}</div><div class="lbl">CS4 Defects</div></div>
-      <div class="stat"><div class="val" style="color:#f97316">${critical}</div><div class="lbl">Critical Findings</div></div>
-      <div class="stat"><div class="val" style="color:#ca8a04">${needsVerify}</div><div class="lbl">Needs Verification</div></div>
-    </div>
-
-    <h2>Condition State Distribution</h2>
-    <table style="max-width:320px;border-collapse:collapse">
-      <thead><tr style="background:#f9fafb">
-        <th style="padding:6px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:#6b7280">State</th>
-        <th style="padding:6px 12px;text-align:right;font-size:10px;text-transform:uppercase;color:#6b7280">Count</th>
-        <th style="padding:6px 12px;text-align:right;font-size:10px;text-transform:uppercase;color:#6b7280">Share</th>
-      </tr></thead>
-      <tbody>
-        ${["CS1","CS2","CS3","CS4"]
-          .map((cs) => {
-            const n = defects.filter((d) => d.cs === cs).length;
-            const pct = defects.length ? Math.round((n / defects.length) * 100) : 0;
-            return `<tr>
-              <td style="padding:5px 12px;font-weight:700;color:${CS_COLORS[cs]}">${cs}</td>
-              <td style="padding:5px 12px;text-align:right">${n}</td>
-              <td style="padding:5px 12px;text-align:right;color:#6b7280">${pct}%</td>
-            </tr>`;
-          })
-          .join("")}
-      </tbody>
-    </table>
-
-    ${
-      nbiRatings.length
-        ? `<h2>NBI Ratings</h2>
-           <table style="border-collapse:collapse">
-             <thead><tr style="background:#f9fafb">
-               <th style="padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;color:#6b7280">Item</th>
-               <th style="padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;color:#6b7280">Description</th>
-               <th style="padding:6px 8px;text-align:center;font-size:10px;text-transform:uppercase;color:#6b7280">Rating</th>
-               <th style="padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;color:#6b7280">Comments</th>
-             </tr></thead>
-             <tbody>${nbiRows}</tbody>
-           </table>`
-        : ""
-    }
-
+    <p class="meta">Generated: ${esc(now)} &nbsp;&middot;&nbsp; ${defects.length} defect records</p>
+    <table style="border-collapse:collapse;margin-bottom:4px">${coverRows}</table>
+    ${statsBlock}
+    ${fuaSection}
+    ${loadSection}
+    ${nbiSection}
     <h2>Defect Records by Location</h2>
     ${defects.length === 0 ? `<p style="color:#6b7280;font-style:italic">No defect records in this session.</p>` : defectSections}
-
+    ${photosSection}
     ${importBlock}
   </div>
 </body>
@@ -722,7 +835,7 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
     if (!sessionData) return;
     setExporting("pdf");
     try {
-      const html = generatePrintHtml(sessionData);
+      const html = generatePrintHtml(sessionData, reportHeader);
       const blob = new Blob([html], { type: "text/html;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const win = window.open(url, "_blank", "noopener");
@@ -739,7 +852,7 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
     } finally {
       setExporting(null);
     }
-  }, [sessionData]);
+  }, [sessionData, reportHeader]);
 
   const exportRedlinePdf = useCallback(async () => {
     if (!sessionData?.structureNumber) return;
