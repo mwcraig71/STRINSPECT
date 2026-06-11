@@ -132,11 +132,12 @@ export interface StandardPhotoSlotLike {
 
 export function collectPhotosFromStandardSlots(
   slots: StandardPhotoSlotLike[],
+  idPrefix = "std_",
 ): PhotoToUpload[] {
   return slots
     .filter((s) => !!s.photoUri)
     .map((s) => ({
-      id: `std_${s.slotId}`,
+      id: `${idPrefix}${s.slotId}`,
       uri: s.photoUri as string,
       description: JSON.stringify({
         directionTags: s.directionTags,

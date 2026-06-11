@@ -1969,6 +1969,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
       photos: [
         ...collectPhotosFromDefects(savedDefects as unknown[]),
         ...collectPhotosFromStandardSlots(standardPhotos),
+        ...collectPhotosFromStandardSlots(extraPhotos, "extra_"),
       ],
     });
 
@@ -2023,11 +2024,12 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         }
       }
 
-      // Upload photos (best-effort — non-fatal if some fail) — includes defect and standard photos
+      // Upload photos (best-effort — non-fatal if some fail) — includes defect, standard, and extra photos
       if (Platform.OS !== "web" && apiUrl) {
         const photos = [
           ...collectPhotosFromDefects(savedDefects as unknown[]),
           ...collectPhotosFromStandardSlots(standardPhotos),
+          ...collectPhotosFromStandardSlots(extraPhotos, "extra_"),
         ];
         uploadPhotos(photos, sn, apiUrl, apiKey).catch(() => {});
       }
@@ -2049,7 +2051,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
       setPendingSyncCount(qLen);
       throw err; // re-throw so SettingsModal can display error state
     }
-  }, [structureNumber, savedDefects, nbiRatings, importSummary, pdfAnnotations, importedPdfPath, pdfUploaded, finalizedAt, standardPhotos]);
+  }, [structureNumber, savedDefects, nbiRatings, importSummary, pdfAnnotations, importedPdfPath, pdfUploaded, finalizedAt, standardPhotos, extraPhotos]);
 
   const acknowledgeUcChannelOverride = useCallback(() => {
     setUcChannelOverrideAcknowledgedState(true);
