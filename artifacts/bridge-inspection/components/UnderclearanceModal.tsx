@@ -40,10 +40,25 @@ export function UnderclearanceModal({ inline = false }: { inline?: boolean }) {
 
   const d = underclearanceData;
   const [scrollEnabled, setScrollEnabled] = useState(true);
+  // step 1 = selecting first reference code, step 2 = selecting second
   const [refPicker, setRefPicker] = useState<{
     entryId: string;
     key: UcMeasureKey;
+    step: 1 | 2;
   } | null>(null);
+
+  // Parse "G-H" → ["G","H"], "G" → ["G",""], "" → ["",""]
+  const parseRefer = (refer: string): [string, string] => {
+    const dash = refer.indexOf("-");
+    if (dash >= 0) return [refer.slice(0, dash), refer.slice(dash + 1)];
+    return [refer, ""];
+  };
+
+  // Build "G-H" or "G" or "" from two codes
+  const buildRefer = (r1: string, r2: string): string => {
+    if (r1 && r2) return `${r1}-${r2}`;
+    return r1 || r2;
+  };
 
   const hasImported = d.entries.some((e) => e.isImported);
   const hasNeedsVerification = d.entries.some((e) => e.needsVerification);
@@ -81,6 +96,8 @@ export function UnderclearanceModal({ inline = false }: { inline?: boolean }) {
 
   const renderReferCell = (entryId: string, key: UcMeasureKey, m: UcMeasure) => {
     const open = refPicker?.entryId === entryId && refPicker?.key === key;
+    const [r1, r2] = parseRefer(m.refer);
+    const display = r1 && r2 ? `${r1}-${r2}` : r1 || "—";
     return (
       <TouchableOpacity
         style={[
@@ -88,12 +105,11 @@ export function UnderclearanceModal({ inline = false }: { inline?: boolean }) {
           styles.referCell,
           { backgroundColor: c.secondary, borderColor: open ? "#0f766e" : c.border },
         ]}
-        onPress={() => setRefPicker(open ? null : { entryId, key })}
+        onPress={() => setRefPicker(open ? null : { entryId, key, step: 1 })}
       >
         <Text style={[styles.referCellText, { color: m.refer ? c.foreground : c.mutedForeground }]}>
-          {m.refer || "—"}
+          {display}
         </Text>
-        <Feather name="chevron-down" size={10} color={c.mutedForeground} />
       </TouchableOpacity>
     );
   };
@@ -268,31 +284,86 @@ export function UnderclearanceModal({ inline = false }: { inline?: boolean }) {
                         {renderReferCell(entry.id, row.key, m)}
                         <Text style={[styles.measureItem, { color: c.mutedForeground }]}>{row.itemNo}</Text>
                       </View>
-                      {pickerOpen && (
+                      {pickerOpen && (() => {
+                        const [ref1, ref2] = parseRefer(m.refer);
+                        const activeStep = refPicker?.step ?? 1;
+                        return (
                         <View style={[styles.refDropdown, { backgroundColor: c.card, borderColor: c.border }]}>
                           <Text style={[styles.refDropdownTitle, { color: c.mutedForeground }]}>
                             {row.label} — Reference Feature
                           </Text>
+
+                          {/* Slot display: Ref 1 — Ref 2 */}
+                          <View style={styles.refSlotRow}>
+                            <TouchableOpacity
+                              style={[styles.refSlot, activeStep === 1 && styles.refSlotActive, { borderColor: activeStep === 1 ? "#0f766e" : c.border }]}
+                              onPress={() => setRefPicker(refPicker ? { ...refPicker, step: 1 } : null)}
+                            >
+                              <Text style={[styles.refSlotLabel, { color: c.mutedForeground }]}>Ref 1</Text>
+                              <Text style={[styles.refSlotValue, { color: ref1 ? "#0f766e" : c.mutedForeground }]}>
+                                {ref1 || "—"}
+                              </Text>
+                            </TouchableOpacity>
+                            <Text style={[styles.refSlotDash, { color: c.mutedForeground }]}>—</Text>
+                            <TouchableOpacity
+                              style={[styles.refSlot, activeStep === 2 && styles.refSlotActive, { borderColor: activeStep === 2 ? "#0891b2" : c.border }]}
+                              onPress={() => setRefPicker(refPicker ? { ...refPicker, step: 2 } : null)}
+                            >
+                              <Text style={[styles.refSlotLabel, { color: c.mutedForeground }]}>Ref 2</Text>
+                              <Text style={[styles.refSlotValue, { color: ref2 ? "#0891b2" : c.mutedForeground }]}>
+                                {ref2 || "—"}
+                              </Text>
+                            </TouchableOpacity>
+                            {m.refer ? (
+                              <TouchableOpacity
+                                style={styles.refClearBtn}
+                                onPress={() => { updateMeasure(entry.id, row.key, { refer: "" }); setRefPicker(null); }}
+                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                              >
+                                <Feather name="x" size={12} color="#dc2626" />
+                              </TouchableOpacity>
+                            ) : null}
+                          </View>
+
+                          <Text style={[styles.refStepHint, { color: c.mutedForeground }]}>
+                            {activeStep === 1 ? "Tap to set first reference →" : "Tap to set second reference"}
+                          </Text>
+
+                          {/* Options grid */}
                           <View style={styles.refOptions}>
                             {UC_REFERENCE_FEATURES.map((r) => {
-                              const selected = m.refer === r.code;
+                              const isRef1 = r.code === ref1;
+                              const isRef2 = r.code === ref2;
+                              const bg = isRef1 ? "#0f766e" : isRef2 ? "#0891b2" : c.secondary;
+                              const borderColor = isRef1 ? "#0f766e" : isRef2 ? "#0891b2" : c.border;
+                              const textColor = (isRef1 || isRef2) ? "#fff" : c.foreground;
+                              const codeColor = (isRef1 || isRef2) ? "#fff" : "#0f766e";
                               return (
                                 <TouchableOpacity
                                   key={r.code}
-                                  style={[
-                                    styles.refOption,
-                                    {
-                                      backgroundColor: selected ? "#0f766e" : c.secondary,
-                                      borderColor: selected ? "#0f766e" : c.border,
-                                    },
-                                  ]}
+                                  style={[styles.refOption, { backgroundColor: bg, borderColor }]}
                                   onPress={() => {
-                                    updateMeasure(entry.id, row.key, { refer: r.code });
-                                    setRefPicker(null);
+                                    let newR1 = ref1, newR2 = ref2;
+                                    if (activeStep === 1) {
+                                      newR1 = r.code === ref1 ? "" : r.code;
+                                      // Auto-advance to step 2 when ref1 is set
+                                      const newRefer = buildRefer(newR1, newR2);
+                                      updateMeasure(entry.id, row.key, { refer: newRefer });
+                                      if (newR1) setRefPicker(refPicker ? { ...refPicker, step: 2 } : null);
+                                    } else {
+                                      newR2 = r.code === ref2 ? "" : r.code;
+                                      const newRefer = buildRefer(newR1, newR2);
+                                      updateMeasure(entry.id, row.key, { refer: newRefer });
+                                      if (newR2) setRefPicker(null);
+                                    }
                                   }}
                                 >
-                                  <Text style={[styles.refOptionCode, { color: selected ? "#fff" : "#0f766e" }]}>{r.code}</Text>
-                                  <Text style={[styles.refOptionLabel, { color: selected ? "#fff" : c.foreground }]} numberOfLines={1}>
+                                  <View style={styles.refOptionCodeWrap}>
+                                    <Text style={[styles.refOptionCode, { color: codeColor }]}>{r.code}</Text>
+                                    {isRef1 && <View style={[styles.refBadge, { backgroundColor: "rgba(255,255,255,0.3)" }]}><Text style={styles.refBadgeText}>1</Text></View>}
+                                    {isRef2 && <View style={[styles.refBadge, { backgroundColor: "rgba(255,255,255,0.3)" }]}><Text style={styles.refBadgeText}>2</Text></View>}
+                                  </View>
+                                  <Text style={[styles.refOptionLabel, { color: textColor }]} numberOfLines={1}>
                                     {r.label}
                                   </Text>
                                 </TouchableOpacity>
@@ -300,7 +371,8 @@ export function UnderclearanceModal({ inline = false }: { inline?: boolean }) {
                             })}
                           </View>
                         </View>
-                      )}
+                        );
+                      })()}
                     </View>
                   );
                 })}
@@ -453,19 +525,30 @@ const styles = StyleSheet.create({
   measureHeaderRow: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 2 },
   measureHeadLabel: { flex: 1, fontSize: 8, fontWeight: "800", textTransform: "uppercase" },
   measureHeadData: { width: 72, fontSize: 8, fontWeight: "800", textTransform: "uppercase", textAlign: "center" },
-  measureHeadRefer: { width: 48, fontSize: 8, fontWeight: "800", textTransform: "uppercase", textAlign: "center" },
+  measureHeadRefer: { width: 56, fontSize: 8, fontWeight: "800", textTransform: "uppercase", textAlign: "center" },
   measureHeadItem: { width: 34, fontSize: 8, fontWeight: "800", textTransform: "uppercase", textAlign: "center" },
   measureRow: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 4, borderBottomWidth: StyleSheet.hairlineWidth },
   measureLabel: { flex: 1, fontSize: 11, fontWeight: "700" },
   measureData: { width: 72, borderWidth: 1, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 6, fontSize: 11, fontWeight: "700", textAlign: "center" },
-  measureRefer: { width: 48, borderWidth: 1, borderRadius: 6, paddingHorizontal: 4, paddingVertical: 6, fontSize: 11, fontWeight: "700", textAlign: "center" },
-  referCell: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 1, paddingHorizontal: 1 },
-  referCellText: { fontSize: 11, fontWeight: "800" },
+  measureRefer: { width: 56, borderWidth: 1, borderRadius: 6, paddingHorizontal: 4, paddingVertical: 6, fontSize: 11, fontWeight: "700", textAlign: "center" },
+  referCell: { flexDirection: "row", alignItems: "center", justifyContent: "center" },
+  referCellText: { fontSize: 10, fontWeight: "800" },
   refDropdown: { borderWidth: 1, borderRadius: 8, padding: 8, gap: 6, marginTop: 2, marginBottom: 4 },
   refDropdownTitle: { fontSize: 9, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.5 },
+  refSlotRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  refSlot: { flex: 1, borderWidth: 1.5, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, alignItems: "center" },
+  refSlotActive: { backgroundColor: "rgba(15,118,110,0.06)" },
+  refSlotLabel: { fontSize: 8, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.4 },
+  refSlotValue: { fontSize: 18, fontWeight: "900", marginTop: 2 },
+  refSlotDash: { fontSize: 16, fontWeight: "900" },
+  refStepHint: { fontSize: 9, fontWeight: "700", textAlign: "center" },
+  refClearBtn: { padding: 8, borderRadius: 6, borderWidth: 1, borderColor: "#fca5a5", backgroundColor: "#fef2f2" },
   refOptions: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   refOption: { flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 6, width: "47%" },
-  refOptionCode: { fontSize: 10, fontWeight: "900", minWidth: 20 },
+  refOptionCodeWrap: { flexDirection: "row", alignItems: "center", gap: 3, minWidth: 22 },
+  refOptionCode: { fontSize: 10, fontWeight: "900" },
+  refBadge: { borderRadius: 3, paddingHorizontal: 3, paddingVertical: 1 },
+  refBadgeText: { fontSize: 7, fontWeight: "900", color: "#fff" },
   refOptionLabel: { fontSize: 10, fontWeight: "600", flex: 1 },
   measureItem: { width: 34, fontSize: 10, fontWeight: "800", textAlign: "center" },
   signedBox: { borderWidth: 2, borderRadius: 10, padding: 12, gap: 8, marginTop: 4 },
