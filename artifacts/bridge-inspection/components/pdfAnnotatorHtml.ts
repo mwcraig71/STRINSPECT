@@ -18,7 +18,7 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
 #page-info{color:#94a3b8;font-size:12px;font-weight:700;flex:1}
 .top-btn{background:#1e293b;border:1.5px solid #334155;border-radius:8px;color:#94a3b8;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap}
 .top-btn.save{background:#0284c7;border-color:#0369a1;color:#fff}
-#scroll-area{position:absolute;top:calc(48px + env(safe-area-inset-top));bottom:100px;left:0;right:0;overflow-y:auto;overflow-x:auto;-webkit-overflow-scrolling:auto;background:#1e293b}
+#scroll-area{position:absolute;top:calc(48px + env(safe-area-inset-top));bottom:140px;left:0;right:0;overflow-y:auto;overflow-x:auto;-webkit-overflow-scrolling:auto;background:#1e293b}
 #scroll-area.drawing{overflow:hidden}
 .page-wrap{position:relative;margin:12px auto;display:block;box-shadow:0 4px 24px rgba(0,0,0,.6)}
 .pdf-canvas{display:block;width:100%}
@@ -44,6 +44,25 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
 #err-txt{display:none;color:#f87171;font-size:13px;text-align:center;padding:0 24px;max-width:300px}
 #text-input-wrap{display:none;position:fixed;z-index:300;background:#1e293b;border:2px solid #38bdf8;border-radius:8px;padding:6px}
 #text-input{background:transparent;border:none;outline:none;font-size:16px;color:#fff;min-width:120px;max-width:220px}
+#shortcuts-row{display:flex;gap:6px;align-items:center;overflow-x:auto;-webkit-overflow-scrolling:auto;scrollbar-width:none;min-height:34px;padding-bottom:1px}
+#shortcuts-row::-webkit-scrollbar{display:none}
+.sc-chip{background:#1e293b;border:1.5px solid #4c1d95;border-radius:16px;color:#c4b5fd;padding:5px 11px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0;-webkit-user-select:none;user-select:none}
+.sc-chip:active{opacity:.65}
+#btn-sc-browse{background:#7c3aed;border:none;border-radius:16px;color:#fff;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;-webkit-user-select:none;user-select:none;margin-left:auto}
+#sc-modal{position:fixed;inset:0;z-index:500;background:#0f172a;flex-direction:column;display:none}
+#sc-modal-hdr{padding:12px 12px 8px;border-bottom:1px solid #334155;display:flex;gap:8px;align-items:center;padding-top:calc(12px + env(safe-area-inset-top))}
+#sc-search{flex:1;background:#1e293b;border:1.5px solid #334155;border-radius:8px;color:#fff;padding:7px 10px;font-size:13px;outline:none}
+#sc-search::placeholder{color:#475569}
+#sc-close-btn{background:#1e293b;border:1.5px solid #334155;border-radius:8px;color:#94a3b8;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0}
+#sc-modal-body{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:4px;padding-bottom:calc(16px + env(safe-area-inset-bottom))}
+.sc-cat-hdr{color:#475569;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:12px 0 4px}
+.sc-cat-hdr:first-child{padding-top:4px}
+.sc-item{background:#1e293b;border:1px solid #334155;border-radius:10px;padding:10px 12px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;cursor:pointer}
+.sc-item:active{opacity:.7}
+.sc-item-txt{color:#e2e8f0;font-size:13px;line-height:1.45;flex:1}
+.sc-star{background:none;border:none;font-size:18px;cursor:pointer;flex-shrink:0;padding:0 2px;line-height:1;color:#475569}
+.sc-star.starred{color:#f59e0b}
+.sc-empty{color:#475569;font-size:13px;text-align:center;padding:40px 0}
 </style>
 </head>
 <body>
@@ -81,6 +100,15 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
       <button class="tbtn" id="btn-zoom-in">&#43;</button>
     </div>
   </div>
+  <div id="shortcuts-row"></div>
+</div>
+
+<div id="sc-modal">
+  <div id="sc-modal-hdr">
+    <input id="sc-search" type="search" placeholder="Search shortcuts&#x2026;" autocomplete="off" autocorrect="off" spellcheck="false">
+    <button id="sc-close-btn">Done</button>
+  </div>
+  <div id="sc-modal-body"></div>
 </div>
 
 <div id="text-input-wrap">
@@ -167,6 +195,11 @@ var zoomLevel = 1.0;
 var ZOOM_STEPS = [0.5,0.75,1.0,1.25,1.5,2.0,2.5,3.0];
 var annScale = 1; // hi-res supersample factor for the annotation canvas (matches RENDER_SCALE)
 
+/* ── Shortcuts state ── */
+var scList = [];
+var scFavorites = [];
+var scInsertIdx = 0;
+
 /* ── RN bridge ── */
 function postRN(msg) {
   try {
@@ -240,6 +273,11 @@ function onMsg(e) {
     if (Array.isArray(data.annotations) && data.annotations.length > 0) {
       annotations = data.annotations;
       initialAnnotationCount = annotations.length;
+    }
+    if (Array.isArray(data.shortcuts)) {
+      scList = data.shortcuts;
+      scFavorites = Array.isArray(data.scFavorites) ? data.scFavorites : [];
+      renderShortcutsRow();
     }
     loadPdf(data.pdfBase64);
   }
@@ -607,6 +645,148 @@ function observePages() {
 }
 
 renderOptRow();
+
+/* ── Shortcuts ── */
+function insertShortcutText(text) {
+  var infoEl = document.getElementById('page-info');
+  var pn = 1;
+  if (infoEl) {
+    var m = infoEl.textContent.match(/Page (\d+)/);
+    if (m) pn = parseInt(m[1], 10);
+  }
+  var pd = pageDimensions[pn] || { w: 600, h: 800 };
+  var area = document.getElementById('scroll-area');
+  var L = pageLayout[pn];
+  var z = zoomLevel || 1;
+  var cx, cy;
+  if (L && area) {
+    var visTop = (area.scrollTop / z) - L.top;
+    cy = Math.max(40, visTop + 50 + scInsertIdx * 30);
+    cx = 24;
+  } else {
+    cy = 60 + scInsertIdx * 30;
+    cx = 24;
+  }
+  cy = Math.min(cy, pd.h - 30);
+  cx = Math.min(cx, pd.w - 100);
+  var fontSize = (penSize * 4 + 10) * 0.25;
+  annotations.push({ type: 'text', page: pn, x: cx, y: cy, text: text, fontSize: fontSize, color: penColor });
+  isDirty = true;
+  scInsertIdx = (scInsertIdx + 1) % 12;
+  redrawPage(pn);
+}
+
+function toggleFavorite(id) {
+  var idx = scFavorites.indexOf(id);
+  if (idx >= 0) {
+    scFavorites = scFavorites.filter(function(f) { return f !== id; });
+  } else {
+    scFavorites = scFavorites.concat([id]);
+  }
+  postRN({ type: 'sc-favorites', ids: scFavorites });
+  renderShortcutsRow();
+  renderScModalBody(document.getElementById('sc-search') ? document.getElementById('sc-search').value : '');
+}
+
+function renderShortcutsRow() {
+  var row = document.getElementById('shortcuts-row');
+  if (!row) return;
+  row.innerHTML = '';
+  var favItems = scList.filter(function(s) { return scFavorites.indexOf(s.id) >= 0; });
+  favItems.forEach(function(s) {
+    var btn = document.createElement('button');
+    btn.className = 'sc-chip';
+    var chipLabel = s.label || (s.text.length > 28 ? s.text.substring(0, 26) + '\u2026' : s.text);
+    btn.textContent = chipLabel;
+    btn.title = s.text;
+    (function(sc) {
+      btn.onclick = function() { insertShortcutText(sc.text); };
+    })(s);
+    row.appendChild(btn);
+  });
+  var browse = document.createElement('button');
+  browse.id = 'btn-sc-browse';
+  browse.textContent = scList.length > 0 ? (scFavorites.length === 0 ? '\u2605 Shortcuts' : '\u2026 More') : '\u2605 Shortcuts';
+  browse.onclick = function() { openScModal(); };
+  row.appendChild(browse);
+}
+
+function openScModal() {
+  var modal = document.getElementById('sc-modal');
+  var searchEl = document.getElementById('sc-search');
+  if (!modal) return;
+  modal.style.display = 'flex';
+  if (searchEl) { searchEl.value = ''; searchEl.focus(); }
+  renderScModalBody('');
+}
+
+function closeScModal() {
+  var modal = document.getElementById('sc-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+function renderScModalBody(q) {
+  var body = document.getElementById('sc-modal-body');
+  if (!body) return;
+  body.innerHTML = '';
+  var query = (q || '').toLowerCase().trim();
+  var cats = {};
+  var catOrder = [];
+  scList.forEach(function(s) {
+    var cat = s.category || 'General';
+    if (!cats[cat]) { cats[cat] = []; catOrder.push(cat); }
+    cats[cat].push(s);
+  });
+  var totalFound = 0;
+  catOrder.forEach(function(cat) {
+    var items = cats[cat].filter(function(s) {
+      if (!query) return true;
+      var inText = s.text.toLowerCase().indexOf(query) >= 0;
+      var inLabel = (s.label || '').toLowerCase().indexOf(query) >= 0;
+      var inCat = cat.toLowerCase().indexOf(query) >= 0;
+      return inText || inLabel || inCat;
+    });
+    if (items.length === 0) return;
+    totalFound += items.length;
+    var catEl = document.createElement('div');
+    catEl.className = 'sc-cat-hdr';
+    catEl.textContent = cat;
+    body.appendChild(catEl);
+    items.forEach(function(s) {
+      var row = document.createElement('div');
+      row.className = 'sc-item';
+      var txt = document.createElement('div');
+      txt.className = 'sc-item-txt';
+      txt.textContent = s.text;
+      var star = document.createElement('button');
+      var isFav = scFavorites.indexOf(s.id) >= 0;
+      star.className = isFav ? 'sc-star starred' : 'sc-star';
+      star.textContent = isFav ? '\u2605' : '\u2606';
+      star.title = isFav ? 'Remove from favorites' : 'Add to favorites';
+      (function(sc, starBtn, txtEl, rowEl) {
+        txtEl.onclick = function() { insertShortcutText(sc.text); closeScModal(); };
+        rowEl.onclick = function(e) { if (e.target !== starBtn) { insertShortcutText(sc.text); closeScModal(); } };
+        starBtn.onclick = function(e) { e.stopPropagation(); toggleFavorite(sc.id); };
+      })(s, star, txt, row);
+      row.appendChild(txt);
+      row.appendChild(star);
+      body.appendChild(row);
+    });
+  });
+  if (totalFound === 0) {
+    var empty = document.createElement('div');
+    empty.className = 'sc-empty';
+    empty.textContent = query ? 'No shortcuts match your search' : 'No shortcuts loaded';
+    body.appendChild(empty);
+  }
+}
+
+document.getElementById('sc-close-btn').onclick = closeScModal;
+document.getElementById('sc-search').addEventListener('input', function() {
+  renderScModalBody(this.value);
+});
+
+renderShortcutsRow();
 </script>
 </body>
 </html>`;

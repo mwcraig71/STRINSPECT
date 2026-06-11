@@ -9,8 +9,12 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { WebView } from "react-native-webview";
 import { getPdfAnnotatorHtml } from "./pdfAnnotatorHtml";
+import { TEXT_SHORTCUTS } from "@/data/textShortcuts";
+
+const SC_FAVORITES_KEY = "@bridge_sc_favorites";
 
 const HTML = getPdfAnnotatorHtml();
 
@@ -28,6 +32,15 @@ export default function PDFAnnotatorModal({ visible, pdfPath, annotations, onSav
   const [loadError, setLoadError] = useState<string | null>(null);
   const [sessionKey, setSessionKey] = useState(0);
   const injectedRef = useRef(false);
+  const [scFavorites, setScFavorites] = useState<string[]>([]);
+
+  useEffect(() => {
+    AsyncStorage.getItem(SC_FAVORITES_KEY).then((raw) => {
+      if (raw) {
+        try { setScFavorites(JSON.parse(raw)); } catch {}
+      }
+    });
+  }, []);
 
   useEffect(() => {
     if (visible) {
@@ -67,21 +80,23 @@ export default function PDFAnnotatorModal({ visible, pdfPath, annotations, onSav
       const existingAnnotations = (annotations ?? []).filter(
         (a) => (a as { type?: string } | null)?.type !== "_meta",
       );
-      const msg = JSON.stringify({ type: "init", pdfBase64: base64Uri, annotations: existingAnnotations });
-      const js = `
-        (function() {
-          var e = new MessageEvent('message', { data: ${JSON.stringify(msg)} });
-          window.dispatchEvent(e);
-          document.dispatchEvent(e);
-        })();
-        true;
-      `;
+      const savedFavs = await AsyncStorage.getItem(SC_FAVORITES_KEY).catch(() => null);
+      const favIds: string[] = savedFavs ? JSON.parse(savedFavs) : scFavorites;
+      const msg = JSON.stringify({
+        type: "init",
+        pdfBase64: base64Uri,
+        annotations: existingAnnotations,
+        shortcuts: TEXT_SHORTCUTS,
+        scFavorites: favIds,
+      });
+      const msgJson = JSON.stringify(msg);
+      const js = "(function(){var e=new MessageEvent('message',{data:" + msgJson + "});window.dispatchEvent(e);document.dispatchEvent(e);})();true;";
       webViewRef.current?.injectJavaScript(js);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to load PDF";
       setLoadError(msg);
     }
-  }, [pdfPath, annotations]);
+  }, [pdfPath, annotations, scFavorites]);
 
   const onWebViewLoad = useCallback(() => {
     setReady(true);
@@ -125,7 +140,14 @@ export default function PDFAnnotatorModal({ visible, pdfPath, annotations, onSav
         annotations?: unknown[];
         pageDimensions?: Record<string, { w: number; h: number }>;
         text?: string;
+        ids?: string[];
       };
+      if (data.type === "sc-favorites") {
+        const ids = Array.isArray(data.ids) ? data.ids : [];
+        setScFavorites(ids);
+        AsyncStorage.setItem(SC_FAVORITES_KEY, JSON.stringify(ids)).catch(() => {});
+        return;
+      }
       if (data.type === "save") {
         const saved = Array.isArray(data.annotations) ? data.annotations : [];
         // Prepend _meta entry so web viewer can look up per-page canvas dimensions
