@@ -138,11 +138,23 @@ export const TEXT_SHORTCUTS: TextShortcut[] = [
 
 export const SC_FAVORITES_KEY = "@bridge_sc_favorites";
 export const CUSTOM_SHORTCUTS_KEY = "@bridge_custom_shortcuts";
+export const SC_OVERRIDES_KEY = "@bridge_sc_overrides";
+export const SC_HIDDEN_KEY = "@bridge_sc_hidden";
 
-export function mergeShortcuts(customRaw: string | null): TextShortcut[] {
+export function mergeShortcuts(
+  customRaw: string | null,
+  overridesRaw?: string | null,
+  hiddenRaw?: string | null,
+): TextShortcut[] {
   try {
     const custom: TextShortcut[] = customRaw ? JSON.parse(customRaw) : [];
-    return [...TEXT_SHORTCUTS, ...custom];
+    const overrides: Record<string, { label: string; text: string }> =
+      overridesRaw ? JSON.parse(overridesRaw) : {};
+    const hidden: string[] = hiddenRaw ? JSON.parse(hiddenRaw) : [];
+    const builtIns = TEXT_SHORTCUTS
+      .filter((s) => !hidden.includes(s.id))
+      .map((s) => (overrides[s.id] ? { ...s, ...overrides[s.id] } : s));
+    return [...builtIns, ...custom];
   } catch {
     return [...TEXT_SHORTCUTS];
   }

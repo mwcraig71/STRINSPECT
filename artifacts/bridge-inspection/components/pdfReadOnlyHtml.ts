@@ -32,10 +32,28 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
 .sz-btn{background:#1e293b;border:1.5px solid #334155;border-radius:7px;color:#94a3b8;padding:4px 9px;font-size:10px;font-weight:700;cursor:pointer;flex-shrink:0;-webkit-user-select:none;user-select:none}
 .sz-btn.active{border-color:#38bdf8;color:#38bdf8}
 .sep{width:1px;background:#334155;height:18px;flex-shrink:0;margin:0 2px}
-#shortcuts-row{display:none;gap:6px;align-items:center;overflow-x:auto;-webkit-overflow-scrolling:auto;scrollbar-width:none;min-height:34px;padding-bottom:1px}
-#shortcuts-row::-webkit-scrollbar{display:none}
-.sc-btn{background:#1e293b;border:1.5px solid #334155;border-radius:8px;color:#94a3b8;padding:4px 10px;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;-webkit-user-select:none;user-select:none}
+#shortcuts-row{display:none;flex-wrap:wrap;gap:5px;align-items:center;min-height:34px;padding:2px 0}
+.sc-btn{background:#1e293b;border:1.5px solid #334155;border-radius:16px;color:#94a3b8;padding:4px 10px;font-size:10px;font-weight:700;cursor:pointer;-webkit-user-select:none;user-select:none}
 .sc-btn.sc-fav{border-color:#7c3aed;color:#a78bfa}
+#btn-sc-browse{background:#7c3aed;border:none;border-radius:16px;color:#fff;padding:4px 12px;font-size:10px;font-weight:700;cursor:pointer;-webkit-user-select:none;user-select:none}
+#sc-modal{position:fixed;inset:0;z-index:500;background:#0f172a;flex-direction:column;display:none}
+#sc-modal-hdr{padding:12px;border-bottom:1px solid #334155;display:flex;gap:8px;align-items:center;padding-top:calc(12px + env(safe-area-inset-top))}
+#sc-search{flex:1;background:#1e293b;border:1.5px solid #334155;border-radius:8px;color:#fff;padding:7px 10px;font-size:13px;outline:none}
+#sc-search::placeholder{color:#475569}
+#sc-close-btn{background:#1e293b;border:1.5px solid #334155;border-radius:8px;color:#94a3b8;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0}
+#sc-modal-body{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:4px;padding-bottom:calc(16px + env(safe-area-inset-bottom))}
+.sc-cat-hdr{color:#475569;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:12px 0 4px}
+.sc-cat-hdr:first-child{padding-top:4px}
+.sc-item{background:#1e293b;border:1px solid #334155;border-radius:10px;padding:10px 12px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;cursor:pointer}
+.sc-item:active{opacity:.7}
+.sc-item-txt{color:#e2e8f0;font-size:13px;line-height:1.45;flex:1}
+.sc-star{background:none;border:none;font-size:18px;cursor:pointer;flex-shrink:0;padding:0 2px;line-height:1;color:#475569}
+.sc-star.starred{color:#f59e0b}
+.sc-empty{color:#475569;font-size:13px;text-align:center;padding:40px 0}
+#sc-suggest{display:none;position:fixed;z-index:302;bottom:0;left:0;right:0;background:#0f172a;border-top:1px solid #7c3aed;flex-direction:row;gap:6px;padding:5px 8px;padding-bottom:calc(5px + env(safe-area-inset-bottom));overflow-x:auto}
+#sc-suggest::-webkit-scrollbar{display:none}
+.sc-sug{background:#1e293b;border:1px solid #7c3aed;border-radius:8px;color:#c4b5fd;padding:3px 8px;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0}
+.sc-sug:active{opacity:.65}
 #loading{position:fixed;inset:0;background:#0f172a;z-index:500;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
 .spinner{width:36px;height:36px;border:3px solid #334155;border-top-color:#38bdf8;border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -83,6 +101,14 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
   <input id="text-input" placeholder="Type here..." autocomplete="off" autocorrect="off" spellcheck="false">
 </div>
 <div id="pending-hint"></div>
+<div id="sc-modal">
+  <div id="sc-modal-hdr">
+    <input id="sc-search" type="search" placeholder="Search shortcuts..." autocomplete="off" autocorrect="off" spellcheck="false">
+    <button id="sc-close-btn">Done</button>
+  </div>
+  <div id="sc-modal-body"></div>
+</div>
+<div id="sc-suggest"></div>
 
 <script>
 ${PDFJS_INLINE_SCRIPT}
@@ -477,33 +503,159 @@ function renderSC() {
   if (tool !== 'text') { row.style.display = 'none'; return; }
   if (scList.length === 0) { row.style.display = 'none'; return; }
   row.style.display = 'flex';
-  var favSet = {};
-  scFavorites.forEach(function(id) { favSet[id] = true; });
-  var sorted = scList.slice().sort(function(a, b) {
-    var af = favSet[a.id] ? 0 : 1;
-    var bf = favSet[b.id] ? 0 : 1;
-    return af - bf;
-  });
-  sorted.forEach(function(s) {
-    var isFav = favSet[s.id];
+  var favItems = scList.filter(function(s) { return scFavorites.indexOf(s.id) >= 0; });
+  favItems.forEach(function(s) {
     var btn = document.createElement('button');
-    btn.className = 'sc-btn' + (isFav ? ' sc-fav' : '');
-    btn.textContent = (isFav ? '\u2605 ' : '') + (s.label || s.text);
+    btn.className = 'sc-btn sc-fav';
+    btn.textContent = s.label || (s.text.length > 28 ? s.text.substring(0, 26) + '\u2026' : s.text);
     btn.title = s.text;
     btn.onmousedown = function(e) { e.preventDefault(); };
-    btn.onclick = function() {
-      var inp = document.getElementById('text-input');
-      var wrap = document.getElementById('text-input-wrap');
-      if (wrap && wrap.style.display !== 'none' && inp) {
-        inp.value = inp.value ? inp.value + ' ' + s.text : s.text;
-        inp.focus();
-        return;
-      }
-      setPendingShortcut(s.text);
-      setTool('text');
-    };
+    (function(sc) {
+      btn.onclick = function() {
+        var inp = document.getElementById('text-input');
+        var wrap = document.getElementById('text-input-wrap');
+        if (wrap && wrap.style.display !== 'none' && inp) {
+          inp.value = inp.value ? inp.value + ' ' + sc.text : sc.text;
+          inp.focus();
+          return;
+        }
+        setPendingShortcut(sc.text);
+        setTool('text');
+      };
+    })(s);
     row.appendChild(btn);
   });
+  var browse = document.createElement('button');
+  browse.id = 'btn-sc-browse';
+  browse.textContent = scList.length > 0 ? (scFavorites.length === 0 ? '\u2605 Shortcuts' : '\u2026 More') : '\u2605 Shortcuts';
+  browse.onclick = function() { openScModal(); };
+  row.appendChild(browse);
+}
+
+function openScModal() {
+  var modal = document.getElementById('sc-modal');
+  var searchEl = document.getElementById('sc-search');
+  if (!modal) return;
+  modal.style.display = 'flex';
+  if (searchEl) { searchEl.value = ''; searchEl.focus(); }
+  renderScModalBody('');
+}
+
+function closeScModal() {
+  var modal = document.getElementById('sc-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+function toggleFavRO(id) {
+  var idx = scFavorites.indexOf(id);
+  if (idx >= 0) {
+    scFavorites = scFavorites.filter(function(f) { return f !== id; });
+  } else {
+    scFavorites = scFavorites.concat([id]);
+  }
+  postBridge({ type: 'sc-favorites', ids: scFavorites });
+  renderSC();
+  var searchEl = document.getElementById('sc-search');
+  renderScModalBody(searchEl ? searchEl.value : '');
+}
+
+function renderScModalBody(q) {
+  var body = document.getElementById('sc-modal-body');
+  if (!body) return;
+  body.innerHTML = '';
+  var query = (q || '').toLowerCase().trim();
+  var cats = {};
+  var catOrder = [];
+  scList.forEach(function(s) {
+    var cat = s.category || 'General';
+    if (!cats[cat]) { cats[cat] = []; catOrder.push(cat); }
+    cats[cat].push(s);
+  });
+  var totalFound = 0;
+  catOrder.forEach(function(cat) {
+    var items = cats[cat].filter(function(s) {
+      if (!query) return true;
+      return s.text.toLowerCase().indexOf(query) >= 0 || (s.label || '').toLowerCase().indexOf(query) >= 0 || cat.toLowerCase().indexOf(query) >= 0;
+    });
+    if (items.length === 0) return;
+    totalFound += items.length;
+    var catEl = document.createElement('div');
+    catEl.className = 'sc-cat-hdr';
+    catEl.textContent = cat;
+    body.appendChild(catEl);
+    items.forEach(function(s) {
+      var rowEl = document.createElement('div');
+      rowEl.className = 'sc-item';
+      var txt = document.createElement('div');
+      txt.className = 'sc-item-txt';
+      txt.textContent = s.text;
+      var star = document.createElement('button');
+      var isFav = scFavorites.indexOf(s.id) >= 0;
+      star.className = isFav ? 'sc-star starred' : 'sc-star';
+      star.textContent = isFav ? '\u2605' : '\u2606';
+      star.title = isFav ? 'Remove from favorites' : 'Add to favorites';
+      (function(sc, starBtn, rEl) {
+        rEl.onclick = function(e) {
+          if (e.target === starBtn) return;
+          var inp = document.getElementById('text-input');
+          var wrap = document.getElementById('text-input-wrap');
+          closeScModal();
+          if (wrap && wrap.style.display !== 'none' && inp) {
+            inp.value = inp.value ? inp.value + ' ' + sc.text : sc.text;
+            inp.focus();
+            return;
+          }
+          setPendingShortcut(sc.text);
+          setTool('text');
+        };
+        starBtn.onclick = function(e) { e.stopPropagation(); toggleFavRO(sc.id); };
+      })(s, star, rowEl);
+      rowEl.appendChild(txt);
+      rowEl.appendChild(star);
+      body.appendChild(rowEl);
+    });
+  });
+  if (totalFound === 0) {
+    var empty = document.createElement('div');
+    empty.className = 'sc-empty';
+    empty.textContent = query ? 'No shortcuts match your search' : 'No shortcuts loaded';
+    body.appendChild(empty);
+  }
+}
+
+function renderSuggest(val) {
+  var sugEl = document.getElementById('sc-suggest');
+  if (!sugEl) return;
+  if (!val || val.length < 2) { sugEl.style.display = 'none'; return; }
+  var q = val.toLowerCase();
+  var matches = [];
+  for (var i = 0; i < scList.length; i++) {
+    var sc = scList[i];
+    var lbl = (sc.label || '').toLowerCase();
+    if (lbl.indexOf(q) >= 0 || sc.text.toLowerCase().indexOf(q) >= 0) {
+      matches.push(sc);
+      if (matches.length >= 4) break;
+    }
+  }
+  if (matches.length === 0) { sugEl.style.display = 'none'; return; }
+  sugEl.innerHTML = '';
+  sugEl.style.display = 'flex';
+  for (var j = 0; j < matches.length; j++) {
+    (function(sc) {
+      var btn = document.createElement('button');
+      btn.className = 'sc-sug';
+      btn.textContent = sc.label || sc.text.substring(0, 30);
+      btn.title = sc.text;
+      btn.onmousedown = function(e) { e.preventDefault(); };
+      btn.onclick = function() {
+        var inp = document.getElementById('text-input');
+        if (inp) { inp.value = sc.text; inp.focus(); }
+        var sg = document.getElementById('sc-suggest');
+        if (sg) sg.style.display = 'none';
+      };
+      sugEl.appendChild(btn);
+    })(matches[j]);
+  }
 }
 
 function setTool(t) {
@@ -575,6 +727,19 @@ function observePages() {
     }
   }, { threshold: [0,.25,.5,.75,1] });
   document.querySelectorAll('.page-wrap').forEach(function(el) { obs.observe(el); });
+}
+
+var _scCloseBtn = document.getElementById('sc-close-btn');
+if (_scCloseBtn) _scCloseBtn.onclick = closeScModal;
+var _scSearch = document.getElementById('sc-search');
+if (_scSearch) _scSearch.addEventListener('input', function() { renderScModalBody(this.value); });
+var _textInpRO = document.getElementById('text-input');
+if (_textInpRO) {
+  _textInpRO.addEventListener('input', function() { renderSuggest(this.value); });
+  _textInpRO.addEventListener('focus', function() { renderSuggest(this.value); });
+  _textInpRO.addEventListener('blur', function() {
+    setTimeout(function() { var sg = document.getElementById('sc-suggest'); if (sg) sg.style.display = 'none'; }, 300);
+  });
 }
 
 renderOptRow();

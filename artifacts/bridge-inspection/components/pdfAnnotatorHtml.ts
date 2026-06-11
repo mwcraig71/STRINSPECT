@@ -44,11 +44,14 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
 #err-txt{display:none;color:#f87171;font-size:13px;text-align:center;padding:0 24px;max-width:300px}
 #text-input-wrap{display:none;position:fixed;z-index:300;background:#1e293b;border:2px solid #38bdf8;border-radius:8px;padding:6px}
 #text-input{background:transparent;border:none;outline:none;font-size:16px;color:#fff;min-width:120px;max-width:220px}
-#shortcuts-row{display:flex;gap:6px;align-items:center;overflow-x:auto;-webkit-overflow-scrolling:auto;scrollbar-width:none;min-height:34px;padding-bottom:1px}
-#shortcuts-row::-webkit-scrollbar{display:none}
-.sc-chip{background:#1e293b;border:1.5px solid #4c1d95;border-radius:16px;color:#c4b5fd;padding:5px 11px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0;-webkit-user-select:none;user-select:none}
+#shortcuts-row{display:flex;flex-wrap:wrap;gap:5px;align-items:center;min-height:34px;padding:2px 0}
+.sc-chip{background:#1e293b;border:1.5px solid #4c1d95;border-radius:16px;color:#c4b5fd;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;-webkit-user-select:none;user-select:none}
 .sc-chip:active{opacity:.65}
-#btn-sc-browse{background:#7c3aed;border:none;border-radius:16px;color:#fff;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;-webkit-user-select:none;user-select:none;margin-left:auto}
+#btn-sc-browse{background:#7c3aed;border:none;border-radius:16px;color:#fff;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;-webkit-user-select:none;user-select:none}
+#sc-suggest{display:none;position:fixed;z-index:302;bottom:0;left:0;right:0;background:#0f172a;border-top:1px solid #7c3aed;flex-direction:row;gap:6px;padding:5px 8px;padding-bottom:calc(5px + env(safe-area-inset-bottom));overflow-x:auto}
+#sc-suggest::-webkit-scrollbar{display:none}
+.sc-sug{background:#1e293b;border:1px solid #7c3aed;border-radius:8px;color:#c4b5fd;padding:3px 8px;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0}
+.sc-sug:active{opacity:.65}
 #sc-modal{position:fixed;inset:0;z-index:500;background:#0f172a;flex-direction:column;display:none}
 #sc-modal-hdr{padding:12px 12px 8px;border-bottom:1px solid #334155;display:flex;gap:8px;align-items:center;padding-top:calc(12px + env(safe-area-inset-top))}
 #sc-search{flex:1;background:#1e293b;border:1.5px solid #334155;border-radius:8px;color:#fff;padding:7px 10px;font-size:13px;outline:none}
@@ -111,6 +114,7 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
   <div id="sc-modal-body"></div>
 </div>
 
+<div id="sc-suggest"></div>
 <div id="text-input-wrap">
   <input id="text-input" placeholder="Type here\u2026" autocomplete="off" autocorrect="off" spellcheck="false">
 </div>
@@ -808,6 +812,50 @@ document.getElementById('sc-close-btn').onclick = closeScModal;
 document.getElementById('sc-search').addEventListener('input', function() {
   renderScModalBody(this.value);
 });
+
+function renderSuggest(val) {
+  var sugEl = document.getElementById('sc-suggest');
+  if (!sugEl) return;
+  if (!val || val.length < 2) { sugEl.style.display = 'none'; return; }
+  var q = val.toLowerCase();
+  var matches = [];
+  for (var i = 0; i < scList.length; i++) {
+    var sc = scList[i];
+    var lbl = (sc.label || '').toLowerCase();
+    if (lbl.indexOf(q) >= 0 || sc.text.toLowerCase().indexOf(q) >= 0) {
+      matches.push(sc);
+      if (matches.length >= 4) break;
+    }
+  }
+  if (matches.length === 0) { sugEl.style.display = 'none'; return; }
+  sugEl.innerHTML = '';
+  sugEl.style.display = 'flex';
+  for (var j = 0; j < matches.length; j++) {
+    (function(sc) {
+      var btn = document.createElement('button');
+      btn.className = 'sc-sug';
+      btn.textContent = sc.label || sc.text.substring(0, 30);
+      btn.title = sc.text;
+      btn.onmousedown = function(e) { e.preventDefault(); };
+      btn.onclick = function() {
+        var inp = document.getElementById('text-input');
+        if (inp) { inp.value = sc.text; inp.focus(); }
+        var sg = document.getElementById('sc-suggest');
+        if (sg) sg.style.display = 'none';
+      };
+      sugEl.appendChild(btn);
+    })(matches[j]);
+  }
+}
+
+var _textInp = document.getElementById('text-input');
+if (_textInp) {
+  _textInp.addEventListener('input', function() { renderSuggest(this.value); });
+  _textInp.addEventListener('focus', function() { renderSuggest(this.value); });
+  _textInp.addEventListener('blur', function() {
+    setTimeout(function() { var sg = document.getElementById('sc-suggest'); if (sg) sg.style.display = 'none'; }, 300);
+  });
+}
 
 renderShortcutsRow();
 </script>

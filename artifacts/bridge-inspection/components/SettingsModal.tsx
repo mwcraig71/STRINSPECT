@@ -14,7 +14,7 @@ import {
   View,
 } from "react-native";
 
-import { CUSTOM_SHORTCUTS_KEY, SC_FAVORITES_KEY, TEXT_SHORTCUTS, TextShortcut } from "@/data/textShortcuts";
+import { CUSTOM_SHORTCUTS_KEY, SC_FAVORITES_KEY, SC_HIDDEN_KEY, SC_OVERRIDES_KEY, TEXT_SHORTCUTS, TextShortcut } from "@/data/textShortcuts";
 import { useColors } from "@/hooks/useColors";
 import {
   MATERIAL_OPTIONS,
@@ -75,6 +75,11 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [editLabel, setEditLabel] = React.useState("");
   const [editText, setEditText] = React.useState("");
+  const [scOverrides, setScOverrides] = React.useState<Record<string, { label: string; text: string }>>({});
+  const [scHidden, setScHidden] = React.useState<string[]>([]);
+  const [editingBuiltinId, setEditingBuiltinId] = React.useState<string | null>(null);
+  const [editBuiltinLabel, setEditBuiltinLabel] = React.useState("");
+  const [editBuiltinText, setEditBuiltinText] = React.useState("");
 
   React.useEffect(() => {
     if (!visible) return;
@@ -83,6 +88,12 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
     }).catch(() => {});
     AsyncStorage.getItem(SC_FAVORITES_KEY).then((raw) => {
       try { setScFavs(raw ? JSON.parse(raw) : []); } catch { setScFavs([]); }
+    }).catch(() => {});
+    AsyncStorage.getItem(SC_OVERRIDES_KEY).then((raw) => {
+      try { setScOverrides(raw ? JSON.parse(raw) : {}); } catch { setScOverrides({}); }
+    }).catch(() => {});
+    AsyncStorage.getItem(SC_HIDDEN_KEY).then((raw) => {
+      try { setScHidden(raw ? JSON.parse(raw) : []); } catch { setScHidden([]); }
     }).catch(() => {});
   }, [visible]);
 
@@ -121,6 +132,28 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
     if (!lbl || !txt) { setEditingId(null); return; }
     saveCustom(customShortcuts.map((s) => (s.id === id ? { ...s, label: lbl, text: txt } : s)));
     setEditingId(null);
+  };
+
+  const saveOverrides = (ovr: Record<string, { label: string; text: string }>) => {
+    setScOverrides(ovr);
+    AsyncStorage.setItem(SC_OVERRIDES_KEY, JSON.stringify(ovr)).catch(() => {});
+  };
+  const saveHidden = (hidden: string[]) => {
+    setScHidden(hidden);
+    AsyncStorage.setItem(SC_HIDDEN_KEY, JSON.stringify(hidden)).catch(() => {});
+  };
+  const startEditBuiltin = (s: TextShortcut) => {
+    const effective = scOverrides[s.id] ? { ...s, ...scOverrides[s.id] } : s;
+    setEditingBuiltinId(s.id);
+    setEditBuiltinLabel(effective.label);
+    setEditBuiltinText(effective.text);
+  };
+  const commitBuiltinEdit = (id: string) => {
+    const lbl = editBuiltinLabel.trim();
+    const txt = editBuiltinText.trim();
+    if (!lbl || !txt) { setEditingBuiltinId(null); return; }
+    saveOverrides({ ...scOverrides, [id]: { label: lbl, text: txt } });
+    setEditingBuiltinId(null);
   };
 
   const hasInspectionData =
@@ -784,20 +817,110 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
 
                 {/* Built-in shortcuts */}
                 <View style={styles.scSection}>
-                  <Text style={[styles.scSectionTitle, { color: c.mutedForeground }]}>Built-in ({TEXT_SHORTCUTS.length})</Text>
-                  {TEXT_SHORTCUTS.map((s) => (
-                    <View key={s.id} style={[styles.scRow, { borderColor: c.border, backgroundColor: c.background }]}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.scLabel, { color: c.foreground }]}>{s.label}</Text>
-                        <Text style={[styles.scText, { color: c.mutedForeground }]} numberOfLines={1}>{s.text}</Text>
+                  <Text style={[styles.scSectionTitle, { color: c.mutedForeground }]}>
+                    Built-in ({TEXT_SHORTCUTS.filter((s) => !scHidden.includes(s.id)).length})
+                  </Text>
+                  {TEXT_SHORTCUTS.filter((s) => !scHidden.includes(s.id)).map((s) => {
+                    const effective = scOverrides[s.id] ? { ...s, ...scOverrides[s.id] } : s;
+                    const isEditing = editingBuiltinId === s.id;
+                    return (
+                      <View key={s.id} style={[styles.scRow, { borderColor: c.border, backgroundColor: c.background }]}>
+                        {isEditing ? (
+                          <View style={{ flex: 1, gap: 6 }}>
+                            <TextInput
+                              style={[styles.scInput, { color: c.foreground, borderColor: "#38bdf8", backgroundColor: c.secondary }]}
+                              value={editBuiltinLabel}
+                              onChangeText={setEditBuiltinLabel}
+                              autoFocus
+                              autoCapitalize="sentences"
+                            />
+                            <TextInput
+                              style={[styles.scInput, styles.scTextArea, { color: c.foreground, borderColor: "#38bdf8", backgroundColor: c.secondary }]}
+                              value={editBuiltinText}
+                              onChangeText={setEditBuiltinText}
+                              multiline
+                              numberOfLines={3}
+                              autoCapitalize="sentences"
+                            />
+                            <View style={{ flexDirection: "row", gap: 8 }}>
+                              <TouchableOpacity
+                                style={[styles.scAddBtn, { backgroundColor: "#022c22", borderColor: "#064e3b", flex: 1 }]}
+                                onPress={() => commitBuiltinEdit(s.id)}
+                              >
+                                <Feather name="check" size={13} color="#34d399" />
+                                <Text style={[styles.keyBtnText, { color: "#34d399" }]}>Save</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={[styles.scAddBtn, { backgroundColor: c.secondary, borderColor: c.border }]}
+                                onPress={() => setEditingBuiltinId(null)}
+                              >
+                                <Feather name="x" size={13} color={c.mutedForeground} />
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        ) : (
+                          <>
+                            <View style={{ flex: 1 }}>
+                              <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                                <Text style={[styles.scLabel, { color: c.foreground }]}>{effective.label}</Text>
+                                {scOverrides[s.id] && (
+                                  <Text style={{ fontSize: 9, color: "#f59e0b", fontWeight: "700" }}>EDITED</Text>
+                                )}
+                              </View>
+                              <Text style={[styles.scText, { color: c.mutedForeground }]} numberOfLines={1}>{effective.text}</Text>
+                            </View>
+                            {scOverrides[s.id] && (
+                              <TouchableOpacity
+                                onPress={() => { const next = { ...scOverrides }; delete next[s.id]; saveOverrides(next); }}
+                                style={styles.scIconBtn}
+                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                              >
+                                <Feather name="rotate-ccw" size={11} color="#78716c" />
+                              </TouchableOpacity>
+                            )}
+                            <TouchableOpacity onPress={() => toggleFav(s.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                              <Text style={{ fontSize: 16, color: scFavs.includes(s.id) ? "#a78bfa" : c.muted }}>
+                                {scFavs.includes(s.id) ? "\u2605" : "\u2606"}
+                              </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => startEditBuiltin(s)} style={styles.scIconBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                              <Feather name="edit-2" size={13} color="#38bdf8" />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              onPress={() =>
+                                Alert.alert("Hide Shortcut", `Hide "${effective.label}" from the list?`, [
+                                  { text: "Cancel", style: "cancel" },
+                                  { text: "Hide", style: "destructive", onPress: () => saveHidden([...scHidden, s.id]) },
+                                ])
+                              }
+                              style={styles.scIconBtn}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            >
+                              <Feather name="eye-off" size={13} color="#f87171" />
+                            </TouchableOpacity>
+                          </>
+                        )}
                       </View>
-                      <TouchableOpacity onPress={() => toggleFav(s.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                        <Text style={{ fontSize: 16, color: scFavs.includes(s.id) ? "#a78bfa" : c.muted }}>
-                          {scFavs.includes(s.id) ? "\u2605" : "\u2606"}
-                        </Text>
-                      </TouchableOpacity>
+                    );
+                  })}
+                  {/* Restore hidden built-ins */}
+                  {scHidden.length > 0 && (
+                    <View style={{ marginTop: 10, borderTopWidth: 1, borderTopColor: c.border, paddingTop: 8 }}>
+                      <Text style={[styles.scSectionTitle, { color: "#78716c" }]}>Hidden ({scHidden.length}) — tap to restore</Text>
+                      {TEXT_SHORTCUTS.filter((s) => scHidden.includes(s.id)).map((s) => (
+                        <TouchableOpacity
+                          key={s.id}
+                          style={[styles.scRow, { borderColor: c.border, backgroundColor: c.background, opacity: 0.55 }]}
+                          onPress={() => saveHidden(scHidden.filter((id) => id !== s.id))}
+                        >
+                          <View style={{ flex: 1 }}>
+                            <Text style={[styles.scLabel, { color: c.mutedForeground }]}>{s.label}</Text>
+                          </View>
+                          <Feather name="eye" size={13} color="#78716c" />
+                        </TouchableOpacity>
+                      ))}
                     </View>
-                  ))}
+                  )}
                 </View>
               </>
             )}
