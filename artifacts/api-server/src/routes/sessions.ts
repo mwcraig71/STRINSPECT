@@ -170,6 +170,28 @@ router.get("/sessions/pdf/:structureNumber", requireApiKey, async (req, res) => 
   res.send(rows[0].pdfDocument);
 });
 
+// ── Photo metadata list (no binary) ───────────────────────────────────────────
+
+router.get("/sessions/photos/:structureNumber", requireApiKey, async (req, res) => {
+  const structureNumber = String(req.params["structureNumber"] ?? "");
+  if (!structureNumber) {
+    res.status(400).json({ error: "structureNumber is required" });
+    return;
+  }
+
+  const rows = await db
+    .select({
+      photoId: sessionPhotosTable.photoId,
+      mimeType: sessionPhotosTable.mimeType,
+      description: sessionPhotosTable.description,
+      createdAt: sessionPhotosTable.createdAt,
+    })
+    .from(sessionPhotosTable)
+    .where(eq(sessionPhotosTable.structureNumber, structureNumber));
+
+  res.json(rows);
+});
+
 // ── Photo binary upload/download ───────────────────────────────────────────────
 
 router.put(

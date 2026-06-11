@@ -11,6 +11,7 @@ import {
 } from "recharts";
 import { SessionData, DefectRecord, NbiRating, ImportSummary } from "@/lib/types";
 import PDFRedlineViewer from "@/components/PDFRedlineViewer";
+import StandardPhotosPanel from "@/components/StandardPhotosPanel";
 import {
   useListSessions,
   useGetSession,
@@ -463,6 +464,10 @@ export default function InspectionProgress({ sessionData, setSessionData }: Prop
               </div>
             );
           })()}
+
+          {sessionData.structureNumber && (
+            <StandardPhotosPanel structureNumber={sessionData.structureNumber} />
+          )}
 
           <div className="grid grid-cols-2 gap-4 mb-4">
             {/* CS Distribution chart */}
