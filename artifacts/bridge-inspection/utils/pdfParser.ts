@@ -120,6 +120,8 @@ export interface ParsedChannelCrossSection {
   inspectionDate: string;
   upstream: ParsedChannelMeasurement[];
   downstream: ParsedChannelMeasurement[];
+  /** Extra metadata from Channel Measurement report (water level, measurement type, etc.) */
+  comments?: string;
 }
 
 type PdfSource = File | { uri: string };
@@ -1016,6 +1018,158 @@ export function parseChannelCrossSection(pages: string[][]): ParsedChannelCrossS
   return { ...header, upstream, downstream };
 }
 
+// ─── Channel Measurement Report (alternate format) ───────────────────────────
+// Parses the Channel Measurement image/table form that shows labeled measurement
+// points with horizontal locations and depth values (e.g., from the Channel
+// Measurement software). This differs from TxDOT Form 2600 (Channel
+// Cross-Section) which uses upstream/downstream sections with topRef/botRef.
+//
+// Expected PDF text structure on the page:
+//   Channel Measurement                         ← page title / anchor
+//   Date of Channel Measurements:  06/18/2024  Number of Fixed Objects…
+//   Distance Measured From:  0                 Water Level:  34.1
+//   Depth Measured From:  0                    High Water Mark:
+//   Number of Measurement Points Taken:         Measurement Type:  Depth…
+//   Bridge #150150052104404 IH 410 SBFR over Leon Creek  ← title line
+//   [diagram — no useful text]
+//   Measurement Points  1  2  3  …  10
+//   Measurement Point Label  SW A1  B2  B3  …  NE A10
+//   Measurement Location     0  75  146  …  587
+//   Depth/Height Measured    8.0  25.9  30.6  …  9.2
+//
+// Measurement points are imported into the upstream section of ChannelData:
+//   totalHoriz  ← Measurement Location
+//   vertDist    ← Depth/Height Measured
+//   notes       ← Measurement Point Label (e.g. "SW A1", "B2")
+//   topRef      ← "TR"   (Top of Railing — standard reference)
+//   botRef      ← "CH"   (Channel — bottom reference)
+
+export function parseChannelMeasurementReport(
+  pages: string[][]
+): ParsedChannelCrossSection | null {
+  const allLines = pages.flat();
+
+  // Anchor: a line that starts (and roughly ends) with "Channel Measurement"
+  // but is NOT one of the row-header lines ("Measurement Point Label", etc.).
+  const anchorIdx = allLines.findIndex((l) => {
+    const t = l.trim();
+    return (
+      /^Channel\s+Measurement\b/i.test(t) &&
+      !/Date|Points?\b|Location|Height|Depth|Type/i.test(t)
+    );
+  });
+  if (anchorIdx < 0) return null;
+
+  // ── Parse header fields ──────────────────────────────────────────────────
+  let inspectionDate = "";
+  let waterLevel = "";
+  let measurementType = "";
+  let structureNumber = "";
+  let featureCrossed = "";
+
+  const headerEnd = Math.min(anchorIdx + 25, allLines.length);
+  for (let i = anchorIdx; i < headerEnd; i++) {
+    const line = allLines[i];
+
+    const dateM = line.match(/Date\s+of\s+Channel\s+Measurements?:\s*([\d/\-]+)/i);
+    if (dateM && !inspectionDate) inspectionDate = dateM[1].trim();
+
+    // Water Level can appear on the same line as other fields
+    const waterM = line.match(/Water\s+Level:\s*([\d.]+)/i);
+    if (waterM && !waterLevel) waterLevel = waterM[1].trim();
+
+    const typeM = line.match(/Measurement\s+Type:\s*(.+)/i);
+    if (typeM && !measurementType) measurementType = typeM[1].trim();
+
+    // Bridge title: "Bridge #150150052104404 IH 410 SBFR over Leon Creek"
+    const bridgeM = line.match(/Bridge\s+#?([\w\-]+)\s+.+\s+over\s+(.+)/i);
+    if (bridgeM && !structureNumber) {
+      structureNumber = bridgeM[1].trim();
+      featureCrossed = bridgeM[2].trim();
+    }
+  }
+
+  // ── Find measurement table rows ─────────────────────────────────────────
+  let labelLineIdx = -1;
+  let locationLineIdx = -1;
+  let depthLineIdx = -1;
+
+  for (let i = anchorIdx; i < allLines.length; i++) {
+    const l = allLines[i];
+    if (/Measurement\s+Point\s+Label/i.test(l) && labelLineIdx < 0) labelLineIdx = i;
+    else if (/Measurement\s+Location/i.test(l) && locationLineIdx < 0) locationLineIdx = i;
+    else if (/Depth\s*[\/|]\s*Height\s+Measured/i.test(l) && depthLineIdx < 0) depthLineIdx = i;
+    if (labelLineIdx >= 0 && locationLineIdx >= 0 && depthLineIdx >= 0) break;
+  }
+
+  // We need at least the location and depth rows to produce useful data.
+  if (locationLineIdx < 0 || depthLineIdx < 0) return null;
+
+  // Extract all numeric values from a row (skips the leading label text).
+  const extractNums = (lineIdx: number): string[] => {
+    const line = allLines[lineIdx] || "";
+    // Try splitting on 2+ spaces first; the first chunk is the row header.
+    const parts = line.trim().split(/\s{2,}/);
+    if (parts.length > 1) {
+      const candidates = parts.slice(1).map((s) => s.trim()).filter(Boolean);
+      // Validate that they look numeric before returning.
+      if (candidates.every((c) => /^[\d.]+$/.test(c))) return candidates;
+    }
+    // Fallback: pull all numbers out of the line via regex.
+    return (line.match(/\b\d+\.?\d*\b/g) || []);
+  };
+
+  // Extract label tokens from a row (non-numeric, variable spacing).
+  const extractLabels = (lineIdx: number): string[] => {
+    if (lineIdx < 0) return [];
+    const line = allLines[lineIdx] || "";
+    const parts = line.trim().split(/\s{2,}/);
+    return parts.slice(1).map((s) => s.trim()).filter(Boolean);
+  };
+
+  const labels = extractLabels(labelLineIdx);
+  const locations = extractNums(locationLineIdx);
+  const depths = extractNums(depthLineIdx);
+
+  if (!locations.length && !depths.length) return null;
+
+  const count = Math.max(locations.length, depths.length);
+  const upstream: ParsedChannelMeasurement[] = [];
+
+  for (let i = 0; i < count; i++) {
+    const loc = locations[i] || "";
+    const depth = depths[i] || "";
+    if (!loc && !depth) continue;
+    upstream.push({
+      topRef: "TR",
+      botRef: "CH",
+      totalHoriz: loc,
+      distFromLastBent: "",
+      vertDist: depth,
+      notes: labels[i] || "",
+    });
+  }
+
+  if (!upstream.length) return null;
+
+  const commentParts: string[] = [];
+  if (waterLevel) commentParts.push(`Water Level: ${waterLevel}`);
+  if (measurementType) commentParts.push(`Measurement Type: ${measurementType}`);
+
+  return {
+    district: "",
+    county: "",
+    controlSection: "",
+    structureNumber,
+    route: "",
+    featureCrossed,
+    inspectionDate,
+    upstream,
+    downstream: [],
+    comments: commentParts.length ? commentParts.join(" | ") : undefined,
+  };
+}
+
 // ─── Top-level report parser ──────────────────────────────────────────────────
 
 export async function parseReport(source: PdfSource): Promise<ParsedReport> {
@@ -1024,6 +1178,10 @@ export async function parseReport(source: PdfSource): Promise<ParsedReport> {
   const elements = parseElementsTable(pages);
   const nbi = parseNbiRatings(pages);
   const underclearance = parseUnderclearance(pages) ?? undefined;
-  const channelCrossSection = parseChannelCrossSection(pages) ?? undefined;
+  // Try TxDOT Form 2600 first; fall back to Channel Measurement report format.
+  const channelCrossSection =
+    parseChannelCrossSection(pages) ??
+    parseChannelMeasurementReport(pages) ??
+    undefined;
   return { structureNumber, elements, nbi, underclearance, channelCrossSection };
 }

@@ -2994,7 +2994,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           });
         }
 
-        // ── Channel Cross-Section import (Form 2600) ──
+        // ── Channel Cross-Section import (Form 2600 or Channel Measurement report) ──
         if (parsedChannelCrossSection) {
           setChannelDataState((prev) => {
             const merged: ChannelData = {
@@ -3007,6 +3007,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
               featureCrossed: prev.featureCrossed || parsedChannelCrossSection.featureCrossed,
               // Prefer imported date over default placeholder (today's date)
               inspectionDate: parsedChannelCrossSection.inspectionDate || prev.inspectionDate,
+              // Channel Measurement report includes extra metadata (water level, measurement type)
+              comments: prev.comments || parsedChannelCrossSection.comments || "",
             };
             const mergeChannelRows = (
               existing: typeof merged.upstream,
