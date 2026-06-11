@@ -81,6 +81,17 @@ export default function PhotosScreen() {
     return result.assets[0].uri;
   };
 
+  const confirm = (message: string, onConfirm: () => void) => {
+    if (Platform.OS === "web") {
+      if (window.confirm(message)) onConfirm();
+    } else {
+      Alert.alert("Confirm", message, [
+        { text: "Cancel", style: "cancel" },
+        { text: "OK", onPress: onConfirm },
+      ]);
+    }
+  };
+
   const headingToDirection = (heading: number): string => {
     if (heading >= 315 || heading < 45) return "N";
     if (heading >= 45 && heading < 135) return "E";
@@ -136,44 +147,26 @@ export default function PhotosScreen() {
   };
 
   const removePhoto = (slotId: string) => {
-    Alert.alert("Remove Photo", "Remove the main photo for this slot?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Remove",
-        style: "destructive",
-        onPress: () =>
-          setStandardPhotoSlot(slotId, {
-            photoUri: undefined,
-            capturedAt: undefined,
-            directionTags: [],
-            subjectTags: [],
-          }),
-      },
-    ]);
+    confirm("Remove the main photo for this slot?", () =>
+      setStandardPhotoSlot(slotId, {
+        photoUri: undefined,
+        capturedAt: undefined,
+        directionTags: [],
+        subjectTags: [],
+      })
+    );
   };
 
   const removeAdditionalPhoto = (slotId: string, index: number) => {
-    Alert.alert("Remove Photo", "Remove this additional photo?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Remove",
-        style: "destructive",
-        onPress: () => removeStandardPhotoAdditional(slotId, index),
-      },
-    ]);
+    confirm("Remove this additional photo?", () =>
+      removeStandardPhotoAdditional(slotId, index)
+    );
   };
 
   const markNotNeeded = (slotId: string) => {
-    Alert.alert(
-      "Mark as Not Needed",
-      "This photo will be waived and won't block sign-off. You can undo this later.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Mark Not Needed",
-          onPress: () => setStandardPhotoSlot(slotId, { notNeeded: true }),
-        },
-      ]
+    confirm(
+      "Mark as not needed? This waives the photo requirement and won't block sign-off. You can undo it later.",
+      () => setStandardPhotoSlot(slotId, { notNeeded: true })
     );
   };
 
@@ -202,27 +195,20 @@ export default function PhotosScreen() {
   };
 
   const removeExtraPhoto = (slotId: string) => {
-    Alert.alert("Remove Photo", "Remove this photo?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Remove",
-        style: "destructive",
-        onPress: () =>
-          setExtraPhotoSlot(slotId, {
-            photoUri: undefined,
-            capturedAt: undefined,
-            directionTags: [],
-            subjectTags: [],
-          }),
-      },
-    ]);
+    confirm("Remove this photo?", () =>
+      setExtraPhotoSlot(slotId, {
+        photoUri: undefined,
+        capturedAt: undefined,
+        directionTags: [],
+        subjectTags: [],
+      })
+    );
   };
 
   const deleteExtraSlot = (slotId: string) => {
-    Alert.alert("Delete Slot", "Delete this additional photo slot?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: () => deleteExtraSlotFromContext(slotId) },
-    ]);
+    confirm("Delete this additional photo slot?", () =>
+      deleteExtraSlotFromContext(slotId)
+    );
   };
 
   const requiredCount = standardPhotos.filter((s) => !s.notNeeded).length;
