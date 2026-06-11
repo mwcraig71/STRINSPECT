@@ -105,6 +105,10 @@ export async function markPhotoUploaded(structureNumber: string, id: string): Pr
   await AsyncStorage.setItem(UPLOADED_PHOTOS_KEY, JSON.stringify([...set]));
 }
 
+export async function clearUploadedPhotoIds(): Promise<void> {
+  await AsyncStorage.removeItem(UPLOADED_PHOTOS_KEY);
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 export function collectPhotosFromDefects(defects: unknown[]): PhotoToUpload[] {

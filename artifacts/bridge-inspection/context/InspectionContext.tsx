@@ -18,6 +18,7 @@ import {
   collectPhotosFromDefects,
   collectPhotosFromStandardSlots,
   uploadPhotos,
+  clearUploadedPhotoIds,
 } from "@/lib/offlineQueue";
 setAuthTokenGetter(() => process.env.EXPO_PUBLIC_API_KEY ?? null);
 
@@ -2073,6 +2074,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     AsyncStorage.removeItem(STORAGE_KEYS.IMPORT_AUDIT_ACK).catch(() => {});
     setCriticalFindingsAcknowledgedState(false);
     AsyncStorage.removeItem(STORAGE_KEYS.CRITICAL_FINDINGS_ACK).catch(() => {});
+    clearUploadedPhotoIds().catch(() => {});
   }, [setStructureNumber, setImportSummary]);
 
   const setStandardPhotoSlot = useCallback((slotId: string, patch: Partial<StandardPhotoSlot>) => {
