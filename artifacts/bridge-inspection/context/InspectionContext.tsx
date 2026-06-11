@@ -848,16 +848,21 @@ const INITIAL_SNBI_RATINGS: NbiRating[] = [
   },
   {
     item: "BC10",
-    description: "Waterway",
+    description: "Scour/Underwater",
     subComponents: [
-      { name: "Waterway Adequacy", desc: "", min: "-", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Scour Vulnerability Assessment", desc: "", min: "-", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Underwater Inspection", desc: "", min: "-", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Countermeasures", desc: "", min: "-", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Overall Component Rating", desc: "", min: "-", rating: "", snbiIds: [], comments: "", previousComments: "" },
     ],
   },
   {
     item: "BC11",
-    description: "Appr. Alignment",
+    description: "Bridge Rails",
     subComponents: [
-      { name: "Approach Roadway Alignment", desc: "", min: "-", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Bridge Railing", desc: "", min: "6", rating: "", snbiIds: ["331"], comments: "", previousComments: "" },
+      { name: "End Treatments", desc: "", min: "6", rating: "", snbiIds: [], comments: "", previousComments: "" },
+      { name: "Overall Component Rating", desc: "", min: "-", rating: "", snbiIds: [], comments: "", previousComments: "" },
     ],
   },
 ];

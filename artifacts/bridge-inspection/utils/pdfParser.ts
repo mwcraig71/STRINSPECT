@@ -458,8 +458,15 @@ const SNBI_COMPONENT_ALIASES: Record<string, string> = {
   "rip rap": "Rip Rap, Toe Walls & Apron",
   "dikes": "Dikes",
   "jetties": "Jetties",
-  "waterway adequacy": "Waterway Adequacy",
-  "approach roadway alignment": "Approach Roadway Alignment",
+  "scour vulnerability assessment": "Scour Vulnerability Assessment",
+  "scour vulnerability": "Scour Vulnerability Assessment",
+  "underwater inspection": "Underwater Inspection",
+  "underwater inspection results": "Underwater Inspection",
+  "countermeasures": "Countermeasures",
+  "bridge railing": "Bridge Railing",
+  "bridge rail": "Bridge Railing",
+  "end treatments": "End Treatments",
+  "end treatment": "End Treatments",
   "other": "Other",
 };
 
