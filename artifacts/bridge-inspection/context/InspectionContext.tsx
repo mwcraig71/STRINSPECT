@@ -875,6 +875,7 @@ export interface SafetyCrewSignoff {
   name: string; // Printed name / signature
   date: string;
   initials: string;
+  signature?: string; // base64 PNG data URL of drawn signature
 }
 
 export interface SafetyBriefingData {
@@ -890,6 +891,8 @@ export interface SafetyBriefingData {
   ppeOtherText: string;
   selectedRisks: string[]; // identified risks present at this site (by risk title)
   crew: SafetyCrewSignoff[];
+  submitted?: boolean;
+  submittedAt?: string;
 }
 
 // Static reference content from the Strinteg Risk Assessment & Safety Briefing form.
@@ -1495,6 +1498,7 @@ const STORAGE_KEYS = {
   UNDERCLEARANCE: "@bridge_underclearance",
   CHANNEL: "@bridge_channel",
   SAFETY_BRIEFING: "@bridge_safety_briefing",
+  SAFETY_STICKY: "@bridge_safety_sticky",
   SNBI: "@bridge_snbi",
   STEEL_PIPE_PILE: "@bridge_steel_pipe_pile",
   IMPORT_SUMMARY: "@bridge_import_summary",
