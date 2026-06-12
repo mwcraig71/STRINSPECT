@@ -509,7 +509,7 @@ interface Props {
 export default function ReviewExport({ sessionData, setSessionData }: Props) {
   const [selectedId, setSelectedId] = useState("");
   const [exporting, setExporting] = useState<"excel" | "word" | "pdf" | "redline" | "annotations" | null>(null);
-  const [showReportHeader, setShowReportHeader] = useState(false);
+  const [showReportHeader, setShowReportHeader] = useState(true);
   const [pdfAnnotations, setPdfAnnotations] = useState<Annotation[]>([]);
   const [reportHeader, setReportHeader] = useState(() => {
     const DEFAULTS = {
