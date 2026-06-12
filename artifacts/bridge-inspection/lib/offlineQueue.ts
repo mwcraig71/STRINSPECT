@@ -148,6 +148,28 @@ export function collectPhotosFromStandardSlots(
 
 // ─── Photo upload ─────────────────────────────────────────────────────────────
 
+/**
+ * Fetch the set of photo IDs already stored on the server for a given session.
+ * Returns an empty set on any network or parse error so we fail open (upload rather than skip).
+ */
+async function fetchServerPhotoIds(
+  structureNumber: string,
+  apiUrl: string,
+  apiKey: string | undefined,
+): Promise<Set<string>> {
+  try {
+    const url = `${apiUrl}/api/sessions/photos/${encodeURIComponent(structureNumber)}`;
+    const headers: Record<string, string> = {};
+    if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
+    const res = await fetch(url, { headers });
+    if (!res.ok) return new Set();
+    const data = (await res.json()) as Array<{ photoId?: string }>;
+    return new Set(data.map((r) => r.photoId).filter((id): id is string => !!id));
+  } catch {
+    return new Set();
+  }
+}
+
 async function uploadOnePhoto(
   photo: PhotoToUpload,
   structureNumber: string,
@@ -180,8 +202,18 @@ export async function uploadPhotos(
   apiUrl: string,
   apiKey: string | undefined,
 ): Promise<void> {
+  // Query the server for photos already stored there, so we never re-upload them
+  // even when the local tracking set was cleared between syncs.
+  const serverIds = await fetchServerPhotoIds(structureNumber, apiUrl, apiKey);
+
+  // Seed local tracking from server knowledge so subsequent calls are instant.
+  for (const id of serverIds) {
+    await markPhotoUploaded(structureNumber, id);
+  }
+
   const uploadedIds = await getUploadedPhotoIds();
   for (const photo of photos) {
+    // Skip if already tracked locally (covers both server-seeded and previously uploaded).
     if (uploadedIds.has(scopedPhotoKey(structureNumber, photo.id))) continue;
     const ok = await uploadOnePhoto(photo, structureNumber, apiUrl, apiKey);
     if (ok) await markPhotoUploaded(structureNumber, photo.id);
