@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
-import { Audio } from "expo-av";
+import { AudioModule, RecordingPresets, useAudioRecorder } from "expo-audio";
 import * as Network from "expo-network";
-import React, { useCallback, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -31,8 +31,8 @@ export function SpeechToTextButton({ onResult, style }: SpeechToTextButtonProps)
   const c = useColors();
   const { openAiKey, aiRephrase } = useInspection();
   const networkState = Network.useNetworkState();
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
 
-  const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -45,17 +45,16 @@ export function SpeechToTextButton({ onResult, style }: SpeechToTextButtonProps)
   if (!openAiKey?.trim()) return null;
   if (!isOnline) return null;
 
-  const stopAndTranscribe = async (rec: Audio.Recording) => {
+  const stopAndTranscribe = async () => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
     }
-    setRecording(null);
     setBusy(true);
     setError(null);
     try {
-      await rec.stopAndUnloadAsync();
-      const uri = rec.getURI();
+      await recorder.stop();
+      const uri = recorder.uri;
       if (!uri) throw new Error("No recording URI.");
 
       const key = openAiKey.trim();
@@ -123,27 +122,22 @@ export function SpeechToTextButton({ onResult, style }: SpeechToTextButtonProps)
     if (busy) return;
     clearErr();
 
-    if (recording) {
-      await stopAndTranscribe(recording);
+    if (recorder.isRecording) {
+      await stopAndTranscribe();
       return;
     }
 
     try {
-      const { granted } = await Audio.requestPermissionsAsync();
+      const { granted } = await AudioModule.requestRecordingPermissionsAsync();
       if (!granted) {
         setError("Microphone permission denied.");
         return;
       }
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
-      const { recording: rec } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
-      );
-      setRecording(rec);
+      await AudioModule.setAudioModeAsync({ playsInSilentMode: true });
+      await recorder.prepareToRecordAsync();
+      recorder.record();
       timeoutRef.current = setTimeout(() => {
-        stopAndTranscribe(rec);
+        stopAndTranscribe();
       }, MAX_RECORD_MS);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Could not start recording.";
@@ -151,7 +145,7 @@ export function SpeechToTextButton({ onResult, style }: SpeechToTextButtonProps)
     }
   };
 
-  const isRecording = !!recording;
+  const isRecording = recorder.isRecording;
 
   return (
     <View style={[styles.wrapper, style]}>
