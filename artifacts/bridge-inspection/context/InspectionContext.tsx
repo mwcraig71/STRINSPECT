@@ -434,6 +434,7 @@ export interface AdditionalPhoto {
 export interface StandardPhotoSlot {
   slotId: string;
   label: string;
+  note?: string;
   photoUri?: string;
   capturedAt?: string;
   directionTags: string[];

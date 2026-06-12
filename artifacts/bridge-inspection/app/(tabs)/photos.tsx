@@ -12,6 +12,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -215,7 +216,7 @@ export default function PhotosScreen() {
   const capturedCount = standardPhotos.filter((s) => !!s.photoUri && !s.notNeeded).length;
   const waivedCount = standardPhotos.filter((s) => !!s.notNeeded).length;
 
-  const getPreviewPhoto = (): { uri: string; directionTags: string[]; subjectTags: string[]; capturedAt?: string; label: string } | null => {
+  const getPreviewPhoto = (): { uri: string; directionTags: string[]; subjectTags: string[]; capturedAt?: string; label: string; note?: string } | null => {
     if (!previewTarget) return null;
     const { kind, slot } = previewTarget;
     if (kind === "additional") {
@@ -224,6 +225,9 @@ export default function PhotosScreen() {
       return { uri: p.uri, directionTags: p.directionTags, subjectTags: p.subjectTags, capturedAt: p.capturedAt, label: `${slot.label} — Additional ${previewTarget.index + 1}` };
     }
     if (!slot.photoUri) return null;
+    if (kind === "extra") {
+      return { uri: slot.photoUri, directionTags: slot.directionTags, subjectTags: slot.subjectTags, capturedAt: slot.capturedAt, label: slot.label, note: slot.note };
+    }
     return { uri: slot.photoUri, directionTags: slot.directionTags, subjectTags: slot.subjectTags, capturedAt: slot.capturedAt, label: slot.label };
   };
 
@@ -367,6 +371,7 @@ export default function PhotosScreen() {
             onTagsChange={(directionTags, subjectTags) =>
               setExtraPhotoSlot(slot.slotId, { directionTags, subjectTags })
             }
+            onNoteChange={(note) => setExtraPhotoSlot(slot.slotId, { note })}
           />
         ))}
 
@@ -378,7 +383,14 @@ export default function PhotosScreen() {
           <Pressable style={styles.previewBackdrop} onPress={() => setPreviewTarget(null)}>
             <Pressable style={[styles.previewCard, { backgroundColor: c.card }]} onPress={() => {}}>
               <View style={styles.previewHeader}>
-                <Text style={[styles.previewTitle, { color: c.foreground }]}>{previewPhoto.label}</Text>
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <Text style={[styles.previewTitle, { color: c.foreground }]}>
+                    {previewPhoto.note ? previewPhoto.note : previewPhoto.label}
+                  </Text>
+                  {previewPhoto.note ? (
+                    <Text style={[styles.previewSubtitle, { color: c.mutedForeground }]}>{previewPhoto.label}</Text>
+                  ) : null}
+                </View>
                 <TouchableOpacity onPress={() => setPreviewTarget(null)} style={{ padding: 4 }}>
                   <Feather name="x" size={20} color={c.mutedForeground} />
                 </TouchableOpacity>
@@ -421,6 +433,7 @@ interface SlotCardProps {
   onRemoveAdditional?: (index: number) => void;
   onPreviewAdditional?: (index: number) => void;
   onTagsChange: (directionTags: string[], subjectTags: string[]) => void;
+  onNoteChange?: (note: string) => void;
 }
 
 function SlotCard({
@@ -439,6 +452,7 @@ function SlotCard({
   onRemoveAdditional,
   onPreviewAdditional,
   onTagsChange,
+  onNoteChange,
 }: SlotCardProps) {
   const captured = !!slot.photoUri;
   const notNeeded = !!slot.notNeeded;
@@ -479,6 +493,21 @@ function SlotCard({
           )}
         </View>
       </View>
+
+      {isExtra && (
+        <View style={styles.noteRow}>
+          <Feather name="edit-3" size={12} color="#64748b" style={{ marginTop: 2 }} />
+          <TextInput
+            style={styles.noteInput}
+            placeholder="Add a note (e.g. Underside of Span 2 — active efflorescence)"
+            placeholderTextColor="#475569"
+            value={slot.note ?? ""}
+            onChangeText={(text) => onNoteChange?.(text.slice(0, 80))}
+            maxLength={80}
+            returnKeyType="done"
+          />
+        </View>
+      )}
 
       {notNeeded ? (
         <View style={styles.notNeededArea}>
@@ -641,10 +670,13 @@ const styles = StyleSheet.create({
   previewBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.85)", justifyContent: "center", alignItems: "center", padding: 16 },
   previewCard: { width: "100%", maxWidth: 520, borderRadius: 16, overflow: "hidden" },
   previewHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12 },
-  previewTitle: { fontSize: 15, fontWeight: "700", flex: 1, marginRight: 8 },
+  previewTitle: { fontSize: 15, fontWeight: "700" },
+  previewSubtitle: { fontSize: 11, marginTop: 2 },
   previewImage: { width: "100%", height: 280 },
   previewTags: { padding: 14 },
   previewMeta: { paddingHorizontal: 14, paddingBottom: 12, fontSize: 11 },
+  noteRow: { flexDirection: "row", alignItems: "flex-start", gap: 6, paddingHorizontal: 12, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: "#1e293b" },
+  noteInput: { flex: 1, color: "#e2e8f0", fontSize: 12, paddingVertical: 4, minWidth: 0 },
   sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8, marginBottom: 4 },
   sectionHeaderLeft: { flexDirection: "row", alignItems: "center", gap: 6 },
   sectionHeaderText: { color: "#c4b5fd", fontSize: 14, fontWeight: "700" },
