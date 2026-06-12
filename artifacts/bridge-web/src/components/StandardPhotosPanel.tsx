@@ -1,4 +1,5 @@
-import { useEffect, useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Camera, ImageOff, ChevronLeft, ChevronRight, X } from "lucide-react";
 
 const STANDARD_SLOTS = [
@@ -37,36 +38,27 @@ function parseTags(description: string | null): PhotoTags {
   }
 }
 
+export const SESSION_PHOTOS_QUERY_KEY = "session-photos";
+
+async function fetchPhotoMeta(structureNumber: string): Promise<PhotoMeta[]> {
+  const r = await fetch(`/api/sessions/photos/${encodeURIComponent(structureNumber)}`);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json() as Promise<PhotoMeta[]>;
+}
+
 interface Props {
   structureNumber: string;
 }
 
 export default function StandardPhotosPanel({ structureNumber }: Props) {
-  const [photoMeta, setPhotoMeta] = useState<PhotoMeta[] | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
-  useEffect(() => {
-    if (!structureNumber) return;
-    setLoading(true);
-    setError(false);
-    setPhotoMeta(null);
-
-    fetch(`/api/sessions/photos/${encodeURIComponent(structureNumber)}`)
-      .then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json() as Promise<PhotoMeta[]>;
-      })
-      .then((data) => {
-        setPhotoMeta(data);
-        setLoading(false);
-      })
-      .catch(() => {
-        setError(true);
-        setLoading(false);
-      });
-  }, [structureNumber]);
+  const { data: photoMeta, isLoading, isError } = useQuery<PhotoMeta[]>({
+    queryKey: [SESSION_PHOTOS_QUERY_KEY, structureNumber],
+    queryFn: () => fetchPhotoMeta(structureNumber),
+    enabled: !!structureNumber,
+    staleTime: 5 * 60 * 1000,
+  });
 
   const metaBySlot = new Map<string, PhotoMeta>();
   if (photoMeta) {
@@ -114,7 +106,7 @@ export default function StandardPhotosPanel({ structureNumber }: Props) {
       <div className="px-4 py-3 border-b border-border flex items-center gap-2">
         <Camera className="h-4 w-4 text-sky-400" />
         <span className="text-sm font-semibold text-foreground">Standard Photos</span>
-        {!loading && (
+        {!isLoading && (
           <span
             className={`text-xs rounded-full px-2 py-0.5 font-semibold ${
               uploadedCount === STANDARD_SLOTS.length
@@ -130,7 +122,7 @@ export default function StandardPhotosPanel({ structureNumber }: Props) {
       </div>
 
       <div className="p-4">
-        {loading ? (
+        {isLoading ? (
           <div className="grid grid-cols-4 gap-3">
             {STANDARD_SLOTS.map((s) => (
               <div key={s.slotId} className="rounded-lg overflow-hidden border border-border">
@@ -141,7 +133,7 @@ export default function StandardPhotosPanel({ structureNumber }: Props) {
               </div>
             ))}
           </div>
-        ) : error ? (
+        ) : isError ? (
           <p className="text-sm text-muted-foreground text-center py-4">
             Could not load photos. Ensure the API server is running.
           </p>
@@ -226,8 +218,6 @@ export default function StandardPhotosPanel({ structureNumber }: Props) {
         const meta = metaBySlot.get(slot.slotId)!;
         const photoUrl = `/api/sessions/photos/${encodeURIComponent(structureNumber)}/${encodeURIComponent(meta.photoId)}`;
         const tags = parseTags(meta.description);
-        const hasPrev = uploadedSlots.length > 1;
-        const hasNext = uploadedSlots.length > 1;
 
         return (
           <div
@@ -266,58 +256,43 @@ export default function StandardPhotosPanel({ structureNumber }: Props) {
                   )}
                   <button
                     onClick={closeLightbox}
-                    className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-md hover:bg-secondary"
-                    title="Close (Esc)"
-                    aria-label="Close lightbox"
+                    className="p-1.5 rounded-md hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
+                    title="Close"
                   >
                     <X className="h-4 w-4" />
                   </button>
                 </div>
               </div>
 
-              {/* Image area with nav arrows */}
-              <div className="relative bg-black flex items-center justify-center">
-                <img
-                  key={photoUrl}
-                  src={photoUrl}
-                  alt={slot.label}
-                  className="max-h-[70vh] w-full object-contain"
-                />
-                {hasPrev && (
-                  <button
-                    onClick={goPrev}
-                    className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/75 text-white rounded-full p-2 transition-colors"
-                    title="Previous (←)"
-                    aria-label="Previous photo"
-                  >
-                    <ChevronLeft className="h-5 w-5" />
-                  </button>
-                )}
-                {hasNext && (
-                  <button
-                    onClick={goNext}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/75 text-white rounded-full p-2 transition-colors"
-                    title="Next (→)"
-                    aria-label="Next photo"
-                  >
-                    <ChevronRight className="h-5 w-5" />
-                  </button>
+              {/* Image */}
+              <div className="relative bg-black">
+                <img src={photoUrl} alt={slot.label} className="w-full max-h-[65vh] object-contain" />
+                {uploadedSlots.length > 1 && (
+                  <>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); goPrev(); }}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 hover:bg-black/70 transition-colors text-white"
+                      title="Previous"
+                    >
+                      <ChevronLeft className="h-5 w-5" />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); goNext(); }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 hover:bg-black/70 transition-colors text-white"
+                      title="Next"
+                    >
+                      <ChevronRight className="h-5 w-5" />
+                    </button>
+                  </>
                 )}
               </div>
 
               {/* Footer */}
-              <div className="px-4 py-2 border-t border-border flex items-center justify-between shrink-0">
-                {meta.createdAt ? (
-                  <p className="text-xs text-muted-foreground">
-                    Uploaded {new Date(meta.createdAt).toLocaleString("en-US")}
-                  </p>
-                ) : (
-                  <span />
-                )}
-                <p className="text-xs text-muted-foreground">
-                  ESC to close · ← → to navigate
+              {meta.createdAt && (
+                <p className="text-xs text-muted-foreground px-4 py-2 border-t border-border shrink-0">
+                  Uploaded {new Date(meta.createdAt).toLocaleString("en-US")}
                 </p>
-              </div>
+              )}
             </div>
           </div>
         );

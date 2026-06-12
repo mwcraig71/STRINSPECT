@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Upload, AlertTriangle, Wrench, HelpCircle, RefreshCw, Cloud, ChevronDown, ChevronUp, Smartphone, FileText, PenLine } from "lucide-react";
 import {
   BarChart,
@@ -11,7 +12,7 @@ import {
 } from "recharts";
 import { SessionData, DefectRecord, NbiRating, ImportSummary } from "@/lib/types";
 import PDFRedlineViewer from "@/components/PDFRedlineViewer";
-import StandardPhotosPanel from "@/components/StandardPhotosPanel";
+import StandardPhotosPanel, { SESSION_PHOTOS_QUERY_KEY } from "@/components/StandardPhotosPanel";
 import {
   useListSessions,
   useGetSession,
@@ -57,6 +58,7 @@ function formatRelativeTime(iso: string): string {
 }
 
 export default function InspectionProgress({ sessionData, setSessionData }: Props) {
+  const queryClient = useQueryClient();
   const [dragOver, setDragOver] = useState(false);
   const [fileError, setFileError] = useState("");
   const [showUpload, setShowUpload] = useState(false);
@@ -187,7 +189,7 @@ export default function InspectionProgress({ sessionData, setSessionData }: Prop
               </span>
             )}
             <button
-              onClick={() => refetch()}
+              onClick={() => { void refetch(); queryClient.invalidateQueries({ queryKey: [SESSION_PHOTOS_QUERY_KEY] }); }}
               disabled={isFetching}
               className="p-1.5 rounded-md hover:bg-secondary transition-colors disabled:opacity-40"
               title="Refresh sessions"

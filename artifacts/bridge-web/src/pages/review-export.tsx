@@ -1,4 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { SESSION_PHOTOS_QUERY_KEY } from "@/components/StandardPhotosPanel";
 import {
   FileSpreadsheet, FileText, RefreshCw, Database, FileDown, X,
   ChevronDown, ChevronUp, ExternalLink, PenLine,
@@ -507,6 +509,7 @@ interface Props {
 }
 
 export default function ReviewExport({ sessionData, setSessionData }: Props) {
+  const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState("");
   const [exporting, setExporting] = useState<"excel" | "word" | "pdf" | "redline" | "annotations" | null>(null);
   const [showReportHeader, setShowReportHeader] = useState(true);
@@ -1288,7 +1291,7 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
             </span>
           </div>
           <button
-            onClick={() => refetch()}
+            onClick={() => { void refetch(); queryClient.invalidateQueries({ queryKey: [SESSION_PHOTOS_QUERY_KEY] }); }}
             disabled={isFetching}
             className="text-muted-foreground hover:text-foreground transition-colors"
             title="Refresh"
