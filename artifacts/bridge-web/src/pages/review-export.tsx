@@ -109,7 +109,15 @@ const EMPTY_HEADER: ReportHeader = {
   inspectors: "", inspectionType: "", latitude: "", longitude: "",
 };
 
-function generatePrintHtml(data: SessionData, header: ReportHeader = EMPTY_HEADER): string {
+interface ExtraPhotoEntry {
+  photoId: string;
+  dataUri: string | null;
+  directionTags: string[];
+  subjectTags: string[];
+  capturedAt: Date;
+}
+
+function generatePrintHtml(data: SessionData, header: ReportHeader = EMPTY_HEADER, extraPhotos: ExtraPhotoEntry[] = []): string {
   const defects = data.defects ?? [];
   const nbiRatings = data.nbiRatings ?? [];
   const importSummary = data.importSummary;
@@ -391,6 +399,30 @@ function generatePrintHtml(data: SessionData, header: ReportHeader = EMPTY_HEADE
       }).join("")}
     </div>`;
 
+  // ── 7. ADDITIONAL PHOTOS ─────────────────────────────────────────────────────
+  const additionalPhotosSection = extraPhotos.length === 0 ? "" : `
+    <h2>Additional Photos</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px">
+      ${extraPhotos.map((e, i) => {
+        const tags = [...e.directionTags, ...e.subjectTags].filter(Boolean);
+        const tagsLabel = tags.length ? tags.join(", ") : "";
+        const dateLabel = e.capturedAt.toLocaleString();
+        const imgHtml = e.dataUri
+          ? `<img src="${esc(e.dataUri)}" style="max-width:240px;max-height:160px;border-radius:4px;display:block" />`
+          : `<span style="color:#94a3b8;font-style:italic">Image unavailable</span>`;
+        return `<div style="page-break-inside:avoid;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden">
+          <div style="padding:10px 12px;background:#f9fafb;border-bottom:1px solid #e5e7eb">
+            <div style="font-size:11px;font-weight:700">EXTRA PHOTO ${i + 1}</div>
+            ${tagsLabel ? `<div style="font-size:10px;color:#64748b;margin-top:1px">${esc(tagsLabel)}</div>` : ""}
+            <div style="font-size:10px;color:#9ca3af;margin-top:1px">${esc(dateLabel)}</div>
+          </div>
+          <div style="padding:10px 12px">
+            ${imgHtml}
+          </div>
+        </div>`;
+      }).join("")}
+    </div>`;
+
   // ── IMPORT AUDIT (appended at end if present) ────────────────────────────────
   const importBlock = importSummary
     ? `<div style="margin-top:36px;padding-top:24px;border-top:2px solid #e5e7eb">
@@ -462,6 +494,7 @@ function generatePrintHtml(data: SessionData, header: ReportHeader = EMPTY_HEADE
     <h2>Defect Records by Location</h2>
     ${defects.length === 0 ? `<p style="color:#6b7280;font-style:italic">No defect records in this session.</p>` : defectSections}
     ${photosSection}
+    ${additionalPhotosSection}
     ${importBlock}
   </div>
 </body>
@@ -515,16 +548,78 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
     const rawAnns = (sessionDetail.pdfAnnotations ?? []) as Annotation[];
     setPdfAnnotations(rawAnns);
 
-    const html = generatePrintHtml(data, reportHeader);
-    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const win = window.open(url, "_blank", "noopener");
-    if (!win) {
-      const a = document.createElement("a");
-      a.href = url; a.target = "_blank"; a.rel = "noopener";
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    }
-    setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    const structureNumber = sessionDetail.structureNumber;
+
+    const openReport = (extraPhotos: ExtraPhotoEntry[]) => {
+      const html = generatePrintHtml(data, reportHeader, extraPhotos);
+      const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const win = window.open(url, "_blank", "noopener");
+      if (!win) {
+        const a = document.createElement("a");
+        a.href = url; a.target = "_blank"; a.rel = "noopener";
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    };
+
+    const fetchExtraPhotos = async (): Promise<ExtraPhotoEntry[]> => {
+      try {
+        const metaRes = await fetch(`/api/sessions/photos/${encodeURIComponent(structureNumber)}`);
+        if (!metaRes.ok) return [];
+        const photoMeta = (await metaRes.json()) as Array<{
+          photoId: string;
+          mimeType: string;
+          description: string | null;
+          createdAt: string;
+        }>;
+        const extraMeta = photoMeta.filter((p) => p.photoId.startsWith("extra_"));
+        return await Promise.all(
+          extraMeta.map(async (p): Promise<ExtraPhotoEntry> => {
+            let directionTags: string[] = [];
+            let subjectTags: string[] = [];
+            try {
+              const parsed = JSON.parse(p.description ?? "{}") as {
+                directionTags?: string[];
+                subjectTags?: string[];
+              };
+              directionTags = parsed.directionTags ?? [];
+              subjectTags = parsed.subjectTags ?? [];
+            } catch { /* ignore */ }
+
+            let dataUri: string | null = null;
+            try {
+              const photoRes = await fetch(
+                `/api/sessions/photos/${encodeURIComponent(structureNumber)}/${encodeURIComponent(p.photoId)}`,
+              );
+              if (photoRes.ok) {
+                const blobData = await photoRes.blob();
+                dataUri = await new Promise<string>((resolve, reject) => {
+                  const reader = new FileReader();
+                  reader.onload = () => resolve(reader.result as string);
+                  reader.onerror = reject;
+                  reader.readAsDataURL(blobData);
+                });
+              }
+            } catch { /* ignore — best-effort */ }
+
+            return {
+              photoId: p.photoId,
+              dataUri,
+              directionTags,
+              subjectTags,
+              capturedAt: new Date(p.createdAt),
+            };
+          }),
+        );
+      } catch {
+        return [];
+      }
+    };
+
+    fetchExtraPhotos().then((extraPhotos) => {
+      openReport(extraPhotos);
+    });
 
     setSelectedId("");
   }, [sessionDetail, setSessionData]);
