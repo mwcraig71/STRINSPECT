@@ -119,7 +119,20 @@ interface ExtraPhotoEntry {
   capturedAt: Date;
 }
 
-function generatePrintHtml(data: SessionData, header: ReportHeader = EMPTY_HEADER, extraPhotos: ExtraPhotoEntry[] = []): string {
+const REPORT_STYLES = `
+  *{box-sizing:border-box;margin:0;padding:0}
+  body,div{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#1f2937;line-height:1.5}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:20px 0 28px}
+  .stat{border:1px solid #e5e7eb;border-radius:8px;padding:12px 16px}
+  .stat .val{font-size:26px;font-weight:700;line-height:1.1}
+  .stat .lbl{font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
+  h1{font-size:22px;font-weight:700;color:#111827;margin-bottom:4px}
+  h2{font-size:15px;font-weight:700;color:#1f2937;margin:28px 0 12px;border-bottom:2px solid #e5e7eb;padding-bottom:6px}
+  .meta{color:#6b7280;font-size:11px;margin-bottom:8px}
+  @media print{tr{page-break-inside:avoid}h2,h3{page-break-after:avoid}}
+`;
+
+function buildReportContentHtml(data: SessionData, header: ReportHeader = EMPTY_HEADER, extraPhotos: ExtraPhotoEntry[] = []): string {
   const defects = data.defects ?? [];
   const nbiRatings = data.nbiRatings ?? [];
   const importSummary = data.importSummary;
@@ -451,40 +464,7 @@ function generatePrintHtml(data: SessionData, header: ReportHeader = EMPTY_HEADE
       </div>`
     : "";
 
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Bridge Inspection Report \u2014 ${esc(structNum)}</title>
-  <style>
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#1f2937;line-height:1.5}
-    .print-bar{background:#1e293b;color:#fff;padding:12px 24px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:10}
-    .print-btn{background:#3b82f6;color:#fff;border:none;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600}
-    .print-btn:hover{background:#2563eb}
-    .content{max-width:960px;margin:0 auto;padding:32px 24px}
-    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:20px 0 28px}
-    .stat{border:1px solid #e5e7eb;border-radius:8px;padding:12px 16px}
-    .stat .val{font-size:26px;font-weight:700;line-height:1.1}
-    .stat .lbl{font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
-    h1{font-size:22px;font-weight:700;color:#111827;margin-bottom:4px}
-    h2{font-size:15px;font-weight:700;color:#1f2937;margin:28px 0 12px;border-bottom:2px solid #e5e7eb;padding-bottom:6px}
-    .meta{color:#6b7280;font-size:11px;margin-bottom:8px}
-    @media print{
-      .print-bar{display:none!important}
-      .content{padding:0;max-width:100%}
-      tr{page-break-inside:avoid}
-      h2,h3{page-break-after:avoid}
-    }
-  </style>
-</head>
-<body>
-  <div class="print-bar">
-    <button class="print-btn" onclick="window.print()">&#128424; Print / Save as PDF</button>
-    <span style="font-size:13px">Bridge Inspection Report &mdash; ${esc(structNum)}</span>
-  </div>
-  <div class="content">
+  return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#1f2937;line-height:1.5;padding:32px 24px;max-width:960px">
     <h1>Bridge Inspection Report</h1>
     <p class="meta">Generated: ${esc(now)} &nbsp;&middot;&nbsp; ${defects.length} defect records</p>
     <table style="border-collapse:collapse;margin-bottom:4px">${coverRows}</table>
@@ -498,7 +478,32 @@ function generatePrintHtml(data: SessionData, header: ReportHeader = EMPTY_HEADE
     ${photosSection}
     ${additionalPhotosSection}
     ${importBlock}
+  </div>`;
+}
+
+function generatePrintHtml(data: SessionData, header: ReportHeader = EMPTY_HEADER, extraPhotos: ExtraPhotoEntry[] = []): string {
+  const structNum = data.structureNumber ?? "Unknown";
+  const content = buildReportContentHtml(data, header, extraPhotos);
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Bridge Inspection Report \u2014 ${esc(structNum)}</title>
+  <style>
+    ${REPORT_STYLES}
+    .print-bar{background:#1e293b;color:#fff;padding:12px 24px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:10}
+    .print-btn{background:#3b82f6;color:#fff;border:none;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600}
+    .print-btn:hover{background:#2563eb}
+    @media print{.print-bar{display:none!important}}
+  </style>
+</head>
+<body>
+  <div class="print-bar">
+    <button class="print-btn" onclick="window.print()">&#128424; Print / Save as PDF</button>
+    <span style="font-size:13px">Bridge Inspection Report &mdash; ${esc(structNum)}</span>
   </div>
+  ${content}
 </body>
 </html>`;
 }
@@ -1031,25 +1036,34 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
     }
   }, [sessionData, defects, nbiRatings, reportHeader]);
 
-  const exportPdf = useCallback(() => {
+  const exportPdf = useCallback(async () => {
     if (!sessionData) return;
     setExporting("pdf");
+    const structNum = sessionData.structureNumber ?? "bridge";
+    const container = document.createElement("div");
+    container.style.cssText = "position:fixed;left:-9999px;top:0;width:960px;background:#fff";
+    container.innerHTML = `<style>${REPORT_STYLES}</style>${buildReportContentHtml(sessionData, reportHeader)}`;
+    document.body.appendChild(container);
     try {
-      const html = generatePrintHtml(sessionData, reportHeader);
-      const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const win = window.open(url, "_blank", "noopener");
-      if (!win) {
-        const a = document.createElement("a");
-        a.href = url;
-        a.target = "_blank";
-        a.rel = "noopener";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-      }
-      setTimeout(() => URL.revokeObjectURL(url), 30_000);
+      const { jsPDF } = await import("jspdf");
+      await import("html2canvas");
+      const pdf = new jsPDF({ unit: "pt", format: "letter", orientation: "portrait" });
+      await new Promise<void>((resolve, reject) => {
+        pdf.html(container, {
+          callback(doc) {
+            try { doc.save(`bridge_report_${structNum}.pdf`); resolve(); }
+            catch (e) { reject(e); }
+          },
+          margin: [24, 20, 24, 20],
+          autoPaging: "text",
+          width: 572,
+          windowWidth: 960,
+        });
+      });
+    } catch (e) {
+      alert("Could not generate PDF: " + (e instanceof Error ? e.message : String(e)));
     } finally {
+      document.body.removeChild(container);
       setExporting(null);
     }
   }, [sessionData, reportHeader]);
@@ -1449,7 +1463,7 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
               className="flex items-center gap-1.5 bg-slate-600 hover:bg-slate-500 disabled:opacity-50 text-white px-3 py-1.5 rounded-md text-xs font-semibold transition-colors"
             >
               <FileDown className="h-3.5 w-3.5" />
-              {exporting === "pdf" ? "Opening…" : "Print PDF"}
+              {exporting === "pdf" ? "Generating…" : "Download PDF"}
             </button>
 
             {/* Divider */}

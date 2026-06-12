@@ -76,6 +76,8 @@
   },
   "dependencies": {
     "docx": "^9.7.1",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.2.1",
     "pdfjs-dist": "4.4.168",
     "xlsx": "^0.18.5"
   }
