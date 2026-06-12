@@ -520,10 +520,12 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
   const [showReportHeader, setShowReportHeader] = useState(true);
   const [pdfAnnotations, setPdfAnnotations] = useState<Annotation[]>([]);
   const [reportHeader, setReportHeader] = useState(() => {
+    const today = new Date();
+    const todayFormatted = `${String(today.getMonth() + 1).padStart(2, "0")}/${String(today.getDate()).padStart(2, "0")}/${today.getFullYear()}`;
     const DEFAULTS = {
       facilityCarried: "",
       featureCrossed: "",
-      inspectionDate: "",
+      inspectionDate: todayFormatted,
       inspectors: "",
       inspectionType: "Routine",
       latitude: "",
@@ -531,7 +533,10 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
     };
     try {
       const raw = localStorage.getItem("bridge_report_header_last");
-      if (raw) return { ...DEFAULTS, ...JSON.parse(raw) };
+      if (raw) {
+        const saved = JSON.parse(raw);
+        return { ...DEFAULTS, ...saved, inspectionDate: saved.inspectionDate || todayFormatted };
+      }
     } catch { /* ignore */ }
     return DEFAULTS;
   });
