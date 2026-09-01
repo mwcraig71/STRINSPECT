@@ -1522,7 +1522,7 @@ export function scdotStreambedToChannel(report: ParsedScdotReport): ParsedChanne
     }));
   const describe = (s: (typeof sections)[number]) =>
     [
-      s.offsetRemark && `${s.offsetRemark}`,
+      [s.offsetRemark, s.orientation].filter(Boolean).join(" / "),
       s.waterSurface && `Water Surface ${s.waterSurface}`,
       s.offset && `Offset ${s.offset}`,
       s.elevBasis && `Elev Basis ${s.elevBasis}`,

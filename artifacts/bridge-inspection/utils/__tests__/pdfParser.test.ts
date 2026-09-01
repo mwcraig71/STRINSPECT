@@ -90,7 +90,7 @@ describe("parsePages — SCDOT adapter", () => {
       { topRef: "Top of Headwall", botRef: "", totalHoriz: "20.0", distFromLastBent: "", vertDist: "9.9", notes: "Exterior Wall 2" },
     ]);
     expect(report.channelCrossSection!.downstream.map((r) => r.vertDist)).toEqual(["10.0", "10.0", "9.6", "8.7", "6.7"]);
-    expect(report.channelCrossSection!.comments).toMatch(/^Inlet, Water Surface -5.20, Offset 24.00/);
+    expect(report.channelCrossSection!.comments).toMatch(/^Inlet \/ Left View, Water Surface -5.20, Offset 24.00/);
     expect(report.underclearance).toBeUndefined();
   });
 

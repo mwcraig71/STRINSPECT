@@ -425,4 +425,74 @@ describe("parseScdotReport — corpus", () => {
       "Element 302: tagged quantities for 2350 (Debris Impaction) are CS 0/44/0/0 but the row says 0/50/0/0"
     );
   });
+
+  describe("asset 09697 routine (13-span PSC girder bridge, template v15)", () => {
+    const r = parseScdotReport(loadPages("scdot-9697-Routine-2024-11-14-001.pages.json"));
+
+    it("parses with no roll-up, tag or caption warnings", () => {
+      // The only note is the template's blank "(099) Border Bridge Structure Number"
+      // sharing a row with "(SBI) Bridge with Complex Feature: 0".
+      expect(r.warnings).toEqual([
+        'Stray value "0" attached to "Bridge with Complex Feature" (ambiguous near "Border Bridge Structure Number")',
+      ]);
+      expect(r.header).toMatchObject({ assetId: "09697", structureNumber: "2640002241200", teamLeader: "Molly Capistrant", teamMembers: ["Jihad Libbus"], inspectionTypes: "Routine" });
+    });
+
+    it("reads bridge-only inventory blocks and labels ending in '?'", () => {
+      const v = (k: string) => r.fields[k]?.value;
+      expect(v("045")).toBe("13");
+      expect(v("046")).toBe("0");
+      expect(v("614")).toBe("N/A (NBI) No Approach Sp");
+      expect(v("418A")).toBe("8");
+      expect(v("418B")).toBe("8");
+      expect(v("418C")).toBe("8");
+      expect(v("630")).toBe("No E/E’ details");
+      expect(v("527")).toBe("No Feature");
+      expect(v("101")).toBe("Left of || bridge");
+      expect(v("103")).toBe("");
+      expect(v("SBI_topside_inspection_category")).toBe("SB7");
+      expect(v("SBI_underwater_inspection_category")).toBe("UA10");
+      expect(v("442B")).toBe("2 - Has POA");
+      expect(v("517")).toBe("9.8");
+    });
+
+    it("keeps an untagged description line out of the next tagged note", () => {
+      const ws = r.elements.find((e) => e.elementId === "510")!;
+      expect(ws.notes).toEqual(["Asphalt Wearing surface (38ft W x 20ft L x 2in thick) on both approach slabs"]);
+      expect(ws.defects.map((d) => [d.defectCode, d.cs, d.qty, d.location])).toEqual([
+        ["3210", 3, 76, "Both approach asphalt wearing surface along joint at EB"],
+        ["3220", 3, 38, "East approach asphalt wearing surface"],
+      ]);
+    });
+
+    it("merges a note wrapped mid-dimension and splits multi-state tags", () => {
+      const girder = r.elements.find((e) => e.elementId === "109")!;
+      expect(girder.defects[0].text).toMatch(/spall \(3in H x 2in L x 1in D\) at poured concrete section\.$/);
+      const joint = r.elements.find((e) => e.elementId === "300")!;
+      expect(joint.defects.map((d) => `${d.defectCode}:${d.cs}:${d.qty}`)).toEqual(["2350:2:72", "2350:3:51"]);
+      const deck = r.elements.find((e) => e.elementId === "12")!;
+      expect(deck.defects.filter((d) => d.defectCode === "1130").reduce((a, d) => a + d.qty, 0)).toBe(16104);
+      expect(deck.defects.find((d) => d.defectCode === "1120")?.context).toBe("Underside of Deck");
+    });
+
+    it("attributes wrapped photo captions by column width", () => {
+      const cap = (n: number) => r.photos.find((p) => p.number === n)?.caption;
+      expect(r.photos).toHaveLength(41);
+      expect(cap(37)).toBe("West approach roadway at Southwest corner undermined (4ft L x >4ft D x >4ft H) with curb footer settled west (12in).");
+      expect(cap(38)).toBe("SE delineator leaning to the West");
+      expect(cap(39)).toBe("South bank beginning at Bent 5 column 1 drain downspout, erosion gully (30ft L x up to 8ft W x 3ft D) with sufficient rubble riprap in place.");
+      expect(cap(40)).toBe("Drains in Spans 2 through 4, clogged");
+      expect(cap(21)).toBe("Drainage System in Span 5");
+      expect(cap(22)).toBe("Throughout all spans, in North travel lane at average 5ft centers, transverse cracks (12ft W x FL x 1/32in W)");
+    });
+
+    it("reads long streambed sections and single-spaced equipment rows", () => {
+      expect(r.streambed.map((s) => [s.orientation, s.offsetRemark, s.waterSurface, s.rows.length])).toEqual([
+        ["Right View", "Upstream Fascia", "4.60", 39],
+        ["Left View", "Upstream Fascia", "3.60", 37],
+      ]);
+      expect(r.streambed[0].rows[38]).toEqual({ station: "12 + 75.5", elevation: "10.3", remark: "End Bent 14" });
+      expect(r.equipment).toEqual([{ name: "A13 Unmanned Aircraft System (UAS)", hours: "1.00", cost: "0" }]);
+    });
+  });
 });

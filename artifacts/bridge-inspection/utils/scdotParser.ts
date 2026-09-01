@@ -285,7 +285,7 @@ const NUMBERED_LABEL_RE = new RegExp(
     // bracket form: "Deck Structure Condition [B.C.01]:" / "[B.AP.01" (unclosed)
     `(${LABEL_TEXT})\\s*\\[([^\\]]*?)(?:\\]|(?=\\s{2,}|$))\\s*:?` +
     // colon form: "Scour Condition:"
-    `|(${LABEL_TEXT.replace("[^\\[\\]\\s]", "[^\\[\\]\\s:]")}):` +
+    `|(${LABEL_TEXT.replace("[^\\[\\]\\s]", "[^\\[\\]\\s:?]")})[:?]` +
     // unit-suffix form with no colon: "Max Water Depth at Bent (ft)"
     `|(${LABEL_TEXT.replace("[^\\[\\]\\s]", "[^\\[\\]\\s:]")}\\([a-z°A-Z/]{1,6}\\))(?=\\s{2,}|$)` +
     `)(?=\\s|$)`,
@@ -407,14 +407,19 @@ export function parseFields(body: string[]): { fields: Record<string, ScdotField
   const empties = (ll: LabelLine | null) =>
     ll ? ll.labels.map((l, idx) => ({ ll, idx, label: l })).filter((e) => ll.values[e.idx] === null) : [];
 
-  const attach = (strays: string[], candidates: { ll: LabelLine; idx: number; label: LabelSpan }[], where: string) => {
+  const attach = (
+    strays: string[],
+    candidates: { ll: LabelLine; idx: number; label: LabelSpan }[],
+    where: string,
+    trackColumn = true
+  ) => {
     if (strays.length === 0 || candidates.length === 0) return;
     let pool = [...candidates];
     // Same count and every value fits its column: zip in order.
     if (strays.length === pool.length && strays.every((v, k) => valueFitsLabel(pool[k].label.label, v))) {
       strays.forEach((v, k) => {
         pool[k].ll.values[pool[k].idx] = v;
-        lastCol = pool[k].idx;
+        if (trackColumn) lastCol = pool[k].idx;
       });
       return;
     }
@@ -433,7 +438,7 @@ export function parseFields(body: string[]): { fields: Record<string, ScdotField
         warnings.push(`Stray value "${v}" attached to "${preferred.label.label}" (ambiguous near "${where}")`);
       }
       preferred.ll.values[preferred.idx] = v;
-      lastCol = preferred.idx;
+      if (trackColumn) lastCol = preferred.idx;
       pool = pool.filter((c) => c !== preferred);
     }
   };
@@ -446,9 +451,11 @@ export function parseFields(body: string[]): { fields: Record<string, ScdotField
     }
     if (cur.kind === "labels") {
       if (cur.prefix.length) {
+        // Text before the first label is always the left column's value (for
+        // this line or the next); it says nothing about which column drifts.
         const own = empties(cur);
         const below = empties(labelLineAt(i + 1));
-        attach(cur.prefix, own.length ? own : below, cur.labels[0].label);
+        attach(cur.prefix, own.length ? own : below, cur.labels[0].label, false);
       }
       continue;
     }
@@ -677,12 +684,12 @@ export function parseElementNotes(body: string[]): { elements: ScdotElementRow[]
       if (/^[^.]{1,50}:$/.test(line)) {
         flushPending();
         const label = line.slice(0, -1).trim();
-        // Nested headings: a "Span 10:" resets deeper "At BT 10:" contexts.
-        if (/^(span|bent|bt|pier|abut|end bent|barrel|top|underside|bottom|north|south|east|west)/i.test(label) && contextStack.length > 1) {
-          contextStack = [contextStack[0]];
-        }
-        if (contextStack.length >= 2) contextStack = [contextStack[0]];
-        contextStack.push(label);
+        // Two levels of context: a top-level heading ("Top of Deck:", "Span 10:",
+        // "NBL Defects:") starts a new stack; anything else ("At BT 10:") is a
+        // sub-heading that replaces the previous sub-heading.
+        const topLevel = /^(top|underside|bottom|side|span|spans|bent|bt|pier|abut|end bent|barrel|north|south|east|west|nbl|sbl|left|right|interior|exterior)\b/i.test(label);
+        if (topLevel) contextStack = [label];
+        else contextStack = [...contextStack.slice(0, 1), label];
         parent.notes.push(line);
         continue;
       }
@@ -695,7 +702,15 @@ export function parseElementNotes(body: string[]): { elements: ScdotElementRow[]
       continue;
     }
 
-    // Tagged defect sentence(s)
+    // Tagged defect sentence(s). Pending untagged lines are a wrapped start of
+    // this sentence only if this line continues it (lowercase start) or the
+    // pending text is clearly unfinished; otherwise they were a description
+    // line without a full stop ("Asphalt Wearing surface (…) on both approach slabs").
+    const lastPending = pendingText[pendingText.length - 1] || "";
+    const continues =
+      pendingText.length > 0 &&
+      (/^[a-z0-9(\[]/.test(line.trim()) || /[,;:\-]$|\b(and|or|the following|following|with|at|of|in|to|x)$/i.test(lastPending));
+    if (!continues) flushPending();
     const text = [...pendingText, line.replace(TAG_RE, "").replace(/\s{2,}/g, " ").replace(/\s+([.:])/g, "$1").trim()]
       .join(" ")
       .trim();
@@ -797,16 +812,21 @@ export function parsePhotos(body: string[]): { photos: ScdotPhoto[]; warnings: s
       captions.get(slots[0])!.push(cells[0]);
       captions.get(slots[1])!.push(cells.slice(1).join(" "));
     } else if (slots.length === 2) {
-      // Only one column wrapped. Give the fragment to the caption that is not
-      // yet a finished sentence; if both/neither qualify, keep it with the right column.
+      // Only one column wrapped. Captions are centred in a fixed-width column,
+      // so the caption whose last line is long enough to have wrapped owns the
+      // fragment; fall back to "not yet a finished sentence".
       const left = captions.get(slots[0])!;
       const right = captions.get(slots[1])!;
+      const lastLen = (c: string[]) => (c.length > 0 ? c[c.length - 1].length : 0);
+      const WRAP_MIN = 44;
       const unfinished = (c: string[]) => c.length > 0 && !/[.)]$/.test(c[c.length - 1]);
-      if (unfinished(left) && !unfinished(right)) left.push(cells[0]);
+      if (lastLen(left) >= WRAP_MIN && lastLen(right) < WRAP_MIN) left.push(cells[0]);
+      else if (lastLen(right) >= WRAP_MIN && lastLen(left) < WRAP_MIN) right.push(cells[0]);
+      else if (unfinished(left) && !unfinished(right)) left.push(cells[0]);
       else if (unfinished(right) && !unfinished(left)) right.push(cells[0]);
       else {
-        right.push(cells[0]);
-        warnings.push(`Photo ${slots[1]}: wrapped caption fragment "${cells[0]}" could not be attributed reliably`);
+        (lastLen(left) > lastLen(right) ? left : right).push(cells[0]);
+        warnings.push(`Photo ${lastLen(left) > lastLen(right) ? slots[0] : slots[1]}: wrapped caption fragment "${cells[0]}" could not be attributed reliably`);
       }
     } else {
       captions.get(slots[0])!.push(cells.join(" "));
@@ -925,7 +945,7 @@ export function parseEquipment(body: string[]): { equipment: ScdotEquipment[]; e
   const equipment: ScdotEquipment[] = [];
   for (const line of body.slice(start + 1, notesIdx)) {
     if (/^Name\s{2,}Hours/.test(line)) continue;
-    const m = line.match(/^(.+?)\s{2,}([\d.]+)\s{2,}([\d.]+)$/);
+    const m = line.match(/^(.+?)\s+([\d.]+)\s+([\d.]+)$/);
     if (m) equipment.push({ name: m[1].trim(), hours: m[2], cost: m[3] });
   }
   return { equipment, equipmentNotes: body.slice(notesIdx + 1, end).join(" ").trim() };
