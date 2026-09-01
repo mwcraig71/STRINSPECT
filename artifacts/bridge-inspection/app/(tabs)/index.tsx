@@ -131,6 +131,7 @@ export default function InspectionScreen() {
     imageSize,
     dateStampEnabled,
     hasUnsyncedChanges,
+    setLastPhotoSource,
   } = useInspection();
   const router = useRouter();
 
@@ -204,22 +205,24 @@ export default function InspectionScreen() {
     });
   }, [router]);
   const addPhoto = async () => {
-    if (Platform.OS === "web") {
-      Alert.alert("Info", "Photo library not supported in web preview. Use camera.");
-      return;
-    }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
       quality: 0.8,
     });
     if (!result.canceled) {
+      setLastPhotoSource("library");
       const capturedAt = new Date().toISOString();
       const newPhotos: PhotoItem[] = await Promise.all(
-        result.assets.map(async (a) => ({
+        result.assets.map(async (a, index) => ({
           uri: await resizePhoto(a.uri, imageSize, a.width, a.height),
           description: "",
+          photoId: `draft_photo_${Date.now()}_${index}_${Math.random().toString(36).slice(2, 7)}`,
           capturedAt,
+          source: "library",
+          fileName: a.fileName ?? undefined,
+          directionTags: [],
+          subjectTags: [],
         }))
       );
       setPhotos([...photos, ...newPhotos]);
@@ -238,6 +241,7 @@ export default function InspectionScreen() {
     }
     const result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
     if (!result.canceled) {
+      setLastPhotoSource("camera");
       let heading: number | null = null;
       try {
         const perm = await Location.getForegroundPermissionsAsync();
@@ -249,7 +253,17 @@ export default function InspectionScreen() {
       } catch {}
       const asset = result.assets[0];
       const uri = await resizePhoto(asset.uri, imageSize, asset.width, asset.height);
-      setPhotos([...photos, { uri, description: "", heading, capturedAt: new Date().toISOString() }]);
+       setPhotos([...photos, {
+         uri,
+         description: "",
+         photoId: `draft_photo_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+         heading,
+         capturedAt: new Date().toISOString(),
+         source: "camera",
+         fileName: asset.fileName ?? undefined,
+         directionTags: [],
+         subjectTags: [],
+       }]);
     }
   };
 

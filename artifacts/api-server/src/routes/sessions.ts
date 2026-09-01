@@ -299,6 +299,25 @@ router.get("/sessions/photos/:structureNumber/:photoId", requireApiKey, async (r
   res.send(rows[0].photoData);
 });
 
+router.delete("/sessions/photos/:structureNumber/:photoId", requireApiKey, async (req, res) => {
+  const structureNumber = String(req.params["structureNumber"] ?? "");
+  const photoId = String(req.params["photoId"] ?? "");
+  if (!structureNumber || !photoId) {
+    res.status(400).json({ error: "structureNumber and photoId are required" });
+    return;
+  }
+
+  await db
+    .delete(sessionPhotosTable)
+    .where(
+      and(
+        eq(sessionPhotosTable.structureNumber, structureNumber),
+        eq(sessionPhotosTable.photoId, photoId),
+      ),
+    );
+  res.json({ ok: true });
+});
+
 // ── Single session (by UUID id) ────────────────────────────────────────────────
 
 router.get("/sessions/:id", async (req, res) => {

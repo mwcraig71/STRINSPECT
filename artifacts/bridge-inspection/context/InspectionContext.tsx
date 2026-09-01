@@ -429,8 +429,13 @@ export type ConditionState = "CS1" | "CS2" | "CS3" | "CS4";
 export interface PhotoItem {
   uri: string;
   description: string;
+  photoId?: string;
   heading?: number | null;
   capturedAt?: string;
+  directionTags?: string[];
+  subjectTags?: string[];
+  source?: "camera" | "library";
+  fileName?: string;
 }
 
 export interface AdditionalPhoto {
@@ -560,6 +565,13 @@ function normalizeDefectRecord(record: DefectRecord): DefectRecord {
     cs: getWorstConditionState(quantities),
     quantityValue: String(total),
     quantity: `${total} ${unit || "ea"}`,
+    photos: (record.photos ?? []).map((photo, index) => ({
+      ...photo,
+      photoId: photo.photoId || `${record.id}_${index}`,
+      directionTags: photo.directionTags ?? [],
+      subjectTags: photo.subjectTags ?? [],
+    })),
+    photosCount: (record.photos ?? []).length,
   };
 }
 
@@ -1361,10 +1373,14 @@ interface InspectionContextType {
   setIsMaintenance: (v: boolean) => void;
   photos: PhotoItem[];
   setPhotos: (v: PhotoItem[]) => void;
+  lastPhotoSource: "camera" | "library";
+  setLastPhotoSource: (v: "camera" | "library") => void;
 
   // Saved data
   savedDefects: DefectRecord[];
   setSavedDefects: (v: DefectRecord[]) => void;
+  updateDefectPhoto: (defectId: string, photoId: string, patch: Partial<PhotoItem>) => void;
+  removeDefectPhoto: (defectId: string, photoId: string) => void;
   nbiRatings: NbiRating[];
   setNbiRatings: (v: NbiRating[]) => void;
 
@@ -1772,6 +1788,7 @@ const STORAGE_KEYS = {
   UC_CHANNEL_OVERRIDE: "@bridge_uc_channel_override",
   STANDARD_PHOTOS: "@bridge_standard_photos",
   EXTRA_PHOTOS: "@bridge_extra_photos",
+  LAST_PHOTO_SOURCE: "@bridge_last_photo_source",
   IS_SNBI_FORMAT: "@bridge_is_snbi_format",
   TEAM_LEADER: "@bridge_team_leader",
   TEAM_MEMBERS: "@bridge_team_members",
@@ -1887,6 +1904,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const [isCritical, setIsCritical] = useState(false);
   const [isMaintenance, setIsMaintenance] = useState(false);
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
+  const [lastPhotoSource, setLastPhotoSourceState] = useState<"camera" | "library">("library");
 
   const [showCIFModal, setShowCIFModal] = useState(false);
   const [showFUAModal, setShowFUAModal] = useState(false);
@@ -1964,7 +1982,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
             "@bridge_demo_mode",
           ]);
         }
-        const [defects, nbi, nom, insType, superType, subType, superMat, subMat, structNum, uc, ch, sb, sn, spp, impSummary, lastJoint, lastSync, lastMod, pdfPath, pdfAnns, pdfUploadedStr, imgSz, aspectRatioStr, dateStampStr, finalizedAtStr, importAuditAckStr, criticalAckStr, stdPhotosStr, openAiKeyStr, aiRephraseStr, extraPhotosStr, ucChannelOverrideStr, isSnbiFormatStr, teamLeaderStr, teamMembersStr, inspectionDateStr, weatherStr, equipmentUsedStr, elementZoneStr, activeElementIdsStr] = await Promise.all([
+        const [defects, nbi, nom, insType, superType, subType, superMat, subMat, structNum, uc, ch, sb, sn, spp, impSummary, lastJoint, lastSync, lastMod, pdfPath, pdfAnns, pdfUploadedStr, imgSz, aspectRatioStr, dateStampStr, finalizedAtStr, importAuditAckStr, criticalAckStr, stdPhotosStr, openAiKeyStr, aiRephraseStr, extraPhotosStr, ucChannelOverrideStr, isSnbiFormatStr, teamLeaderStr, teamMembersStr, inspectionDateStr, weatherStr, equipmentUsedStr, elementZoneStr, activeElementIdsStr, lastPhotoSourceStr] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.SAVED_DEFECTS),
           AsyncStorage.getItem(STORAGE_KEYS.NBI_RATINGS),
           AsyncStorage.getItem(STORAGE_KEYS.NOMENCLATURE),
@@ -2005,10 +2023,14 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           AsyncStorage.getItem(STORAGE_KEYS.EQUIPMENT_USED),
           AsyncStorage.getItem(STORAGE_KEYS.ELEMENT_ZONE_FILTER),
           AsyncStorage.getItem(STORAGE_KEYS.ACTIVE_ELEMENT_IDS),
+          AsyncStorage.getItem(STORAGE_KEYS.LAST_PHOTO_SOURCE),
         ]);
         if (lastJoint) setLastJointElementIdState(lastJoint);
         if (lastSync) setLastSynced(lastSync);
         if (lastMod) setLastModifiedState(lastMod);
+        if (lastPhotoSourceStr === "camera" || lastPhotoSourceStr === "library") {
+          setLastPhotoSourceState(lastPhotoSourceStr);
+        }
         if (pdfPath) setImportedPdfPathState(pdfPath);
         if (pdfAnns) { try { setPdfAnnotationsState(JSON.parse(pdfAnns) as unknown[]); } catch {} }
         if (pdfUploadedStr === "1") setPdfUploadedState(true);
@@ -2237,6 +2259,43 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     bumpLastModified();
   }, [bumpLastModified]);
 
+  const updateDefectPhoto = useCallback((defectId: string, photoId: string, patch: Partial<PhotoItem>) => {
+    setSavedDefectsState((current) => {
+      const next = current.map((record) => {
+        if (record.id !== defectId) return record;
+        const nextPhotos = (record.photos ?? []).map((photo, index) =>
+          (photo.photoId || `${record.id}_${index}`) === photoId
+            ? { ...photo, ...patch, photoId }
+            : photo
+        );
+        return normalizeDefectRecord({ ...record, photos: nextPhotos, photosCount: nextPhotos.length });
+      });
+      AsyncStorage.setItem(STORAGE_KEYS.SAVED_DEFECTS, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+    bumpLastModified();
+  }, [bumpLastModified]);
+
+  const removeDefectPhoto = useCallback((defectId: string, photoId: string) => {
+    setSavedDefectsState((current) => {
+      const next = current.map((record) => {
+        if (record.id !== defectId) return record;
+        const nextPhotos = (record.photos ?? []).filter((photo, index) =>
+          (photo.photoId || `${record.id}_${index}`) !== photoId
+        );
+        return normalizeDefectRecord({ ...record, photos: nextPhotos, photosCount: nextPhotos.length });
+      });
+      AsyncStorage.setItem(STORAGE_KEYS.SAVED_DEFECTS, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+    bumpLastModified();
+  }, [bumpLastModified]);
+
+  const setLastPhotoSource = useCallback((value: "camera" | "library") => {
+    setLastPhotoSourceState(value);
+    AsyncStorage.setItem(STORAGE_KEYS.LAST_PHOTO_SOURCE, value).catch(() => {});
+  }, []);
+
   // ── Persist nbiRatings ──
   const setNbiRatings = useCallback((v: NbiRating[]) => {
     setNbiRatingsState(v);
@@ -2427,14 +2486,14 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         }
       }
 
-      // Upload photos (best-effort — non-fatal if some fail) — includes defect, standard, and extra photos
+      // Upload and reconcile photos before declaring the session synced.
       if (Platform.OS !== "web" && apiUrl) {
         const photos = [
           ...collectPhotosFromDefects(savedDefects as unknown[]),
           ...collectPhotosFromStandardSlots(standardPhotos),
           ...collectPhotosFromStandardSlots(extraPhotos, "extra_"),
         ];
-        uploadPhotos(photos, sn, apiUrl, apiKey).catch(() => {});
+        await uploadPhotos(photos, sn, apiUrl, apiKey);
       }
 
       // Clear this bridge from the offline queue (in case it was previously queued)
@@ -2555,6 +2614,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     AsyncStorage.removeItem(STORAGE_KEYS.STANDARD_PHOTOS).catch(() => {});
     setExtraPhotosState([]);
     AsyncStorage.removeItem(STORAGE_KEYS.EXTRA_PHOTOS).catch(() => {});
+    setLastPhotoSourceState("library");
+    AsyncStorage.removeItem(STORAGE_KEYS.LAST_PHOTO_SOURCE).catch(() => {});
     setFinalizedAtState(null);
     AsyncStorage.removeItem(STORAGE_KEYS.FINALIZED_AT).catch(() => {});
     setImportAuditAcknowledgedState(false);
@@ -3076,7 +3137,12 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
       size,
       locationDesc,
       photosCount: photos.length,
-      photos: [...photos],
+      photos: photos.map((photo, index) => ({
+        ...photo,
+        photoId: photo.photoId || `${id}_${index}`,
+        directionTags: photo.directionTags ?? [],
+        subjectTags: photo.subjectTags ?? [],
+      })),
       isCritical,
       isMaintenance,
       needsVerification: false,
@@ -3802,8 +3868,12 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     setIsMaintenance,
     photos,
     setPhotos,
+    lastPhotoSource,
+    setLastPhotoSource,
     savedDefects,
     setSavedDefects,
+    updateDefectPhoto,
+    removeDefectPhoto,
     nbiRatings,
     setNbiRatings,
     showCIFModal,

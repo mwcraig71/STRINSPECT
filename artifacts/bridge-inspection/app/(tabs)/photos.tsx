@@ -20,12 +20,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PhotoTagEditor } from "@/components/PhotoTagEditor";
 import { useColors } from "@/hooks/useColors";
+import { resizePhoto } from "@/lib/photoUtils";
 import { AdditionalPhoto, StandardPhotoSlot, useInspection } from "@/context/InspectionContext";
 
 type PreviewTarget =
   | { kind: "standard"; slot: StandardPhotoSlot }
   | { kind: "extra"; slot: StandardPhotoSlot }
-  | { kind: "additional"; slot: StandardPhotoSlot; index: number };
+  | { kind: "additional"; slot: StandardPhotoSlot; index: number }
+  | { kind: "defect"; defectId: string; photoId: string };
 
 export default function PhotosScreen() {
   const c = useColors();
@@ -42,8 +44,25 @@ export default function PhotosScreen() {
     addExtraPhoto,
     setExtraPhotoSlot,
     removeExtraPhoto: deleteExtraSlotFromContext,
+    savedDefects,
+    updateDefectPhoto,
+    removeDefectPhoto,
+    lastPhotoSource,
+    setLastPhotoSource,
+    imageSize,
   } = useInspection();
   const [previewTarget, setPreviewTarget] = useState<PreviewTarget | null>(null);
+  const defectPhotos = savedDefects.flatMap((record) =>
+    (record.photos ?? []).map((photo, index) => ({
+      defect: record,
+      photo: {
+        ...photo,
+        photoId: photo.photoId || `${record.id}_${index}`,
+        directionTags: photo.directionTags ?? [],
+        subjectTags: photo.subjectTags ?? [],
+      },
+    }))
+  );
 
   const pickPhotoResult = async (): Promise<{ uri: string; heading?: number } | null> => {
     if (Platform.OS === "web") {
@@ -103,6 +122,7 @@ export default function PhotosScreen() {
   const capturePhoto = async (slot: StandardPhotoSlot) => {
     const res = await pickPhotoResult();
     if (!res) return;
+    setLastPhotoSource(Platform.OS === "web" ? "library" : "camera");
     const directionTags: string[] = res.heading !== undefined ? [headingToDirection(res.heading)] : [];
     setStandardPhotoSlot(slot.slotId, {
       photoUri: res.uri,
@@ -115,6 +135,7 @@ export default function PhotosScreen() {
   const pickPhoto = async (slot: StandardPhotoSlot) => {
     const uri = await pickLibraryResult();
     if (!uri) return;
+    setLastPhotoSource("library");
     setStandardPhotoSlot(slot.slotId, {
       photoUri: uri,
       capturedAt: new Date().toISOString(),
@@ -125,6 +146,7 @@ export default function PhotosScreen() {
   const captureAdditionalPhoto = async (slot: StandardPhotoSlot) => {
     const res = await pickPhotoResult();
     if (!res) return;
+    setLastPhotoSource(Platform.OS === "web" ? "library" : "camera");
     const directionTags: string[] = res.heading !== undefined ? [headingToDirection(res.heading)] : [];
     const photo: AdditionalPhoto = {
       uri: res.uri,
@@ -138,6 +160,7 @@ export default function PhotosScreen() {
   const pickAdditionalPhoto = async (slot: StandardPhotoSlot) => {
     const uri = await pickLibraryResult();
     if (!uri) return;
+    setLastPhotoSource("library");
     const photo: AdditionalPhoto = {
       uri,
       capturedAt: new Date().toISOString(),
@@ -178,6 +201,7 @@ export default function PhotosScreen() {
   const captureExtraPhoto = async (slot: StandardPhotoSlot) => {
     const res = await pickPhotoResult();
     if (!res) return;
+    setLastPhotoSource(Platform.OS === "web" ? "library" : "camera");
     const directionTags: string[] = res.heading !== undefined ? [headingToDirection(res.heading)] : [];
     setExtraPhotoSlot(slot.slotId, {
       photoUri: res.uri,
@@ -189,6 +213,7 @@ export default function PhotosScreen() {
   const pickExtraPhoto = async (slot: StandardPhotoSlot) => {
     const uri = await pickLibraryResult();
     if (!uri) return;
+    setLastPhotoSource("library");
     setExtraPhotoSlot(slot.slotId, {
       photoUri: uri,
       capturedAt: new Date().toISOString(),
@@ -218,6 +243,21 @@ export default function PhotosScreen() {
 
   const getPreviewPhoto = (): { uri: string; directionTags: string[]; subjectTags: string[]; capturedAt?: string; label: string; note?: string } | null => {
     if (!previewTarget) return null;
+    if (previewTarget.kind === "defect") {
+      const record = savedDefects.find((candidate) => candidate.id === previewTarget.defectId);
+      const photo = record?.photos.find((candidate, index) =>
+        (candidate.photoId || `${record.id}_${index}`) === previewTarget.photoId
+      );
+      if (!record || !photo) return null;
+      return {
+        uri: photo.uri,
+        directionTags: photo.directionTags ?? [],
+        subjectTags: photo.subjectTags ?? [],
+        capturedAt: photo.capturedAt,
+        label: `${record.element} — ${record.defect}`,
+        note: photo.description,
+      };
+    }
     const { kind, slot } = previewTarget;
     if (kind === "additional") {
       const p = slot.additionalPhotos?.[previewTarget.index];
@@ -233,6 +273,10 @@ export default function PhotosScreen() {
 
   const handlePreviewDirectionChange = (tags: string[]) => {
     if (!previewTarget) return;
+    if (previewTarget.kind === "defect") {
+      updateDefectPhoto(previewTarget.defectId, previewTarget.photoId, { directionTags: tags });
+      return;
+    }
     const { kind, slot } = previewTarget;
     if (kind === "additional") {
       updateStandardPhotoAdditionalTags(slot.slotId, previewTarget.index, tags, slot.additionalPhotos?.[previewTarget.index]?.subjectTags ?? []);
@@ -244,15 +288,19 @@ export default function PhotosScreen() {
       });
     } else if (kind === "extra") {
       setExtraPhotoSlot(slot.slotId, { directionTags: tags });
-      setPreviewTarget((p) => p ? { ...p, slot: { ...p.slot, directionTags: tags } } : p);
+      setPreviewTarget((p) => !p || p.kind === "defect" ? p : { ...p, slot: { ...p.slot, directionTags: tags } });
     } else {
       setStandardPhotoSlot(slot.slotId, { directionTags: tags });
-      setPreviewTarget((p) => p ? { ...p, slot: { ...p.slot, directionTags: tags } } : p);
+      setPreviewTarget((p) => !p || p.kind === "defect" ? p : { ...p, slot: { ...p.slot, directionTags: tags } });
     }
   };
 
   const handlePreviewSubjectChange = (tags: string[]) => {
     if (!previewTarget) return;
+    if (previewTarget.kind === "defect") {
+      updateDefectPhoto(previewTarget.defectId, previewTarget.photoId, { subjectTags: tags });
+      return;
+    }
     const { kind, slot } = previewTarget;
     if (kind === "additional") {
       updateStandardPhotoAdditionalTags(slot.slotId, previewTarget.index, slot.additionalPhotos?.[previewTarget.index]?.directionTags ?? [], tags);
@@ -264,14 +312,42 @@ export default function PhotosScreen() {
       });
     } else if (kind === "extra") {
       setExtraPhotoSlot(slot.slotId, { subjectTags: tags });
-      setPreviewTarget((p) => p ? { ...p, slot: { ...p.slot, subjectTags: tags } } : p);
+      setPreviewTarget((p) => !p || p.kind === "defect" ? p : { ...p, slot: { ...p.slot, subjectTags: tags } });
     } else {
       setStandardPhotoSlot(slot.slotId, { subjectTags: tags });
-      setPreviewTarget((p) => p ? { ...p, slot: { ...p.slot, subjectTags: tags } } : p);
+      setPreviewTarget((p) => !p || p.kind === "defect" ? p : { ...p, slot: { ...p.slot, subjectTags: tags } });
     }
   };
 
   const previewPhoto = getPreviewPhoto();
+
+  const replaceDefectPhoto = async (source: "camera" | "library") => {
+    if (!previewTarget || previewTarget.kind !== "defect") return;
+    const actualSource = Platform.OS === "web" ? "library" : source;
+    if (actualSource === "camera") {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission Denied", "Camera permission is required.");
+        return;
+      }
+    }
+    const result = actualSource === "camera"
+      ? await ImagePicker.launchCameraAsync({ quality: 0.8 })
+      : await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          quality: 0.8,
+        });
+    if (result.canceled) return;
+    const asset = result.assets[0];
+    const uri = await resizePhoto(asset.uri, imageSize, asset.width, asset.height);
+    updateDefectPhoto(previewTarget.defectId, previewTarget.photoId, {
+      uri,
+      capturedAt: new Date().toISOString(),
+      source: actualSource,
+      fileName: asset.fileName ?? undefined,
+    });
+    setLastPhotoSource(actualSource);
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: c.background }]}>
@@ -331,6 +407,54 @@ export default function PhotosScreen() {
             }
           />
         ))}
+
+        <View style={styles.sectionHeader}>
+          <View style={styles.sectionHeaderLeft}>
+            <Feather name="layers" size={14} color="#38bdf8" />
+            <Text style={[styles.sectionHeaderText, { color: "#38bdf8" }]}>Element Inspection Photos</Text>
+            {defectPhotos.length > 0 && (
+              <View style={[styles.extraBadge, { backgroundColor: "#082f49" }]}>
+                <Text style={[styles.extraBadgeText, { color: "#38bdf8" }]}>{defectPhotos.length}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+        <Text style={[styles.sourceHint, { color: c.mutedForeground }]}>
+          Replacement source remembered: {lastPhotoSource === "camera" ? "Camera" : "Photo Library"}. Album/folder navigation remains controlled by your device.
+        </Text>
+        {defectPhotos.length === 0 ? (
+          <View style={[styles.emptyExtraCard, { backgroundColor: c.card, borderColor: c.border }]}>
+            <Feather name="image" size={22} color="#475569" />
+            <Text style={[styles.emptyExtraText, { color: c.mutedForeground }]}>
+              Photos attached while recording element defects will appear here.
+            </Text>
+          </View>
+        ) : (
+          defectPhotos.map(({ defect: record, photo }) => (
+            <View key={`${record.id}:${photo.photoId}`} style={[styles.defectPhotoCard, { backgroundColor: c.card, borderColor: c.border }]}>
+              <TouchableOpacity
+                onPress={() => setPreviewTarget({ kind: "defect", defectId: record.id, photoId: photo.photoId! })}
+                activeOpacity={0.85}
+              >
+                <Image source={{ uri: photo.uri }} style={styles.defectThumbnail} resizeMode="cover" />
+              </TouchableOpacity>
+              <View style={styles.defectPhotoInfo}>
+                <Text style={[styles.defectContext, { color: c.foreground }]}>{record.element} — {record.defect}</Text>
+                <Text style={[styles.defectLocation, { color: c.mutedForeground }]}>{record.location}</Text>
+                {!!photo.description && (
+                  <Text style={[styles.defectNote, { color: c.mutedForeground }]} numberOfLines={2}>{photo.description}</Text>
+                )}
+                <TouchableOpacity
+                  style={styles.smallAction}
+                  onPress={() => setPreviewTarget({ kind: "defect", defectId: record.id, photoId: photo.photoId! })}
+                >
+                  <Feather name="edit-3" size={12} color="#38bdf8" />
+                  <Text style={styles.smallActionText}>Preview & edit</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))
+        )}
 
         <View style={styles.sectionHeader}>
           <View style={styles.sectionHeaderLeft}>
@@ -403,6 +527,45 @@ export default function PhotosScreen() {
                   onDirectionChange={handlePreviewDirectionChange}
                   onSubjectChange={handlePreviewSubjectChange}
                 />
+                {previewTarget.kind === "defect" && (
+                  <>
+                    <Text style={[styles.previewNoteLabel, { color: c.mutedForeground }]}>Photo note</Text>
+                    <TextInput
+                      style={[styles.previewNoteInput, { color: c.foreground, borderColor: c.border, backgroundColor: c.background }]}
+                      value={previewPhoto.note ?? ""}
+                      onChangeText={(description) =>
+                        updateDefectPhoto(previewTarget.defectId, previewTarget.photoId, { description })
+                      }
+                      placeholder="Add inspection photo notes..."
+                      placeholderTextColor={c.mutedForeground}
+                      multiline
+                    />
+                    <View style={styles.previewActions}>
+                      <TouchableOpacity style={[styles.previewActionBtn, { backgroundColor: "#0284c7" }]} onPress={() => replaceDefectPhoto(Platform.OS === "web" ? "library" : lastPhotoSource)}>
+                        <Feather name={Platform.OS !== "web" && lastPhotoSource === "camera" ? "camera" : "image"} size={13} color="#fff" />
+                        <Text style={styles.previewActionText}>Replace with {Platform.OS !== "web" && lastPhotoSource === "camera" ? "Camera" : "Library"}</Text>
+                      </TouchableOpacity>
+                      {Platform.OS !== "web" && (
+                        <TouchableOpacity
+                          style={[styles.previewActionBtn, { backgroundColor: "#334155" }]}
+                          onPress={() => replaceDefectPhoto(lastPhotoSource === "camera" ? "library" : "camera")}
+                        >
+                          <Text style={styles.previewActionText}>Other source</Text>
+                        </TouchableOpacity>
+                      )}
+                      <TouchableOpacity
+                        style={[styles.previewActionBtn, { backgroundColor: "#7f1d1d" }]}
+                        onPress={() => confirm("Remove this photo from the linked defect?", () => {
+                          removeDefectPhoto(previewTarget.defectId, previewTarget.photoId);
+                          setPreviewTarget(null);
+                        })}
+                      >
+                        <Feather name="trash-2" size={13} color="#fff" />
+                        <Text style={styles.previewActionText}>Remove</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                )}
               </View>
               {previewPhoto.capturedAt && (
                 <Text style={[styles.previewMeta, { color: c.mutedForeground }]}>
@@ -686,4 +849,18 @@ const styles = StyleSheet.create({
   addPhotoBtnText: { color: "#fff", fontSize: 13, fontWeight: "600" },
   emptyExtraCard: { alignItems: "center", justifyContent: "center", gap: 10, padding: 24, borderRadius: 12, borderWidth: 1, borderStyle: "dashed" },
   emptyExtraText: { fontSize: 13, textAlign: "center", maxWidth: 260 },
+  sourceHint: { fontSize: 11, marginTop: -8, marginBottom: 2 },
+  defectPhotoCard: { borderWidth: 1, borderRadius: 12, overflow: "hidden", flexDirection: "row", minHeight: 118 },
+  defectThumbnail: { width: 128, height: 118 },
+  defectPhotoInfo: { flex: 1, padding: 12, minWidth: 0 },
+  defectContext: { fontSize: 13, fontWeight: "700" },
+  defectLocation: { fontSize: 11, marginTop: 3 },
+  defectNote: { fontSize: 11, marginTop: 7, lineHeight: 15 },
+  smallAction: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 10 },
+  smallActionText: { color: "#38bdf8", fontSize: 11, fontWeight: "600" },
+  previewNoteLabel: { fontSize: 11, fontWeight: "600", textTransform: "uppercase", marginTop: 12, marginBottom: 6 },
+  previewNoteInput: { minHeight: 64, borderWidth: 1, borderRadius: 8, padding: 10, fontSize: 13, textAlignVertical: "top" },
+  previewActions: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 },
+  previewActionBtn: { flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 },
+  previewActionText: { color: "#fff", fontSize: 11, fontWeight: "600" },
 });

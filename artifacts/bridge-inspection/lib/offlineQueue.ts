@@ -7,7 +7,7 @@ const UPLOADED_PHOTOS_KEY = "@bridge_uploaded_photo_ids_v1";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface PhotoToUpload {
-  id: string;  // stable: "${defectId}_${photoIndex}" or "std_${slotId}"
+  id: string;  // stable photo reference, or "std_${slotId}"
   uri: string;
   description?: string; // JSON-encoded tags, e.g. '{"directionTags":["N"],"subjectTags":["deck"]}'
 }
@@ -119,10 +119,36 @@ export async function clearUploadedPhotoIds(): Promise<void> {
 export function collectPhotosFromDefects(defects: unknown[]): PhotoToUpload[] {
   const photos: PhotoToUpload[] = [];
   for (const d of defects) {
-    const defect = d as { id?: string; photos?: Array<{ uri?: string }> };
+    const defect = d as {
+      id?: string;
+      elementId?: string;
+      element?: string;
+      defect?: string;
+      location?: string;
+      photos?: Array<{ uri?: string; photoId?: string; description?: string; heading?: number | null; capturedAt?: string; directionTags?: string[]; subjectTags?: string[] }>;
+    };
     if (!defect.id || !Array.isArray(defect.photos)) continue;
     defect.photos.forEach((p, i) => {
-      if (p.uri) photos.push({ id: `${defect.id}_${i}`, uri: p.uri });
+      if (p.uri) {
+        const id = p.photoId || `${defect.id}_${i}`;
+        photos.push({
+          id,
+          uri: p.uri,
+          description: JSON.stringify({
+            ownerType: "defect",
+            defectId: defect.id,
+            elementId: defect.elementId,
+            element: defect.element,
+            defect: defect.defect,
+            location: defect.location,
+            description: p.description || "",
+            heading: p.heading ?? null,
+            capturedAt: p.capturedAt,
+            directionTags: p.directionTags ?? [],
+            subjectTags: p.subjectTags ?? [],
+          }),
+        });
+      }
     });
   }
   return photos;
@@ -154,25 +180,29 @@ export function collectPhotosFromStandardSlots(
 // ─── Photo upload ─────────────────────────────────────────────────────────────
 
 /**
- * Fetch the set of photo IDs already stored on the server for a given session.
- * Returns an empty set on any network or parse error so we fail open (upload rather than skip).
+ * Fetch the server photo inventory. A failed inventory check must fail sync so
+ * stale removals remain queued rather than being silently marked complete.
  */
-async function fetchServerPhotoIds(
+async function fetchServerPhotos(
   structureNumber: string,
   apiUrl: string,
   apiKey: string | undefined,
-): Promise<Set<string>> {
-  try {
-    const url = `${apiUrl}/api/sessions/photos/${encodeURIComponent(structureNumber)}`;
-    const headers: Record<string, string> = {};
-    if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
-    const res = await fetch(url, { headers });
-    if (!res.ok) return new Set();
-    const data = (await res.json()) as Array<{ photoId?: string }>;
-    return new Set(data.map((r) => r.photoId).filter((id): id is string => !!id));
-  } catch {
-    return new Set();
+): Promise<Map<string, string | undefined>> {
+  const url = `${apiUrl}/api/sessions/photos/${encodeURIComponent(structureNumber)}`;
+  const headers: Record<string, string> = {};
+  if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
+  const res = await fetch(url, { headers });
+  if (!res.ok) {
+    const text = await res.text().catch(() => String(res.status));
+    throw new Error(`Photo inventory failed (${res.status}): ${text}`);
   }
+  const data = (await res.json()) as Array<{ photoId?: string; description?: string | null }>;
+  if (!Array.isArray(data)) throw new Error("Photo inventory returned an invalid response.");
+  return new Map(
+    data
+      .filter((row): row is { photoId: string; description?: string | null } => !!row.photoId)
+      .map((row) => [row.photoId, row.description ?? undefined])
+  );
 }
 
 async function uploadOnePhoto(
@@ -201,6 +231,25 @@ async function uploadOnePhoto(
   }
 }
 
+async function deleteOnePhoto(
+  photoId: string,
+  structureNumber: string,
+  apiUrl: string,
+  apiKey: string | undefined,
+): Promise<boolean> {
+  try {
+    const headers: Record<string, string> = {};
+    if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
+    const res = await fetch(
+      `${apiUrl}/api/sessions/photos/${encodeURIComponent(structureNumber)}/${encodeURIComponent(photoId)}`,
+      { method: "DELETE", headers },
+    );
+    return res.ok || res.status === 404;
+  } catch {
+    return false;
+  }
+}
+
 export async function uploadPhotos(
   photos: PhotoToUpload[],
   structureNumber: string,
@@ -209,19 +258,33 @@ export async function uploadPhotos(
 ): Promise<void> {
   // Query the server for photos already stored there, so we never re-upload them
   // even when the local tracking set was cleared between syncs.
-  const serverIds = await fetchServerPhotoIds(structureNumber, apiUrl, apiKey);
+  const serverPhotos = await fetchServerPhotos(structureNumber, apiUrl, apiKey);
 
   // Seed local tracking from server knowledge so subsequent calls are instant.
-  for (const id of serverIds) {
+  for (const id of serverPhotos.keys()) {
     await markPhotoUploaded(structureNumber, id);
   }
 
-  const uploadedIds = await getUploadedPhotoIds();
   for (const photo of photos) {
-    // Skip if already tracked locally (covers both server-seeded and previously uploaded).
-    if (uploadedIds.has(scopedPhotoKey(structureNumber, photo.id))) continue;
+    // The description includes capture time, notes, and tags. Matching metadata means
+    // the stable server object is current; any edit or replacement safely overwrites it.
+    if (serverPhotos.has(photo.id) && serverPhotos.get(photo.id) === photo.description) continue;
     const ok = await uploadOnePhoto(photo, structureNumber, apiUrl, apiKey);
-    if (ok) await markPhotoUploaded(structureNumber, photo.id);
+    if (!ok) throw new Error(`Photo upload failed: ${photo.id}`);
+    await markPhotoUploaded(structureNumber, photo.id);
+  }
+
+  const currentIds = new Set(photos.map((photo) => photo.id));
+  for (const [serverId, description] of serverPhotos) {
+    if (currentIds.has(serverId) || !description) continue;
+    try {
+      const metadata = JSON.parse(description) as { ownerType?: string };
+      if (metadata.ownerType !== "defect") continue;
+    } catch {
+      continue;
+    }
+    const ok = await deleteOnePhoto(serverId, structureNumber, apiUrl, apiKey);
+    if (!ok) throw new Error(`Photo deletion failed: ${serverId}`);
   }
 }
 
@@ -277,6 +340,6 @@ export async function processQueueEntry(
     }
   }
 
-  // 3. Upload photos (best-effort per photo) — includes both defect and standard photos
+  // 3. Upload and reconcile every photo. Any failure retains the queue entry for retry.
   await uploadPhotos(entry.photos, entry.structureNumber, apiUrl, apiKey);
 }
