@@ -13,7 +13,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
-import { useInspection, ENVIRONMENTS, INSPECTION_TYPES } from "@/context/InspectionContext";
+import { useInspection } from "@/context/InspectionContext";
 import { SettingsModal } from "@/components/SettingsModal";
 import { SpeechToTextButton } from "@/components/SpeechToTextButton";
 
@@ -36,9 +36,6 @@ export default function NBIScreen() {
     updateSubComponent,
     reviewImportedSubComponent,
     savedDefects,
-    inspectionType,
-    environment,
-    setEnvironment,
     importSummary,
     isSnbiFormat,
   } = useInspection();
@@ -65,7 +62,6 @@ export default function NBIScreen() {
   const [expandedComp, setExpandedComp] = useState<number | null>(null);
   const [ratingPickerOpen, setRatingPickerOpen] = useState<number | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [envPickerOpen, setEnvPickerOpen] = useState(false);
 
   const activeNbi = nbiRatings.find((r) => r.item === activeItem);
   const activeIdx = nbiRatings.findIndex((r) => r.item === activeItem);
@@ -74,7 +70,6 @@ export default function NBIScreen() {
     return savedDefects.filter((d) => snbiIds.includes(d.elementId));
   };
 
-  const currentEnvName = ENVIRONMENTS.find((e) => e.id === environment)?.name || "Benign";
 
   return (
     <View style={[styles.container, { backgroundColor: c.background }]}>
@@ -257,44 +252,6 @@ export default function NBIScreen() {
                         ))}
                       </View>
 
-                      {/* Site Environment — inside rating picker */}
-                      <View style={[styles.envInline, { borderTopColor: c.border }]}>
-                        <View style={styles.envInlineHeader}>
-                          <Feather name="wind" size={12} color={c.mutedForeground} />
-                          <Text style={[styles.envInlineLabel, { color: c.mutedForeground }]}>Site Environment</Text>
-                          <Text style={[styles.envInlineCurrent, { color: c.foreground }]}>{currentEnvName}</Text>
-                        </View>
-                        <TouchableOpacity
-                          style={[styles.envInlinePicker, { backgroundColor: c.background, borderColor: c.border }]}
-                          onPress={() => setEnvPickerOpen(!envPickerOpen)}
-                        >
-                          <Text style={[styles.envInlinePickerText, { color: c.foreground }]}>{currentEnvName}</Text>
-                          <Feather name={envPickerOpen ? "chevron-up" : "chevron-down"} size={14} color={c.mutedForeground} />
-                        </TouchableOpacity>
-                        {envPickerOpen && (
-                          <View style={[styles.dropdownList, { borderColor: c.border }]}>
-                            {ENVIRONMENTS.map((env) => (
-                              <TouchableOpacity
-                                key={env.id}
-                                style={[
-                                  styles.dropdownItem,
-                                  environment === env.id && { backgroundColor: c.primary + "20" },
-                                  { borderBottomColor: c.border },
-                                ]}
-                                onPress={() => {
-                                  setEnvironment(env.id);
-                                  setEnvPickerOpen(false);
-                                }}
-                              >
-                                <Text style={[styles.dropdownItemText, { color: environment === env.id ? c.primary : c.foreground }]}>
-                                  {env.name}
-                                </Text>
-                                {environment === env.id && <Feather name="check" size={13} color={c.primary} />}
-                              </TouchableOpacity>
-                            ))}
-                          </View>
-                        )}
-                      </View>
                     </View>
                   )}
 
@@ -433,12 +390,6 @@ const styles = StyleSheet.create({
   modulePill: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
   modulePillText: { fontSize: 9, fontWeight: "900", color: "#fff", textTransform: "uppercase", letterSpacing: 0.5 },
   gearBtn: { padding: 8, borderRadius: 10 },
-  envInline: { borderTopWidth: 1, paddingTop: 10, marginTop: 4, gap: 8 },
-  envInlineHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
-  envInlineLabel: { fontSize: 10, fontWeight: "700", textTransform: "uppercase", flex: 1 },
-  envInlineCurrent: { fontSize: 11, fontWeight: "800" },
-  envInlinePicker: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderWidth: 1, borderRadius: 8, padding: 9 },
-  envInlinePickerText: { fontSize: 12, fontWeight: "700", flex: 1 },
   picker: {
     flexDirection: "row",
     alignItems: "center",

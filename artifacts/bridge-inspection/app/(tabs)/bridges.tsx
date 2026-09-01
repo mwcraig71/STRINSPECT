@@ -17,6 +17,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { useColors } from "@/hooks/useColors";
 import { useInspection } from "@/context/InspectionContext";
 import { useListSessions, getListSessionsQueryKey } from "@workspace/api-client-react";
@@ -35,6 +36,8 @@ function formatRelativeTime(iso: string): string {
 export default function BridgesScreen() {
   const c = useColors();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const { newInspection } = useLocalSearchParams<{ newInspection?: string }>();
   const {
     structureNumber,
     setStructureNumber,
@@ -50,12 +53,23 @@ export default function BridgesScreen() {
     importFromPdf,
     parsingActive,
     isFinalized,
+    teamLeader,
+    setTeamLeader,
+    teamMembers,
+    setTeamMembers,
+    inspectionDate,
+    setInspectionDate,
+    weather,
+    setWeather,
+    equipmentUsed,
+    setEquipmentUsed,
   } = useInspection();
 
   const [submitStatus, setSubmitStatus] = useState<"idle" | "syncing" | "success" | "error">("idle");
   const [newBridgeVisible, setNewBridgeVisible] = useState(false);
   const [newBridgeDraft, setNewBridgeDraft] = useState("");
   const [annotatorOpen, setAnnotatorOpen] = useState(false);
+  const handledNewInspectionRef = React.useRef<string | undefined>(undefined);
 
   const handleImportPdf = async () => {
     try {
@@ -155,25 +169,41 @@ export default function BridgesScreen() {
         doPrompt();
       }
     } else {
+      const showNewBridgeForm = () => {
+        setNewBridgeDraft("");
+        setNewBridgeVisible(true);
+      };
       if (hasUnsyncedChanges) {
+        const message = "You have data that hasn't been submitted. Starting a new bridge will permanently discard it.";
+        if (Platform.OS === "web") {
+          if (typeof window !== "undefined" && window.confirm(message)) {
+            showNewBridgeForm();
+          }
+          return;
+        }
         Alert.alert(
           "Unsubmitted Changes",
-          "You have data that hasn't been submitted. Starting a new bridge will permanently discard it.",
+          message,
           [
             { text: "Cancel", style: "cancel" },
             {
               text: "Discard & Continue",
               style: "destructive",
-              onPress: () => { setNewBridgeDraft(""); setNewBridgeVisible(true); },
+              onPress: showNewBridgeForm,
             },
           ],
         );
       } else {
-        setNewBridgeDraft("");
-        setNewBridgeVisible(true);
+        showNewBridgeForm();
       }
     }
   };
+
+  React.useEffect(() => {
+    if (!newInspection || handledNewInspectionRef.current === newInspection) return;
+    handledNewInspectionRef.current = newInspection;
+    openNewBridgeFlow();
+  }, [newInspection, hasUnsyncedChanges]);
 
   const handleConfirmNewBridge = () => {
     clearInspection();
@@ -182,16 +212,30 @@ export default function BridgesScreen() {
     setNewBridgeDraft("");
   };
 
-  const handleOpenSubmitted = (sn: string) => {
+  const handleOpenSubmitted = (session: NonNullable<typeof sessions>[number]) => {
+    const sn = session.structureNumber || "";
     const doOpen = () => {
       clearInspection();
       setStructureNumber(sn);
+      setTeamLeader(session.teamLeader ?? "");
+      setTeamMembers(session.teamMembers ?? []);
+      setInspectionDate(session.inspectionDate ?? "");
+      setWeather(session.weather ?? "");
+      setEquipmentUsed(session.equipmentUsed ?? "");
+      router.navigate("/");
     };
 
     const confirmEdit = () => {
+      const message = `Open "${sn}" as the active inspection? You can add or update data and resubmit when done.`;
+      if (Platform.OS === "web") {
+        if (typeof window !== "undefined" && window.confirm(message)) {
+          doOpen();
+        }
+        return;
+      }
       Alert.alert(
         "Re-open for Editing?",
-        `Open "${sn}" as the active inspection? You can add or update data and resubmit when done.`,
+        message,
         [
           { text: "Cancel", style: "cancel" },
           { text: "Open for Editing", onPress: doOpen },
@@ -200,9 +244,16 @@ export default function BridgesScreen() {
     };
 
     if (hasUnsyncedChanges) {
+      const message = "You have data that hasn't been submitted. Opening another bridge will permanently discard it.";
+      if (Platform.OS === "web") {
+        if (typeof window !== "undefined" && window.confirm(message)) {
+          confirmEdit();
+        }
+        return;
+      }
       Alert.alert(
         "Unsubmitted Changes",
-        "You have data that hasn't been submitted. Opening another bridge will permanently discard it.",
+        message,
         [
           { text: "Cancel", style: "cancel" },
           { text: "Discard & Continue", style: "destructive", onPress: confirmEdit },
@@ -239,11 +290,19 @@ export default function BridgesScreen() {
                 Enter the structure number to start a new inspection. All current data will be cleared.
               </Text>
               <TextInput
-                style={[styles.modalInput, { color: c.foreground, backgroundColor: "#0f172a", borderColor: "#334155" }]}
+                style={[
+                  styles.modalInput,
+                  {
+                    color: c.foreground,
+                    backgroundColor: c.background,
+                    borderColor: c.border,
+                  },
+                ]}
                 value={newBridgeDraft}
                 onChangeText={setNewBridgeDraft}
                 placeholder="e.g. 18057026103105"
-                placeholderTextColor="#475569"
+                placeholderTextColor={c.mutedForeground}
+                selectionColor={c.primary}
                 autoFocus
                 autoCapitalize="characters"
                 returnKeyType="done"
@@ -365,6 +424,14 @@ export default function BridgesScreen() {
                   </Text>
                 </View>
               </View>
+                {(teamLeader || inspectionDate || teamMembers.length > 0) && (
+                  <View style={styles.fieldNotesRow}>
+                    <Feather name="users" size={11} color={c.mutedForeground} />
+                    <Text style={[styles.fieldNotesText, { color: c.mutedForeground }]}>
+                      {[teamLeader && `Lead: ${teamLeader}`, teamMembers.length > 0 && `${teamMembers.length} additional`, inspectionDate].filter(Boolean).join(" · ")}
+                    </Text>
+                  </View>
+                )}
 
               {lastSynced && (
                 <Text style={[styles.lastSyncText, { color: c.mutedForeground }]}>
@@ -506,7 +573,7 @@ export default function BridgesScreen() {
               <TouchableOpacity
                 key={s.id}
                 style={[styles.submittedCard, { backgroundColor: c.card, borderColor: c.border }]}
-                onPress={() => handleOpenSubmitted(s.structureNumber || "")}
+                onPress={() => handleOpenSubmitted(s)}
                 activeOpacity={0.75}
               >
                 <View style={styles.submittedTop}>
@@ -515,8 +582,13 @@ export default function BridgesScreen() {
                       {s.structureNumber || "Unnamed Bridge"}
                     </Text>
                     <Text style={[styles.submittedMeta, { color: c.mutedForeground }]}>
-                      Submitted {formatRelativeTime(s.syncedAt)}
+                      {s.inspectionDate ? `Inspected ${s.inspectionDate}` : `Submitted ${formatRelativeTime(s.syncedAt)}`}
                     </Text>
+                    {(s.teamLeader || s.teamMembers.length > 0) && (
+                      <Text style={[styles.submittedMeta, { color: c.mutedForeground }]}>
+                        {[s.teamLeader && `Lead: ${s.teamLeader}`, s.teamMembers.length > 0 && `${s.teamMembers.length} additional`].filter(Boolean).join(" · ")}
+                      </Text>
+                    )}
                   </View>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                     {s.status === "finalized" && (
@@ -623,6 +695,8 @@ const styles = StyleSheet.create({
   },
   statusText: { fontSize: 10, fontWeight: "900", textTransform: "uppercase" },
   lastSyncText: { fontSize: 10, fontWeight: "600" },
+  fieldNotesRow: { flexDirection: "row", alignItems: "center", gap: 5 },
+  fieldNotesText: { fontSize: 10, fontWeight: "600", flex: 1 },
   cardActions: { flexDirection: "row", gap: 8 },
   submitBtn: {
     flex: 1,

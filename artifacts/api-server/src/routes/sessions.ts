@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { db, inspectionSessionsTable, sessionPhotosTable } from "@workspace/db";
 import {
   UpsertSessionBody,
@@ -11,6 +11,16 @@ import {
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
+
+function isValidCalendarDate(value: string): boolean {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return false;
+  const [, year, month, day] = match;
+  const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+  return date.getUTCFullYear() === Number(year)
+    && date.getUTCMonth() + 1 === Number(month)
+    && date.getUTCDate() === Number(day);
+}
 
 function requireApiKey(req: Request, res: Response, next: NextFunction): void {
   const apiKey = process.env.API_KEY;
@@ -45,12 +55,21 @@ router.get("/sessions", async (_req, res) => {
       source: inspectionSessionsTable.source,
       status: inspectionSessionsTable.status,
       finalizedAt: inspectionSessionsTable.finalizedAt,
+      teamLeader: inspectionSessionsTable.teamLeader,
+      teamMembers: inspectionSessionsTable.teamMembers,
+      inspectionDate: inspectionSessionsTable.inspectionDate,
+      weather: inspectionSessionsTable.weather,
+      equipmentUsed: inspectionSessionsTable.equipmentUsed,
       defectCount: inspectionSessionsTable.defectCount,
       cs4Count: inspectionSessionsTable.cs4Count,
       syncedAt: inspectionSessionsTable.syncedAt,
     })
     .from(inspectionSessionsTable)
-    .orderBy(inspectionSessionsTable.syncedAt);
+    .orderBy(
+      desc(sql`COALESCE(${inspectionSessionsTable.inspectionDate}::timestamp, ${inspectionSessionsTable.finalizedAt}, ${inspectionSessionsTable.syncedAt})`),
+      desc(inspectionSessionsTable.syncedAt),
+      inspectionSessionsTable.structureNumber,
+    );
 
   res.json(ListSessionsResponse.parse(rows));
 });
@@ -66,6 +85,15 @@ router.post("/sessions", requireApiKey, async (req, res) => {
   const source = bodyParsed.data.source ?? "mobile_sync";
   const status = bodyParsed.data.status ?? "in_progress";
   const finalizedAt = bodyParsed.data.finalizedAt ?? null;
+  const teamLeader = bodyParsed.data.teamLeader?.trim() || null;
+  const teamMembers = bodyParsed.data.teamMembers ?? [];
+  const inspectionDate = bodyParsed.data.inspectionDate ?? null;
+  if (inspectionDate && !isValidCalendarDate(inspectionDate)) {
+    res.status(400).json({ error: "inspectionDate must be a real calendar date in YYYY-MM-DD format" });
+    return;
+  }
+  const weather = bodyParsed.data.weather?.trim() || null;
+  const equipmentUsed = bodyParsed.data.equipmentUsed?.trim() || null;
   const defects = bodyParsed.data.defects ?? [];
   const nbiRatings = bodyParsed.data.nbiRatings ?? [];
   const importSummary = bodyParsed.data.importSummary ?? null;
@@ -80,10 +108,10 @@ router.post("/sessions", requireApiKey, async (req, res) => {
 
   const [row] = await db
     .insert(inspectionSessionsTable)
-    .values({ structureNumber, source, status, finalizedAt, defects, nbiRatings, importSummary, pdfAnnotations, defectCount, cs4Count })
+    .values({ structureNumber, source, status, finalizedAt, teamLeader, teamMembers, inspectionDate, weather, equipmentUsed, defects, nbiRatings, importSummary, pdfAnnotations, defectCount, cs4Count })
     .onConflictDoUpdate({
       target: inspectionSessionsTable.structureNumber,
-      set: { source, status, finalizedAt, defects, nbiRatings, importSummary, pdfAnnotations, defectCount, cs4Count, syncedAt: new Date() },
+      set: { source, status, finalizedAt, teamLeader, teamMembers, inspectionDate, weather, equipmentUsed, defects, nbiRatings, importSummary, pdfAnnotations, defectCount, cs4Count, syncedAt: new Date() },
     })
     .returning({
       id: inspectionSessionsTable.id,
@@ -91,6 +119,11 @@ router.post("/sessions", requireApiKey, async (req, res) => {
       source: inspectionSessionsTable.source,
       status: inspectionSessionsTable.status,
       finalizedAt: inspectionSessionsTable.finalizedAt,
+      teamLeader: inspectionSessionsTable.teamLeader,
+      teamMembers: inspectionSessionsTable.teamMembers,
+      inspectionDate: inspectionSessionsTable.inspectionDate,
+      weather: inspectionSessionsTable.weather,
+      equipmentUsed: inspectionSessionsTable.equipmentUsed,
       defectCount: inspectionSessionsTable.defectCount,
       cs4Count: inspectionSessionsTable.cs4Count,
       syncedAt: inspectionSessionsTable.syncedAt,

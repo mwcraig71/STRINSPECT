@@ -21,3 +21,8 @@
 - [Offline-first sync architecture](offline-sync-arch.md) — persistent queue (offlineQueue.ts), photo upload to session_photos table, syncSession returns "synced"|"queued" (never throws when offline).
 - [Cross-tab deep-link focus](cross-tab-deep-link-focus.md) — router.navigate focus+focusTs nonce; receiver applies once via handledFocusRef while keeping data dep, or it re-snaps on later edits.
 - [expo-av → expo-audio migration](expo-av-deprecation.md) — SpeechToTextButton fully migrated; useAudioRecorder hook, AudioModule.requestRecordingPermissionsAsync, playsInSilentMode (not playsInSilentModeIOS).
+- [SCDOT underwater reports](scdot-underwater-reports.md) — detect Underwater and Underwater (Unscheduled); use the four-view SCDOT underwater photo checklist.
+- [Inspection assignment modes](inspection-assignment-modes.md) — configure Topside + Underside versus Underwater in Settings; underwater is SCDOT-only.
+- [Android tab icons](android-tab-icons.md) — use classic Feather tabs on Android; NativeTabs configured only with SF Symbols renders missing glyphs.
+- [Tablet orientation](tablet-orientation.md) — support both orientations; detect tablets from the shortest screen edge, not width alone.
+- [WebView toolbar icons](webview-toolbar-icons.md) — embedded PDF controls use inline SVG, not emoji or icon-font glyphs that can render as boxes.

@@ -27,6 +27,7 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
 #opt-dynamic{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .tbtn{background:#1e293b;border:1.5px solid #334155;border-radius:10px;color:#94a3b8;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap;flex-shrink:0;-webkit-user-select:none;user-select:none}
 .tbtn.active{border-color:#38bdf8;color:#38bdf8;background:rgba(56,189,248,.1)}
+.ui-icon{width:14px;height:14px;display:block;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .clr-dot{width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent;flex-shrink:0;transition:transform .1s}
 .clr-dot.active{border-color:#fff;transform:scale(1.25)}
 .sz-btn{background:#1e293b;border:1.5px solid #334155;border-radius:7px;color:#94a3b8;padding:4px 9px;font-size:10px;font-weight:700;cursor:pointer;flex-shrink:0;-webkit-user-select:none;user-select:none}
@@ -80,15 +81,15 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
 
 <div id="toolbar" style="display:none">
   <div id="tool-row">
-    <button class="tbtn active" id="btn-pan">&#9997; Pan</button>
-    <button class="tbtn" id="btn-pen">&#9998; Pen</button>
-    <button class="tbtn" id="btn-highlight">&#128397; HL</button>
+    <button class="tbtn active" id="btn-pan"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 11V6a2 2 0 0 0-4 0v4"/><path d="M14 10V4a2 2 0 0 0-4 0v6"/><path d="M10 10V5a2 2 0 0 0-4 0v9"/><path d="M6 10a2 2 0 0 0-4 0v4c0 4.4 3.6 8 8 8h2a8 8 0 0 0 8-8v-3a2 2 0 0 0-4 0v1"/></svg>Pan</button>
+    <button class="tbtn" id="btn-pen"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 19 7-7 3 3-7 7-4 1 1-4z"/><path d="m18 13-3-3"/><path d="M2 22h6"/></svg>Pen</button>
+    <button class="tbtn" id="btn-highlight"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 11-6 6v3h3l6-6"/><path d="m22 6-4-4L8 12l4 4L22 6z"/><path d="M2 22h20"/></svg>HL</button>
     <button class="tbtn" id="btn-text">T&nbsp;Text</button>
-    <button class="tbtn" id="btn-undo">&#8617; Undo</button>
+    <button class="tbtn" id="btn-undo"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 6 6v4"/></svg>Undo</button>
     <div class="zoom-group">
-      <button class="tbtn" id="btn-zoom-out">&#8722;</button>
+      <button class="tbtn" id="btn-zoom-out" aria-label="Zoom out"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button>
       <span id="zoom-label">100%</span>
-      <button class="tbtn" id="btn-zoom-in">&#43;</button>
+      <button class="tbtn" id="btn-zoom-in" aria-label="Zoom in"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg></button>
     </div>
   </div>
   <div id="opt-row">
@@ -141,11 +142,16 @@ var pdfjsLib = window.pdfjsLib || globalThis.pdfjsLib;
 if (!pdfjsLib) {
   showError('PDF viewer failed to initialise.');
 } else {
+  // Register PDF.js's in-thread fallback before attempting the Blob worker.
+  // Android production WebViews may reject that worker asynchronously even
+  // after URL creation succeeds.
+  // Function scope prevents internal declarations in the worker and main
+  // bundles from colliding while still publishing globalThis.pdfjsWorker.
+  try { Function(__pdfWorkerSrc__)(); } catch (_) {}
   try {
     var _wBlob = new Blob([__pdfWorkerSrc__], { type: 'application/javascript' });
     pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(_wBlob);
   } catch (_wErr) {
-    try { (0, eval)(__pdfWorkerSrc__); } catch (_) {}
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'worker.js';
   }
 }

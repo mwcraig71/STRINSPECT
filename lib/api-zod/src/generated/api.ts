@@ -19,16 +19,24 @@ export const HealthCheckResponse = zod.object({
  * Returns metadata for all synced sessions (no defect/NBI payload)
  * @summary List all inspection sessions
  */
-export const SessionSource = zod.enum(["mobile_sync", "pdf_import"]);
-
-export const SessionStatus = zod.enum(["in_progress", "finalized"]);
+export const listSessionsResponseInspectionDateRegExp = new RegExp(
+  "^\\d{4}-\\d{2}-\\d{2}$",
+);
 
 export const ListSessionsResponseItem = zod.object({
   id: zod.string(),
   structureNumber: zod.string(),
-  source: SessionSource.default("mobile_sync"),
-  status: SessionStatus.default("in_progress"),
-  finalizedAt: zod.coerce.date().nullable().optional(),
+  source: zod.enum(["mobile_sync", "pdf_import"]),
+  status: zod.enum(["in_progress", "finalized"]),
+  finalizedAt: zod.coerce.date().nullish(),
+  teamLeader: zod.string().nullish(),
+  teamMembers: zod.array(zod.string()),
+  inspectionDate: zod
+    .string()
+    .regex(listSessionsResponseInspectionDateRegExp)
+    .nullish(),
+  weather: zod.string().nullish(),
+  equipmentUsed: zod.string().nullish(),
   defectCount: zod.number(),
   cs4Count: zod.number(),
   syncedAt: zod.coerce.date(),
@@ -39,23 +47,47 @@ export const ListSessionsResponse = zod.array(ListSessionsResponseItem);
  * Creates or replaces the session for a given structure number
  * @summary Upsert an inspection session
  */
+export const upsertSessionBodyInspectionDateRegExp = new RegExp(
+  "^\\d{4}-\\d{2}-\\d{2}$",
+);
+
 export const UpsertSessionBody = zod.object({
   structureNumber: zod.string(),
-  source: SessionSource.optional(),
-  status: SessionStatus.optional(),
-  finalizedAt: zod.coerce.date().nullable().optional(),
+  source: zod.enum(["mobile_sync", "pdf_import"]).optional(),
+  status: zod.enum(["in_progress", "finalized"]).optional(),
+  finalizedAt: zod.coerce.date().nullish(),
+  teamLeader: zod.string().nullish(),
+  teamMembers: zod.array(zod.string()).optional(),
+  inspectionDate: zod
+    .string()
+    .regex(upsertSessionBodyInspectionDateRegExp)
+    .nullish(),
+  weather: zod.string().nullish(),
+  equipmentUsed: zod.string().nullish(),
   defects: zod.array(zod.unknown()).optional(),
   nbiRatings: zod.array(zod.unknown()).optional(),
   importSummary: zod.unknown().optional(),
   pdfAnnotations: zod.array(zod.unknown()).optional(),
 });
 
+export const upsertSessionResponseInspectionDateRegExp = new RegExp(
+  "^\\d{4}-\\d{2}-\\d{2}$",
+);
+
 export const UpsertSessionResponse = zod.object({
   id: zod.string(),
   structureNumber: zod.string(),
-  source: SessionSource.default("mobile_sync"),
-  status: SessionStatus.default("in_progress"),
-  finalizedAt: zod.coerce.date().nullable().optional(),
+  source: zod.enum(["mobile_sync", "pdf_import"]),
+  status: zod.enum(["in_progress", "finalized"]),
+  finalizedAt: zod.coerce.date().nullish(),
+  teamLeader: zod.string().nullish(),
+  teamMembers: zod.array(zod.string()),
+  inspectionDate: zod
+    .string()
+    .regex(upsertSessionResponseInspectionDateRegExp)
+    .nullish(),
+  weather: zod.string().nullish(),
+  equipmentUsed: zod.string().nullish(),
   defectCount: zod.number(),
   cs4Count: zod.number(),
   syncedAt: zod.coerce.date(),
@@ -68,19 +100,31 @@ export const GetSessionParams = zod.object({
   id: zod.coerce.string(),
 });
 
+export const getSessionResponseInspectionDateRegExp = new RegExp(
+  "^\\d{4}-\\d{2}-\\d{2}$",
+);
+
 export const GetSessionResponse = zod.object({
   id: zod.string(),
   structureNumber: zod.string(),
-  source: SessionSource.default("mobile_sync"),
-  status: SessionStatus.default("in_progress"),
-  finalizedAt: zod.coerce.date().nullable().optional(),
+  source: zod.enum(["mobile_sync", "pdf_import"]),
+  status: zod.enum(["in_progress", "finalized"]),
+  finalizedAt: zod.coerce.date().nullish(),
+  teamLeader: zod.string().nullish(),
+  teamMembers: zod.array(zod.string()),
+  inspectionDate: zod
+    .string()
+    .regex(getSessionResponseInspectionDateRegExp)
+    .nullish(),
+  weather: zod.string().nullish(),
+  equipmentUsed: zod.string().nullish(),
   defectCount: zod.number(),
   cs4Count: zod.number(),
   syncedAt: zod.coerce.date(),
   defects: zod.array(zod.unknown()),
   nbiRatings: zod.array(zod.unknown()),
-  importSummary: zod.unknown().nullable().optional(),
-  pdfAnnotations: zod.array(zod.unknown()).nullable().optional(),
+  importSummary: zod.unknown().nullish(),
+  pdfAnnotations: zod.array(zod.unknown()).nullish(),
 });
 
 /**

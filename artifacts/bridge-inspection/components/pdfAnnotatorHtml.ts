@@ -13,12 +13,14 @@ export function getPdfAnnotatorHtml(): string {
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{--topbar-height:48px;--toolbar-height:140px}
 body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;overflow:hidden;height:100vh}
 #topbar{position:fixed;top:0;left:0;right:0;z-index:200;height:calc(48px + env(safe-area-inset-top));background:#0f172a;border-bottom:1px solid #334155;display:flex;align-items:center;justify-content:space-between;padding:env(safe-area-inset-top) 12px 0;gap:8px}
 #page-info{color:#94a3b8;font-size:12px;font-weight:700;flex:1}
 .top-btn{background:#1e293b;border:1.5px solid #334155;border-radius:8px;color:#94a3b8;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap}
 .top-btn.save{background:#0284c7;border-color:#0369a1;color:#fff}
-#scroll-area{position:absolute;top:calc(48px + env(safe-area-inset-top));bottom:140px;left:0;right:0;overflow-y:auto;overflow-x:auto;-webkit-overflow-scrolling:auto;background:#1e293b}
+.ui-icon{width:15px;height:15px;display:block;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#scroll-area{position:absolute;top:var(--topbar-height);bottom:var(--toolbar-height);left:0;right:0;overflow-y:auto;overflow-x:auto;-webkit-overflow-scrolling:auto;background:#1e293b}
 #scroll-area.drawing{overflow:hidden}
 .page-wrap{position:relative;margin:12px auto;display:block;box-shadow:0 4px 24px rgba(0,0,0,.6)}
 .pdf-canvas{display:block;width:100%}
@@ -48,7 +50,7 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
 .sc-chip{background:#1e293b;border:1.5px solid #4c1d95;border-radius:16px;color:#c4b5fd;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;-webkit-user-select:none;user-select:none}
 .sc-chip:active{opacity:.65}
 #btn-sc-browse{background:#7c3aed;border:none;border-radius:16px;color:#fff;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;-webkit-user-select:none;user-select:none}
-#sc-suggest{display:none;position:fixed;z-index:302;bottom:0;left:0;right:0;background:#0f172a;border-top:1px solid #7c3aed;flex-direction:row;gap:6px;padding:5px 8px;padding-bottom:calc(5px + env(safe-area-inset-bottom));overflow-x:auto}
+#sc-suggest{display:none;position:fixed;z-index:302;bottom:var(--toolbar-height);left:0;right:0;background:#0f172a;border-top:1px solid #7c3aed;flex-direction:row;gap:6px;padding:5px 8px;overflow-x:auto}
 #sc-suggest::-webkit-scrollbar{display:none}
 .sc-sug{background:#1e293b;border:1px solid #7c3aed;border-radius:8px;color:#c4b5fd;padding:3px 8px;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0}
 .sc-sug:active{opacity:.65}
@@ -79,9 +81,9 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
 <div id="topbar" style="display:none">
   <span id="page-info">Page 1 of ?</span>
   <div style="display:flex;gap:6px">
-    <button class="top-btn" id="btn-export">&#128196; Export</button>
-    <button class="top-btn save" id="btn-save">&#128190; Save</button>
-    <button class="top-btn" id="btn-close">&#10005; Close</button>
+    <button class="top-btn" id="btn-export" aria-label="Export annotation text"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>Export</button>
+    <button class="top-btn save" id="btn-save" aria-label="Save annotations"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg>Save</button>
+    <button class="top-btn" id="btn-close" aria-label="Close annotator"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>Close</button>
   </div>
 </div>
 
@@ -89,18 +91,18 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
 
 <div id="toolbar" style="display:none">
   <div id="tool-row">
-    <button class="tbtn active" id="btn-pan">&#9997; Pan</button>
-    <button class="tbtn" id="btn-pen">&#9998; Pen</button>
-    <button class="tbtn" id="btn-highlight">&#128397; HL</button>
+    <button class="tbtn active" id="btn-pan"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 11V6a2 2 0 0 0-4 0v4"/><path d="M14 10V4a2 2 0 0 0-4 0v6"/><path d="M10 10V5a2 2 0 0 0-4 0v9"/><path d="M6 10a2 2 0 0 0-4 0v4c0 4.4 3.6 8 8 8h2a8 8 0 0 0 8-8v-3a2 2 0 0 0-4 0v1"/></svg>Pan</button>
+    <button class="tbtn" id="btn-pen"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 19 7-7 3 3-7 7-4 1 1-4z"/><path d="m18 13-3-3"/><path d="M2 22h6"/></svg>Pen</button>
+    <button class="tbtn" id="btn-highlight"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 11-6 6v3h3l6-6"/><path d="m22 6-4-4L8 12l4 4L22 6z"/><path d="M2 22h20"/></svg>HL</button>
     <button class="tbtn" id="btn-text">T&nbsp;Text</button>
-    <button class="tbtn" id="btn-undo">&#8617; Undo</button>
+    <button class="tbtn" id="btn-undo"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 6 6v4"/></svg>Undo</button>
   </div>
   <div id="opt-row">
     <div id="opt-dynamic"></div>
     <div class="zoom-group">
-      <button class="tbtn" id="btn-zoom-out">&#8722;</button>
+      <button class="tbtn" id="btn-zoom-out" aria-label="Zoom out"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button>
       <span id="zoom-label">100%</span>
-      <button class="tbtn" id="btn-zoom-in">&#43;</button>
+      <button class="tbtn" id="btn-zoom-in" aria-label="Zoom in"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg></button>
     </div>
   </div>
   <div id="shortcuts-row"></div>
@@ -145,11 +147,26 @@ function setLoadTxt(t) {
   if (el) el.textContent = t;
 }
 
+function syncViewportLayout() {
+  var root = document.documentElement;
+  var topbar = document.getElementById('topbar');
+  var toolbar = document.getElementById('toolbar');
+  var topbarVisible = topbar && topbar.style.display !== 'none';
+  var toolbarVisible = toolbar && toolbar.style.display !== 'none';
+  root.style.setProperty('--topbar-height', (topbarVisible ? topbar.offsetHeight : 0) + 'px');
+  root.style.setProperty('--toolbar-height', (toolbarVisible ? toolbar.offsetHeight : 0) + 'px');
+}
+
+window.addEventListener('resize', syncViewportLayout);
+if (window.visualViewport) window.visualViewport.addEventListener('resize', syncViewportLayout);
+
 function showUI() {
   document.getElementById('loading').style.display = 'none';
   document.getElementById('topbar').style.display = 'flex';
   document.getElementById('toolbar').style.display = 'flex';
   document.getElementById('page-info').textContent = 'Page 1 of ' + pageCount;
+  syncViewportLayout();
+  if (window.requestAnimationFrame) window.requestAnimationFrame(syncViewportLayout);
 }
 
 /* ── Initialise PDF.js from bundled global ── */
@@ -158,6 +175,12 @@ var pdfjsLib = window.pdfjsLib || globalThis.pdfjsLib;
 if (!pdfjsLib) {
   showError('PDF viewer failed to initialise. Please close and try again.');
 } else {
+  // Pre-register the fake-worker handler. Some Android production WebViews
+  // accept a Blob worker URL but reject the worker asynchronously; PDF.js then
+  // needs globalThis.pdfjsWorker.WorkerMessageHandler for its fallback.
+  // Function scope prevents internal declarations in the worker and main
+  // bundles from colliding while still publishing globalThis.pdfjsWorker.
+  try { Function(__pdfWorkerSrc__)(); } catch (_) {}
   // pdf.js throws "No workerSrc specified" for any falsy value, including ''.
   // Create a blob URL from the embedded worker script so pdf.js gets a real,
   // non-empty URL and spins a proper Web Worker (WKWebView iOS 16+ supports
@@ -166,9 +189,7 @@ if (!pdfjsLib) {
     var _wBlob = new Blob([__pdfWorkerSrc__], { type: 'application/javascript' });
     pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(_wBlob);
   } catch (_wErr) {
-    // Blob URL unavailable — execute worker inline so WorkerMessageHandler is
-    // registered on globalThis.pdfjsWorker, then satisfy the non-empty check.
-    try { (0, eval)(__pdfWorkerSrc__); } catch (_) {}
+    // Blob URL unavailable — the handler above supplies the in-thread worker.
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'worker.js';
   }
 }
@@ -620,7 +641,7 @@ function setTool(t) {
 function renderOptRow() {
   var row = document.getElementById('opt-dynamic');
   row.innerHTML = '';
-  if (tool === 'pan') return;
+  if (tool === 'pan') { syncViewportLayout(); return; }
 
   if (tool === 'highlight') {
     var d = document.createElement('div');
@@ -655,6 +676,7 @@ function renderOptRow() {
     b.onclick = function() { penSize = def.s; renderOptRow(); };
     row.appendChild(b);
   });
+  syncViewportLayout();
 }
 
 function observePages() {
@@ -736,6 +758,7 @@ function renderShortcutsRow() {
   browse.textContent = scList.length > 0 ? (scFavorites.length === 0 ? '\u2605 Shortcuts' : '\u2026 More') : '\u2605 Shortcuts';
   browse.onclick = function() { openScModal(); };
   row.appendChild(browse);
+  syncViewportLayout();
 }
 
 function openScModal() {

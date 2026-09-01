@@ -27,11 +27,13 @@ setAuthTokenGetter(() => process.env.EXPO_PUBLIC_API_KEY ?? null);
 export const NOMENCLATURES = {
   TXDOT: "Texas (TxDOT)",
   NCDOT: "North Carolina (NCDOT)",
+  SCDOT: "South Carolina (SCDOT)",
 };
 
 export const INSPECTION_TYPES = {
   TOPSIDE: "Topside",
   UNDERSIDE: "Underside",
+  UNDERWATER: "Underwater",
 };
 
 export const SUPERSTRUCTURE_TYPES = [
@@ -453,6 +455,41 @@ export const TXDOT_REQUIRED_SLOTS: StandardPhotoSlot[] = [
   { slotId: "upstream",         label: "Upstream",                   directionTags: [], subjectTags: [] },
   { slotId: "downstream",       label: "Downstream",                 directionTags: [], subjectTags: [] },
 ];
+
+export const SCDOT_REQUIRED_SLOTS: StandardPhotoSlot[] = [
+  { slotId: "typical_deck", label: "Typical Deck", note: "Required general inspection photo", directionTags: [], subjectTags: [] },
+  { slotId: "typical_superstructure", label: "Typical Superstructure", note: "Required general inspection photo", directionTags: [], subjectTags: [] },
+  { slotId: "typical_substructure", label: "Typical Substructure", note: "Required general inspection photo", directionTags: [], subjectTags: [] },
+  { slotId: "upstream_upstation_elevation", label: "Upstream / Upstation Elevation", note: "Required general inspection photo", directionTags: [], subjectTags: [] },
+  { slotId: "downstream_downstation_elevation", label: "Downstream / Downstation Elevation", note: "Required general inspection photo", directionTags: [], subjectTags: [] },
+];
+
+export const SCDOT_UNDERWATER_REQUIRED_SLOTS: StandardPhotoSlot[] = [
+  { slotId: "underwater_upstream_elevation", label: "Upstream / Upstation Elevation", note: "Required underwater inspection photo", directionTags: [], subjectTags: [] },
+  { slotId: "underwater_downstream_elevation", label: "Downstream / Downstation Elevation", note: "Required underwater inspection photo", directionTags: [], subjectTags: [] },
+  { slotId: "underwater_upstream_view", label: "View Upstream from Under Bridge / Culvert", note: "Required underwater inspection photo", directionTags: [], subjectTags: [] },
+  { slotId: "underwater_downstream_view", label: "View Downstream from Under Bridge / Culvert", note: "Required underwater inspection photo", directionTags: [], subjectTags: [] },
+];
+
+function requiredPhotoSlotsFor(
+  nomenclature: string,
+  inspectionType: string = INSPECTION_TYPES.TOPSIDE
+): StandardPhotoSlot[] {
+  if (nomenclature === NOMENCLATURES.SCDOT && inspectionType === INSPECTION_TYPES.UNDERWATER) {
+    return SCDOT_UNDERWATER_REQUIRED_SLOTS;
+  }
+  return nomenclature === NOMENCLATURES.SCDOT ? SCDOT_REQUIRED_SLOTS : TXDOT_REQUIRED_SLOTS;
+}
+
+function mergePhotoCatalog(
+  catalog: StandardPhotoSlot[],
+  saved: StandardPhotoSlot[]
+): StandardPhotoSlot[] {
+  return catalog.map((slot) => {
+    const found = saved.find((candidate) => candidate.slotId === slot.slotId);
+    return found ? { ...slot, ...found } : slot;
+  });
+}
 
 export interface DefectRecord {
   id: string;
@@ -1239,6 +1276,11 @@ interface InspectionContextType {
   setSubstructureMaterials: (v: string[]) => void;
   elementSearch: string;
   setElementSearch: (v: string) => void;
+  elementZoneFilter: "All" | "Topside" | "Underside";
+  setElementZoneFilter: (v: "All" | "Topside" | "Underside") => void;
+  activeElementIds: string[];
+  setActiveElementIds: (v: string[]) => void;
+  resetElementFilters: () => void;
   supportCount: number;
 
   // Form state
@@ -1345,6 +1387,16 @@ interface InspectionContextType {
   // Structure number
   structureNumber: string;
   setStructureNumber: (v: string) => void;
+  teamLeader: string;
+  setTeamLeader: (v: string) => void;
+  teamMembers: string[];
+  setTeamMembers: (v: string[]) => void;
+  inspectionDate: string;
+  setInspectionDate: (v: string) => void;
+  weather: string;
+  setWeather: (v: string) => void;
+  equipmentUsed: string;
+  setEquipmentUsed: (v: string) => void;
 
   // Actions
   handleSave: () => void;
@@ -1652,7 +1704,6 @@ const STORAGE_KEYS = {
   STEEL_PIPE_PILE: "@bridge_steel_pipe_pile",
   IMPORT_SUMMARY: "@bridge_import_summary",
   LAST_JOINT_ELEMENT: "@bridge_last_joint_element",
-  DEMO_CLEARED: "@bridge_demo_cleared_v1",
   LAST_SYNCED: "@bridge_last_synced",
   LAST_MODIFIED: "@bridge_last_modified",
   IMPORTED_PDF_PATH: "@bridge_imported_pdf_path",
@@ -1670,7 +1721,39 @@ const STORAGE_KEYS = {
   STANDARD_PHOTOS: "@bridge_standard_photos",
   EXTRA_PHOTOS: "@bridge_extra_photos",
   IS_SNBI_FORMAT: "@bridge_is_snbi_format",
+  TEAM_LEADER: "@bridge_team_leader",
+  TEAM_MEMBERS: "@bridge_team_members",
+  INSPECTION_DATE: "@bridge_inspection_date",
+  WEATHER: "@bridge_weather",
+  EQUIPMENT_USED: "@bridge_equipment_used",
+  ELEMENT_ZONE_FILTER: "@bridge_element_zone_filter",
+  ACTIVE_ELEMENT_IDS: "@bridge_active_element_ids",
 };
+
+export function normalizeInspectionDateInput(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  let year: string;
+  let month: string;
+  let day: string;
+  const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoMatch) {
+    [, year, month, day] = isoMatch;
+  } else {
+    const slashMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (!slashMatch) return null;
+    year = slashMatch[3];
+    month = slashMatch[1].padStart(2, "0");
+    day = slashMatch[2].padStart(2, "0");
+  }
+  const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+  if (
+    date.getUTCFullYear() !== Number(year)
+    || date.getUTCMonth() + 1 !== Number(month)
+    || date.getUTCDate() !== Number(day)
+  ) return null;
+  return `${year}-${month}-${day}`;
+}
 
 // ─── Shared header merge utility ─────────────────────────────────────────────
 // Fills empty header fields on a form object from a parsed source header.
@@ -1718,6 +1801,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const [superstructureMaterials, setSuperstructureMaterialsState] = useState<string[]>([]);
   const [substructureMaterials, setSubstructureMaterialsState] = useState<string[]>([]);
   const [elementSearch, setElementSearch] = useState("");
+  const [elementZoneFilter, setElementZoneFilterState] = useState<"All" | "Topside" | "Underside">("All");
+  const [activeElementIds, setActiveElementIdsState] = useState<string[]>([]);
   const [lastSynced, setLastSynced] = useState<string | null>(null);
   const [lastModified, setLastModifiedState] = useState<string | null>(null);
   const [finalizedAt, setFinalizedAtState] = useState<string | null>(null);
@@ -1727,6 +1812,11 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const [savedDefects, setSavedDefectsState] = useState<DefectRecord[]>([]);
   const [nbiRatings, setNbiRatingsState] = useState<NbiRating[]>(INITIAL_NBI_RATINGS);
   const [structureNumber, setStructureNumberState] = useState("");
+  const [teamLeader, setTeamLeaderState] = useState("");
+  const [teamMembers, setTeamMembersState] = useState<string[]>([]);
+  const [inspectionDate, setInspectionDateState] = useState("");
+  const [weather, setWeatherState] = useState("");
+  const [equipmentUsed, setEquipmentUsedState] = useState("");
 
   const [editId, setEditId] = useState<string | null>(null);
   const [currentLocation, setCurrentLocation] = useState("");
@@ -1788,17 +1878,40 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     const load = async () => {
       try {
-        const demoCleared = await AsyncStorage.getItem(STORAGE_KEYS.DEMO_CLEARED);
-        if (!demoCleared) {
+        // Remove demo data left by older builds without touching real sessions.
+        const legacyDemoMode = await AsyncStorage.getItem("@bridge_demo_mode");
+        if (legacyDemoMode === "1") {
           await AsyncStorage.multiRemove([
             STORAGE_KEYS.SAVED_DEFECTS,
             STORAGE_KEYS.NBI_RATINGS,
             STORAGE_KEYS.STRUCTURE_NUMBER,
             STORAGE_KEYS.IMPORT_SUMMARY,
+            STORAGE_KEYS.NOMENCLATURE,
+            STORAGE_KEYS.INSPECTION_TYPE,
+            STORAGE_KEYS.SUPERSTRUCTURE_TYPE,
+            STORAGE_KEYS.SUBSTRUCTURE_TYPE,
+            STORAGE_KEYS.SUPERSTRUCTURE_MATERIAL,
+            STORAGE_KEYS.SUBSTRUCTURE_MATERIAL,
+            STORAGE_KEYS.IS_SNBI_FORMAT,
+            STORAGE_KEYS.STANDARD_PHOTOS,
+            STORAGE_KEYS.UNDERCLEARANCE,
+            STORAGE_KEYS.CHANNEL,
+            STORAGE_KEYS.LAST_MODIFIED,
+            STORAGE_KEYS.IMPORTED_PDF_PATH,
+            STORAGE_KEYS.PDF_ANNOTATIONS,
+            STORAGE_KEYS.PDF_UPLOADED,
+            STORAGE_KEYS.EXTRA_PHOTOS,
+            STORAGE_KEYS.LAST_SYNCED,
+            STORAGE_KEYS.FINALIZED_AT,
+            STORAGE_KEYS.TEAM_LEADER,
+            STORAGE_KEYS.TEAM_MEMBERS,
+            STORAGE_KEYS.INSPECTION_DATE,
+            STORAGE_KEYS.WEATHER,
+            STORAGE_KEYS.EQUIPMENT_USED,
+            "@bridge_demo_mode",
           ]);
-          await AsyncStorage.setItem(STORAGE_KEYS.DEMO_CLEARED, "1");
         }
-        const [defects, nbi, nom, insType, superType, subType, superMat, subMat, structNum, uc, ch, sb, sn, spp, impSummary, lastJoint, lastSync, lastMod, pdfPath, pdfAnns, pdfUploadedStr, imgSz, aspectRatioStr, dateStampStr, finalizedAtStr, importAuditAckStr, criticalAckStr, stdPhotosStr, openAiKeyStr, aiRephraseStr, extraPhotosStr, ucChannelOverrideStr, isSnbiFormatStr] = await Promise.all([
+        const [defects, nbi, nom, insType, superType, subType, superMat, subMat, structNum, uc, ch, sb, sn, spp, impSummary, lastJoint, lastSync, lastMod, pdfPath, pdfAnns, pdfUploadedStr, imgSz, aspectRatioStr, dateStampStr, finalizedAtStr, importAuditAckStr, criticalAckStr, stdPhotosStr, openAiKeyStr, aiRephraseStr, extraPhotosStr, ucChannelOverrideStr, isSnbiFormatStr, teamLeaderStr, teamMembersStr, inspectionDateStr, weatherStr, equipmentUsedStr, elementZoneStr, activeElementIdsStr] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.SAVED_DEFECTS),
           AsyncStorage.getItem(STORAGE_KEYS.NBI_RATINGS),
           AsyncStorage.getItem(STORAGE_KEYS.NOMENCLATURE),
@@ -1832,6 +1945,13 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           AsyncStorage.getItem(STORAGE_KEYS.EXTRA_PHOTOS),
           AsyncStorage.getItem(STORAGE_KEYS.UC_CHANNEL_OVERRIDE),
           AsyncStorage.getItem(STORAGE_KEYS.IS_SNBI_FORMAT),
+          AsyncStorage.getItem(STORAGE_KEYS.TEAM_LEADER),
+          AsyncStorage.getItem(STORAGE_KEYS.TEAM_MEMBERS),
+          AsyncStorage.getItem(STORAGE_KEYS.INSPECTION_DATE),
+          AsyncStorage.getItem(STORAGE_KEYS.WEATHER),
+          AsyncStorage.getItem(STORAGE_KEYS.EQUIPMENT_USED),
+          AsyncStorage.getItem(STORAGE_KEYS.ELEMENT_ZONE_FILTER),
+          AsyncStorage.getItem(STORAGE_KEYS.ACTIVE_ELEMENT_IDS),
         ]);
         if (lastJoint) setLastJointElementIdState(lastJoint);
         if (lastSync) setLastSynced(lastSync);
@@ -1849,14 +1969,35 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         if (isSnbiFormatStr === "1") setIsSnbiFormatState(true);
         if (openAiKeyStr) setOpenAiKeyState(openAiKeyStr);
         if (aiRephraseStr !== null) setAiRephraseState(aiRephraseStr !== "0");
+        if (teamLeaderStr) setTeamLeaderState(teamLeaderStr);
+        if (teamMembersStr) {
+          try {
+            const parsed = JSON.parse(teamMembersStr);
+            if (Array.isArray(parsed)) setTeamMembersState(parsed.filter((v): v is string => typeof v === "string"));
+          } catch {}
+        }
+        if (inspectionDateStr) setInspectionDateState(inspectionDateStr);
+        if (weatherStr) setWeatherState(weatherStr);
+        if (equipmentUsedStr) setEquipmentUsedState(equipmentUsedStr);
+        if (elementZoneStr === "All" || elementZoneStr === "Topside" || elementZoneStr === "Underside") {
+          setElementZoneFilterState(elementZoneStr);
+        }
+        if (activeElementIdsStr) {
+          try {
+            const parsed = JSON.parse(activeElementIdsStr);
+            if (Array.isArray(parsed)) {
+              setActiveElementIdsState(parsed.filter((v): v is string => typeof v === "string"));
+            }
+          } catch {}
+        }
         if (stdPhotosStr) {
           try {
             const saved = JSON.parse(stdPhotosStr) as StandardPhotoSlot[];
             setStandardPhotosState(
-              TXDOT_REQUIRED_SLOTS.map((slot) => {
-                const found = saved.find((s) => s.slotId === slot.slotId);
-                return found ? { ...slot, ...found } : slot;
-              })
+              mergePhotoCatalog(
+                requiredPhotoSlotsFor(nom ?? NOMENCLATURES.TXDOT, insType ?? INSPECTION_TYPES.TOPSIDE),
+                saved
+              )
             );
           } catch {}
         }
@@ -2056,12 +2197,22 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const setNomenclature = useCallback((v: string) => {
     setNomenclatureState(v);
     AsyncStorage.setItem(STORAGE_KEYS.NOMENCLATURE, v).catch(() => {});
+    setStandardPhotosState((current) => {
+      const next = mergePhotoCatalog(requiredPhotoSlotsFor(v), current);
+      AsyncStorage.setItem(STORAGE_KEYS.STANDARD_PHOTOS, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
   }, []);
 
   const setInspectionType = useCallback((v: string) => {
     setInspectionTypeState(v);
     AsyncStorage.setItem(STORAGE_KEYS.INSPECTION_TYPE, v).catch(() => {});
-  }, []);
+    setStandardPhotosState((current) => {
+      const next = mergePhotoCatalog(requiredPhotoSlotsFor(nomenclature, v), current);
+      AsyncStorage.setItem(STORAGE_KEYS.STANDARD_PHOTOS, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  }, [nomenclature]);
 
   const setSuperstructureTypes = useCallback((v: string[]) => {
     setSuperstructureTypesState(v);
@@ -2083,10 +2234,45 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     AsyncStorage.setItem(STORAGE_KEYS.SUBSTRUCTURE_MATERIAL, JSON.stringify(v)).catch(() => {});
   }, []);
 
+  const setTeamLeader = useCallback((v: string) => {
+    setTeamLeaderState(v);
+    AsyncStorage.setItem(STORAGE_KEYS.TEAM_LEADER, v).catch(() => {});
+    bumpLastModified();
+  }, [bumpLastModified]);
+
+  const setTeamMembers = useCallback((v: string[]) => {
+    const cleaned = v.map((name) => name.trim()).filter(Boolean);
+    setTeamMembersState(cleaned);
+    AsyncStorage.setItem(STORAGE_KEYS.TEAM_MEMBERS, JSON.stringify(cleaned)).catch(() => {});
+    bumpLastModified();
+  }, [bumpLastModified]);
+
+  const setInspectionDate = useCallback((v: string) => {
+    setInspectionDateState(v);
+    AsyncStorage.setItem(STORAGE_KEYS.INSPECTION_DATE, v).catch(() => {});
+    bumpLastModified();
+  }, [bumpLastModified]);
+
+  const setWeather = useCallback((v: string) => {
+    setWeatherState(v);
+    AsyncStorage.setItem(STORAGE_KEYS.WEATHER, v).catch(() => {});
+    bumpLastModified();
+  }, [bumpLastModified]);
+
+  const setEquipmentUsed = useCallback((v: string) => {
+    setEquipmentUsedState(v);
+    AsyncStorage.setItem(STORAGE_KEYS.EQUIPMENT_USED, v).catch(() => {});
+    bumpLastModified();
+  }, [bumpLastModified]);
+
   const syncSession = useCallback(async (
     statusArg?: "in_progress" | "finalized",
     finalizedAtArg?: string | null,
   ): Promise<"synced" | "queued"> => {
+    const normalizedInspectionDate = normalizeInspectionDateInput(inspectionDate);
+    if (normalizedInspectionDate === null) {
+      throw new Error("Inspection date must be a real calendar date in YYYY-MM-DD or MM/DD/YYYY format.");
+    }
     const apiUrl = process.env.EXPO_PUBLIC_API_URL ??
       (process.env.EXPO_PUBLIC_DOMAIN
         ? `https://${process.env.EXPO_PUBLIC_DOMAIN}:8080`
@@ -2103,6 +2289,11 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
       payload: {
         status,
         finalizedAt: finAt,
+        teamLeader: teamLeader.trim() || null,
+        teamMembers,
+        inspectionDate: normalizedInspectionDate || null,
+        weather: weather.trim() || null,
+        equipmentUsed: equipmentUsed.trim() || null,
         defects: savedDefects as unknown[],
         nbiRatings: nbiRatings as unknown[],
         importSummary: importSummary ?? null,
@@ -2136,6 +2327,11 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         structureNumber: sn,
         status,
         finalizedAt: finAt,
+        teamLeader: teamLeader.trim() || null,
+        teamMembers,
+        inspectionDate: normalizedInspectionDate || null,
+        weather: weather.trim() || null,
+        equipmentUsed: equipmentUsed.trim() || null,
         defects: savedDefects,
         nbiRatings,
         importSummary: importSummary ?? undefined,
@@ -2194,7 +2390,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
       setPendingSyncCount(qLen);
       throw err; // re-throw so SettingsModal can display error state
     }
-  }, [structureNumber, savedDefects, nbiRatings, importSummary, pdfAnnotations, importedPdfPath, pdfUploaded, finalizedAt, standardPhotos, extraPhotos]);
+  }, [structureNumber, teamLeader, teamMembers, inspectionDate, weather, equipmentUsed, savedDefects, nbiRatings, importSummary, pdfAnnotations, importedPdfPath, pdfUploaded, finalizedAt, standardPhotos, extraPhotos]);
 
   const acknowledgeUcChannelOverride = useCallback(() => {
     setUcChannelOverrideAcknowledgedState(true);
@@ -2228,6 +2424,27 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     });
   }, [bumpLastModified]);
 
+  const setElementZoneFilter = useCallback((v: "All" | "Topside" | "Underside") => {
+    setElementZoneFilterState(v);
+    AsyncStorage.setItem(STORAGE_KEYS.ELEMENT_ZONE_FILTER, v).catch(() => {});
+  }, []);
+
+  const setActiveElementIds = useCallback((values: string[]) => {
+    const validIds = new Set<string>(SNBI_ELEMENTS.map((item) => item.id));
+    const normalized = [...new Set(values.filter((id) => validIds.has(id)))];
+    setActiveElementIdsState(normalized);
+    AsyncStorage.setItem(STORAGE_KEYS.ACTIVE_ELEMENT_IDS, JSON.stringify(normalized)).catch(() => {});
+  }, []);
+
+  const resetElementFilters = useCallback(() => {
+    setElementZoneFilterState("All");
+    setActiveElementIdsState([]);
+    AsyncStorage.multiRemove([
+      STORAGE_KEYS.ELEMENT_ZONE_FILTER,
+      STORAGE_KEYS.ACTIVE_ELEMENT_IDS,
+    ]).catch(() => {});
+  }, []);
+
   // ── Discard the entire imported/working inspection session ──
   const clearInspection = useCallback(() => {
     setSavedDefectsState([]);
@@ -2237,6 +2454,17 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     setIsSnbiFormatState(false);
     AsyncStorage.removeItem(STORAGE_KEYS.IS_SNBI_FORMAT).catch(() => {});
     setStructureNumber("");
+    setTeamLeaderState("");
+    AsyncStorage.removeItem(STORAGE_KEYS.TEAM_LEADER).catch(() => {});
+    setTeamMembersState([]);
+    AsyncStorage.removeItem(STORAGE_KEYS.TEAM_MEMBERS).catch(() => {});
+    setInspectionDateState("");
+    AsyncStorage.removeItem(STORAGE_KEYS.INSPECTION_DATE).catch(() => {});
+    setWeatherState("");
+    AsyncStorage.removeItem(STORAGE_KEYS.WEATHER).catch(() => {});
+    setEquipmentUsedState("");
+    AsyncStorage.removeItem(STORAGE_KEYS.EQUIPMENT_USED).catch(() => {});
+    resetElementFilters();
     setImportSummary(null);
     setLastModifiedState(null);
     AsyncStorage.removeItem(STORAGE_KEYS.LAST_MODIFIED).catch(() => {});
@@ -2258,7 +2486,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     AsyncStorage.removeItem(STORAGE_KEYS.PDF_ANNOTATIONS).catch(() => {});
     setPdfUploadedState(false);
     AsyncStorage.removeItem(STORAGE_KEYS.PDF_UPLOADED).catch(() => {});
-    setStandardPhotosState(TXDOT_REQUIRED_SLOTS);
+    setStandardPhotosState(requiredPhotoSlotsFor(nomenclature, inspectionType));
     AsyncStorage.removeItem(STORAGE_KEYS.STANDARD_PHOTOS).catch(() => {});
     setExtraPhotosState([]);
     AsyncStorage.removeItem(STORAGE_KEYS.EXTRA_PHOTOS).catch(() => {});
@@ -2271,7 +2499,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     setUcChannelOverrideAcknowledgedState(false);
     AsyncStorage.removeItem(STORAGE_KEYS.UC_CHANNEL_OVERRIDE).catch(() => {});
     clearUploadedPhotoIds().catch(() => {});
-  }, [setStructureNumber, setImportSummary]);
+  }, [inspectionType, nomenclature, resetElementFilters, setStructureNumber, setImportSummary]);
 
   const setStandardPhotoSlot = useCallback((slotId: string, patch: Partial<StandardPhotoSlot>) => {
     setStandardPhotosState((prev) => {
@@ -2448,17 +2676,34 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     [inspectionType, nomenclature]
   );
 
-  const filteredElements = useMemo(
-    () =>
-      getFilteredElements(
+  const filteredElements = useMemo(() => {
+    let list = getFilteredElements(
         currentLocation,
         superstructureTypes,
         substructureTypes,
         superstructureMaterials,
         substructureMaterials,
         elementSearch,
-        inspectionType
-      ),
+        elementZoneFilter === "All" ? inspectionType : elementZoneFilter
+      );
+    if (elementZoneFilter === "Topside") {
+      list = list.filter((item) =>
+        ["Deck", "Railing", "Joint"].includes(item.category) || item.id === "510"
+      );
+    } else if (elementZoneFilter === "Underside") {
+      list = list.filter((item) =>
+        ["Superstructure", "Substructure", "Bearing", "Culvert"].includes(item.category)
+        || ["515", "520"].includes(item.id)
+      );
+    }
+    if (!elementSearch.trim() && activeElementIds.length > 0) {
+      list = list.filter((item) => activeElementIds.includes(item.id));
+    }
+    if (editId && element && !list.some((item) => item.id === element.id)) {
+      list = [element, ...list];
+    }
+    return list;
+  },
     [
       currentLocation,
       superstructureTypes,
@@ -2467,6 +2712,10 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
       substructureMaterials,
       elementSearch,
       inspectionType,
+      elementZoneFilter,
+      activeElementIds,
+      editId,
+      element,
     ]
   );
 
@@ -2958,9 +3207,27 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           elements,
           nbi,
           isSnbi: isSnbiParsed,
+          agency: parsedAgency,
+          inspectionType: parsedInspectionType,
           underclearance: parsedUnderclearance,
           channelCrossSection: parsedChannelCrossSection,
         } = await parseReport(source);
+
+        if (parsedAgency === "SCDOT") {
+          setNomenclature(NOMENCLATURES.SCDOT);
+        } else if (parsedAgency === "TXDOT") {
+          setNomenclature(NOMENCLATURES.TXDOT);
+        }
+        if (parsedInspectionType === "Underwater") {
+          setInspectionType(INSPECTION_TYPES.UNDERWATER);
+        }
+        if (parsedAgency === "SCDOT" && parsedInspectionType === "Underwater") {
+          setStandardPhotosState((current) => {
+            const next = mergePhotoCatalog(SCDOT_UNDERWATER_REQUIRED_SLOTS, current);
+            AsyncStorage.setItem(STORAGE_KEYS.STANDARD_PHOTOS, JSON.stringify(next)).catch(() => {});
+            return next;
+          });
+        }
 
         setIsSnbiFormatState(isSnbiParsed);
         AsyncStorage.setItem(STORAGE_KEYS.IS_SNBI_FORMAT, isSnbiParsed ? "1" : "0").catch(() => {});
@@ -3357,19 +3624,19 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         );
       } catch (err: unknown) {
         const { Alert } = require("react-native");
-        const message = err instanceof Error ? err.message : "Could not parse the PDF. Ensure the file is a valid TxDOT inspection report.";
+        const message = err instanceof Error ? err.message : "Could not parse the PDF. Ensure the file is a valid supported agency inspection report.";
         Alert.alert("Import Failed", message);
       } finally {
         setParsingActive(false);
       }
     },
-    [clearInspection, setSavedDefectsState, setNbiRatingsState, setUnderclearanceDataState, setChannelDataState, setStructureNumber, nbiRatings, setImportSummary, bumpLastModified]
+    [clearInspection, setSavedDefectsState, setNbiRatingsState, setUnderclearanceDataState, setChannelDataState, setStructureNumber, setNomenclature, setInspectionType, nbiRatings, setImportSummary, bumpLastModified]
   );
 
   // Retained fallback hook. The UI always triggers a real PDF import via
   // importFromPdf; this named entry point exists for environments where no
   // machine-readable report is available. It runs the parsing lifecycle
-  // without fabricating any placeholder/demo defect records.
+  // without fabricating any placeholder defect records.
   const simulateLegacyImport = useCallback(() => {
     setParsingActive(true);
     setTimeout(() => {
@@ -3392,6 +3659,11 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     setSubstructureMaterials,
     elementSearch,
     setElementSearch,
+    elementZoneFilter,
+    setElementZoneFilter,
+    activeElementIds,
+    setActiveElementIds,
+    resetElementFilters,
     supportCount,
     editId,
     setEditId,
@@ -3509,6 +3781,16 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     reviewImportedSubComponent,
     structureNumber,
     setStructureNumber,
+    teamLeader,
+    setTeamLeader,
+    teamMembers,
+    setTeamMembers,
+    inspectionDate,
+    setInspectionDate,
+    weather,
+    setWeather,
+    equipmentUsed,
+    setEquipmentUsed,
     importFromPdf,
     simulateLegacyImport,
     parsingActive,

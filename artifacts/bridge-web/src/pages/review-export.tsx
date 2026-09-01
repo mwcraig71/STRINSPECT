@@ -519,7 +519,7 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
   const [exporting, setExporting] = useState<"excel" | "word" | "pdf" | "redline" | "annotations" | null>(null);
   const [showReportHeader, setShowReportHeader] = useState(true);
   const [pdfAnnotations, setPdfAnnotations] = useState<Annotation[]>([]);
-  const [reportHeader, setReportHeader] = useState(() => {
+  const [reportHeader, setReportHeader] = useState<ReportHeader>(() => {
     const today = new Date();
     const todayFormatted = `${String(today.getMonth() + 1).padStart(2, "0")}/${String(today.getDate()).padStart(2, "0")}/${today.getFullYear()}`;
     const DEFAULTS = {
@@ -552,6 +552,11 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
     if (!sessionDetail) return;
     const data: SessionData = {
       structureNumber: sessionDetail.structureNumber,
+      teamLeader: sessionDetail.teamLeader,
+      teamMembers: sessionDetail.teamMembers,
+      inspectionDate: sessionDetail.inspectionDate,
+      weather: sessionDetail.weather,
+      equipmentUsed: sessionDetail.equipmentUsed,
       defects: sessionDetail.defects as DefectRecord[],
       nbiRatings: sessionDetail.nbiRatings as NbiRating[],
       importSummary: (sessionDetail.importSummary as ImportSummary | null) ?? null,

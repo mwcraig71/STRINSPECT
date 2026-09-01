@@ -140,6 +140,19 @@ components:
           type: string
           format: date-time
           nullable: true
+        teamLeader:
+          type: ["string", "null"]
+        teamMembers:
+          type: array
+          items:
+            type: string
+        inspectionDate:
+          type: ["string", "null"]
+          pattern: '^\d{4}-\d{2}-\d{2}$'
+        weather:
+          type: ["string", "null"]
+        equipmentUsed:
+          type: ["string", "null"]
         defectCount:
           type: integer
         cs4Count:
@@ -152,6 +165,7 @@ components:
         - structureNumber
         - source
         - status
+        - teamMembers
         - defectCount
         - cs4Count
         - syncedAt
@@ -171,6 +185,19 @@ components:
           type: string
           format: date-time
           nullable: true
+        teamLeader:
+          type: ["string", "null"]
+        teamMembers:
+          type: array
+          items:
+            type: string
+        inspectionDate:
+          type: ["string", "null"]
+          pattern: '^\d{4}-\d{2}-\d{2}$'
+        weather:
+          type: ["string", "null"]
+        equipmentUsed:
+          type: ["string", "null"]
         defectCount:
           type: integer
         cs4Count:
@@ -195,6 +222,7 @@ components:
         - structureNumber
         - source
         - status
+        - teamMembers
         - defectCount
         - cs4Count
         - syncedAt
@@ -214,6 +242,19 @@ components:
           type: string
           format: date-time
           nullable: true
+        teamLeader:
+          type: ["string", "null"]
+        teamMembers:
+          type: array
+          items:
+            type: string
+        inspectionDate:
+          type: ["string", "null"]
+          pattern: '^\d{4}-\d{2}-\d{2}$'
+        weather:
+          type: ["string", "null"]
+        equipmentUsed:
+          type: ["string", "null"]
         defects:
           type: array
           items: {}

@@ -68,9 +68,6 @@ export function DefectCard({ record, isLegacy, onEdit }: DefectCardProps) {
             <Text style={[styles.location, { color: c.primary }]}>
               {record.location}
             </Text>
-            <Text style={[styles.env, { color: c.mutedForeground }]}>
-              ENV {record.environment}
-            </Text>
           </View>
           <Text style={[styles.elementName, { color: c.foreground }]} numberOfLines={1}>
             {record.element}: {record.defect}
@@ -177,7 +174,6 @@ const styles = StyleSheet.create({
   main: { flex: 1, gap: 1 },
   topRow: { flexDirection: "row", alignItems: "center", gap: 5 },
   location: { fontSize: 9, fontWeight: "800", textTransform: "uppercase" },
-  env: { fontSize: 9, fontWeight: "600" },
   elementName: { fontSize: 11, fontWeight: "800", textTransform: "uppercase" },
   badges: { flexDirection: "row", alignItems: "center", gap: 4, flexWrap: "wrap" },
   csBadge: { paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 },

@@ -41,11 +41,17 @@ var pdfjsLib = window.pdfjsLib || globalThis.pdfjsLib;
 if (!pdfjsLib) {
   postRN({ type: 'extract-error', message: 'PDF viewer failed to initialise.' });
 } else {
+  // Register the in-thread worker before trying the Blob worker. Android
+  // production WebViews can create a Blob URL successfully and then reject the
+  // worker asynchronously. PDF.js falls back to this global handler in that
+  // case; without it, _setupFakeWorker() calls setup on undefined.
+  // Function scope prevents the worker bundle's internal top-level names from
+  // colliding with identical names in the already-loaded main PDF.js bundle.
+  try { Function(__pdfWorkerSrc__)(); } catch (_) {}
   try {
     var _wBlob = new Blob([__pdfWorkerSrc__], { type: 'application/javascript' });
     pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(_wBlob);
   } catch (_wErr) {
-    try { (0, eval)(__pdfWorkerSrc__); } catch (_) {}
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'worker.js';
   }
 }

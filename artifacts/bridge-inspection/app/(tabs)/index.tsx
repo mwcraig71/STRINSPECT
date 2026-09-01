@@ -4,7 +4,7 @@ import * as ImagePicker from "expo-image-picker";
 import { resizePhoto } from "@/lib/photoUtils";
 import * as Location from "expo-location";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
   Alert,
@@ -22,6 +22,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { lookupCS } from "@/data/csDescriptions";
+import { useIsTablet } from "@/hooks/useIsTablet";
 
 import { useColors } from "@/hooks/useColors";
 import {
@@ -63,8 +64,8 @@ const CS_COLORS: Record<string, string> = {
 export default function InspectionScreen() {
   const c = useColors();
   const insets = useSafeAreaInsets();
-  const { width: screenWidth } = useWindowDimensions();
-  const isTabletLayout = screenWidth >= 768;
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const isTabletLayout = useIsTablet();
   const {
     inspectionType,
     setInspectionType,
@@ -94,6 +95,11 @@ export default function InspectionScreen() {
     filteredElements,
     elementSearch,
     setElementSearch,
+    elementZoneFilter,
+    setElementZoneFilter,
+    activeElementIds,
+    setActiveElementIds,
+    resetElementFilters,
     sessionManifest,
     legacyManifest,
     handleSave,
@@ -118,7 +124,9 @@ export default function InspectionScreen() {
     setShowSteelPipePileModal,
     imageSize,
     dateStampEnabled,
+    hasUnsyncedChanges,
   } = useInspection();
+  const router = useRouter();
 
   const scrollRef = React.useRef<ScrollView>(null);
 
@@ -147,15 +155,48 @@ export default function InspectionScreen() {
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [moduleMenuOpen, setModuleMenuOpen] = useState(false);
+  const [modeMenuOpen, setModeMenuOpen] = useState(false);
   const [csHelpVisible, setCsHelpVisible] = useState(false);
   const [csHelpHighlight, setCsHelpHighlight] = useState<string>("");
   const isTxDot = nomenclature === NOMENCLATURES.TXDOT;
   const [locationPickerOpen, setLocationPickerOpen] = useState(false);
   const [elementPickerOpen, setElementPickerOpen] = useState(false);
   const [defectPickerOpen, setDefectPickerOpen] = useState(false);
+  const [severityPickerOpen, setSeverityPickerOpen] = useState(false);
+  const [editingShortlist, setEditingShortlist] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [showLegacyCS1, setShowLegacyCS1] = useState(false);
   const [showAllLegacySides, setShowAllLegacySides] = useState(false);
+
+  const leaveInspection = React.useCallback(() => {
+    const goToBridges = () => router.navigate("/bridges");
+    if (hasUnsyncedChanges) {
+      const message = "You have data that hasn't been submitted. Leaving this inspection will keep it as the active draft.";
+      if (Platform.OS === "web") {
+        if (typeof window !== "undefined" && window.confirm(message)) {
+          goToBridges();
+        }
+        return;
+      }
+      Alert.alert(
+        "Unsubmitted Changes",
+        message,
+        [
+          { text: "Stay Here", style: "cancel" },
+          { text: "Go to Bridges", onPress: goToBridges },
+        ],
+      );
+    } else {
+      goToBridges();
+    }
+  }, [hasUnsyncedChanges, router]);
+
+  const startAnotherInspection = React.useCallback(() => {
+    router.navigate({
+      pathname: "/bridges",
+      params: { newInspection: Date.now().toString() },
+    });
+  }, [router]);
   const addPhoto = async () => {
     if (Platform.OS === "web") {
       Alert.alert("Info", "Photo library not supported in web preview. Use camera.");
@@ -236,6 +277,19 @@ export default function InspectionScreen() {
   };
 
   const availableDefects = element ? DEFECTS_BY_ELEMENT[element.id] || [] : [];
+  const shortlistElements = React.useMemo(() => {
+    const query = elementSearch.trim().toLowerCase();
+    return SNBI_ELEMENTS.filter((item) => {
+      const inZone = elementZoneFilter === "All"
+        || (elementZoneFilter === "Topside"
+          ? ["Deck", "Railing", "Joint"].includes(item.category) || item.id === "510"
+          : ["Superstructure", "Substructure", "Bearing", "Culvert"].includes(item.category)
+            || ["515", "520"].includes(item.id));
+      return inZone && (!query
+        || `${item.id} ${item.name} ${item.category} ${item.material}`.toLowerCase().includes(query));
+    });
+  }, [elementSearch, elementZoneFilter]);
+  const displayedElements = editingShortlist ? shortlistElements : filteredElements;
 
   const filteredLegacyManifest = React.useMemo(() => {
     return legacyManifest.filter((d) => {
@@ -279,24 +333,35 @@ export default function InspectionScreen() {
               </TouchableOpacity>
             <Feather name="activity" size={16} color="#38bdf8" />
             <View>
-              <Text style={styles.headerTitleText}>Bridge Inspection</Text>
+              <Text style={styles.headerTitleText}>Bridge Elements</Text>
               <Text style={{ color: "#94a3b8", fontSize: 11, marginTop: 1 }}>
-                  {structureNumber ? structureNumber : "No bridge selected — go to Bridges tab"}
-                </Text>
+                {structureNumber ? structureNumber : "No bridge selected — go to Bridges tab"}
+              </Text>
             </View>
           </View>
           <View style={styles.headerActions}>
             <TouchableOpacity
               style={[
                 styles.moduleToggleHeaderBtn,
-                { backgroundColor: inspectionType === INSPECTION_TYPES.TOPSIDE ? "#0284c7" : "#0f172a" },
+                {
+                  backgroundColor:
+                    inspectionType === INSPECTION_TYPES.TOPSIDE
+                      ? "#0284c7"
+                      : inspectionType === INSPECTION_TYPES.UNDERWATER
+                        ? "#0369a1"
+                        : "#0f172a",
+                },
               ]}
-              onPress={() => setInspectionType(
-                inspectionType === INSPECTION_TYPES.TOPSIDE ? INSPECTION_TYPES.UNDERSIDE : INSPECTION_TYPES.TOPSIDE
-              )}
+              onPress={() => setModeMenuOpen(true)}
             >
               <Feather
-                name={inspectionType === INSPECTION_TYPES.TOPSIDE ? "arrow-up" : "arrow-down"}
+                name={
+                  inspectionType === INSPECTION_TYPES.TOPSIDE
+                    ? "arrow-up"
+                    : inspectionType === INSPECTION_TYPES.UNDERWATER
+                      ? "droplet"
+                      : "arrow-down"
+                }
                 size={12}
                 color={inspectionType === INSPECTION_TYPES.TOPSIDE ? "#fff" : "#38bdf8"}
               />
@@ -315,6 +380,26 @@ export default function InspectionScreen() {
               <Feather name="settings" size={18} color="#94a3b8" />
             </TouchableOpacity>
           </View>
+        </View>
+        <View style={styles.headerQuickActions}>
+          <TouchableOpacity
+            style={styles.headerQuickAction}
+            onPress={leaveInspection}
+            accessibilityRole="button"
+            accessibilityLabel="Back to Bridges"
+          >
+            <Feather name="arrow-left" size={14} color="#38bdf8" />
+            <Text style={styles.headerQuickActionText}>Bridges</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.headerQuickAction}
+            onPress={startAnotherInspection}
+            accessibilityRole="button"
+            accessibilityLabel="Start a new inspection"
+          >
+            <Feather name="plus" size={14} color="#38bdf8" />
+            <Text style={styles.headerQuickActionText}>New Inspection</Text>
+          </TouchableOpacity>
         </View>
       </View>
       <SettingsModal visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
@@ -491,6 +576,71 @@ export default function InspectionScreen() {
         </>
       </Modal>
 
+      {/* ── Inspection mode picker ── */}
+      <Modal
+        visible={modeMenuOpen}
+        transparent
+        animationType="none"
+        statusBarTranslucent
+        onRequestClose={() => setModeMenuOpen(false)}
+      >
+        <>
+          <Pressable style={styles.menuBackdrop} onPress={() => setModeMenuOpen(false)} />
+          <View
+            style={[
+              styles.modeDropdown,
+              {
+                backgroundColor: c.card,
+                borderColor: c.border,
+                right: isTabletLayout ? 12 : 10,
+              },
+            ]}
+          >
+            <Text style={[styles.menuHeading, { color: c.mutedForeground }]}>Inspection Mode</Text>
+            <Text style={[styles.modeHint, { color: c.mutedForeground }]}>
+              Choose the work area you are documenting.
+            </Text>
+            {[
+              { type: INSPECTION_TYPES.TOPSIDE, icon: "arrow-up" as const, sub: "Deck, rails, and roadway" },
+              { type: INSPECTION_TYPES.UNDERSIDE, icon: "arrow-down" as const, sub: "Superstructure and supports" },
+              { type: INSPECTION_TYPES.UNDERWATER, icon: "droplet" as const, sub: "SCDOT underwater inspection" },
+            ].map((option) => {
+              const active = inspectionType === option.type;
+              const unavailable = option.type === INSPECTION_TYPES.UNDERWATER && nomenclature !== NOMENCLATURES.SCDOT;
+              return (
+                <TouchableOpacity
+                  key={option.type}
+                  disabled={unavailable}
+                  style={[
+                    styles.modeOption,
+                    {
+                      backgroundColor: active ? "rgba(2,132,199,0.14)" : "transparent",
+                      borderColor: active ? "#0284c7" : c.border,
+                      opacity: unavailable ? 0.45 : 1,
+                    },
+                  ]}
+                  onPress={() => {
+                    setInspectionType(option.type);
+                    setModeMenuOpen(false);
+                  }}
+                >
+                  <View style={[styles.modeOptionIcon, { backgroundColor: active ? "#0284c7" : c.secondary }]}>
+                    <Feather name={option.icon} size={15} color={active ? "#fff" : c.mutedForeground} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.modeOptionTitle, { color: c.foreground }]}>{option.type}</Text>
+                    <Text style={[styles.modeOptionSub, { color: c.mutedForeground }]}>
+                      {unavailable ? "Select South Carolina (SCDOT) first" : option.sub}
+                    </Text>
+                  </View>
+                  {active && <Feather name="check" size={17} color="#0284c7" />}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </>
+      </Modal>
+
       <KeyboardAwareScrollViewCompat
         ref={scrollRef}
         style={styles.scroll}
@@ -546,11 +696,59 @@ export default function InspectionScreen() {
           )}
           <View style={styles.sectionHeader}>
             <Feather name="file-text" size={14} color={c.mutedForeground} />
-            <Text style={[styles.sectionLabel, { color: c.mutedForeground }]}>Element Defect Data</Text>
+             <Text style={[styles.sectionLabel, { color: c.mutedForeground }]}>Elements</Text>
           </View>
 
           {/* Element */}
-          <Text style={[styles.fieldLabel, { color: c.mutedForeground }]}>Element Selection</Text>
+           <View style={styles.elementFilterHeader}>
+             <Text style={[styles.fieldLabel, { color: c.mutedForeground }]}>Element</Text>
+             <TouchableOpacity
+               onPress={resetElementFilters}
+               accessibilityRole="button"
+               accessibilityLabel="Reset element filters and shortlist"
+             >
+               <Text style={[styles.resetFilterText, { color: c.primary }]}>Reset</Text>
+             </TouchableOpacity>
+           </View>
+           <View style={styles.zoneFilterRow}>
+             {(["All", "Topside", "Underside"] as const).map((zone) => (
+               <TouchableOpacity
+                 key={zone}
+                 accessibilityRole="button"
+                 accessibilityState={{ selected: elementZoneFilter === zone }}
+                 style={[
+                   styles.zoneFilterBtn,
+                   elementZoneFilter === zone
+                     ? { backgroundColor: c.primary, borderColor: c.primary }
+                     : { backgroundColor: c.secondary, borderColor: c.border },
+                 ]}
+                 onPress={() => setElementZoneFilter(zone)}
+               >
+                 <Text style={[styles.zoneFilterText, { color: elementZoneFilter === zone ? "#fff" : c.mutedForeground }]}>
+                   {zone}
+                 </Text>
+               </TouchableOpacity>
+             ))}
+             <TouchableOpacity
+               accessibilityRole="button"
+               accessibilityState={{ expanded: editingShortlist }}
+               style={[
+                 styles.zoneFilterBtn,
+                 editingShortlist
+                   ? { backgroundColor: "#f59e0b", borderColor: "#f59e0b" }
+                   : { backgroundColor: c.secondary, borderColor: c.border },
+               ]}
+               onPress={() => {
+                 setEditingShortlist((value) => !value);
+                 setElementPickerOpen(true);
+               }}
+             >
+               <Feather name="star" size={11} color={editingShortlist ? "#fff" : c.mutedForeground} />
+               <Text style={[styles.zoneFilterText, { color: editingShortlist ? "#fff" : c.mutedForeground }]}>
+                 {editingShortlist ? "Done" : `Shortlist${activeElementIds.length ? ` (${activeElementIds.length})` : ""}`}
+               </Text>
+             </TouchableOpacity>
+           </View>
           <TouchableOpacity
             style={[styles.picker, { backgroundColor: c.background, borderColor: c.border }]}
             onPress={() => setElementPickerOpen(!elementPickerOpen)}
@@ -581,16 +779,20 @@ export default function InspectionScreen() {
               </View>
               <Text style={[styles.elementSearchHint, { color: c.mutedForeground, borderBottomColor: c.border }]}>
                 {elementSearch.trim().length > 0
-                  ? `${filteredElements.length} match${filteredElements.length === 1 ? "" : "es"}`
-                  : `${filteredElements.length} common element${filteredElements.length === 1 ? "" : "s"} · search to find more`}
+                  ? `${displayedElements.length} match${displayedElements.length === 1 ? "" : "es"}`
+                  : editingShortlist
+                    ? "Tap stars to maintain this bridge's active elements"
+                    : activeElementIds.length > 0
+                      ? `${displayedElements.length} active element${displayedElements.length === 1 ? "" : "s"}`
+                      : `${displayedElements.length} common element${displayedElements.length === 1 ? "" : "s"} · search to find more`}
               </Text>
               <ScrollView style={styles.dropdownScroll} nestedScrollEnabled keyboardShouldPersistTaps="handled">
-              {filteredElements.length === 0 && (
+               {displayedElements.length === 0 && (
                 <Text style={[styles.dropdownEmpty, { color: c.mutedForeground }]}>
                   No elements match. Try a different search.
                 </Text>
               )}
-              {filteredElements.map((el) => (
+               {displayedElements.map((el) => (
                 <TouchableOpacity
                   key={el.id}
                   style={[
@@ -598,15 +800,34 @@ export default function InspectionScreen() {
                     element?.id === el.id && { backgroundColor: c.primary + "20" },
                     { borderBottomColor: c.border },
                   ]}
-                  onPress={() => {
-                    setElement(el);
-                    setElementPickerOpen(false);
-                  }}
+                   accessibilityRole="button"
+                   accessibilityLabel={editingShortlist
+                     ? `${activeElementIds.includes(el.id) ? "Remove" : "Add"} ${el.id} ${el.name} ${activeElementIds.includes(el.id) ? "from" : "to"} shortlist`
+                     : `Select element ${el.id} ${el.name}`}
+                   onPress={() => {
+                     if (editingShortlist) {
+                       setActiveElementIds(
+                         activeElementIds.includes(el.id)
+                           ? activeElementIds.filter((id) => id !== el.id)
+                           : [...activeElementIds, el.id]
+                       );
+                     } else {
+                       setElement(el);
+                       setElementPickerOpen(false);
+                     }
+                   }}
                 >
                   <Text style={[styles.dropdownItemText, { color: element?.id === el.id ? c.primary : c.foreground }]}>
                     {el.id} - {el.name}
                   </Text>
                   <Text style={[styles.dropdownItemSub, { color: c.mutedForeground }]}>{el.category}</Text>
+                   {editingShortlist && (
+                     <Feather
+                       name="star"
+                       size={15}
+                       color={activeElementIds.includes(el.id) ? "#f59e0b" : c.mutedForeground}
+                     />
+                   )}
                 </TouchableOpacity>
               ))}
               </ScrollView>
@@ -701,7 +922,7 @@ export default function InspectionScreen() {
           <View style={styles.twoCol}>
             <View style={[styles.colLeft]}>
               <Text style={[styles.fieldLabel, { color: c.mutedForeground }]}>
-                Element Qty ({defect?.unit || "ea"})
+                 Defect Qty ({defect?.unit || "ea"})
               </Text>
               <TextInput
                 style={[styles.input, { backgroundColor: c.background, borderColor: c.border, color: c.foreground }]}
@@ -743,18 +964,6 @@ export default function InspectionScreen() {
             placeholder="Record structural anomalies..."
             placeholderTextColor={c.mutedForeground}
           />
-
-          {/* ── Commit ── */}
-          <TouchableOpacity
-            style={[styles.saveBtn, { backgroundColor: c.headerBg }]}
-            onPress={onSave}
-            testID="save-button"
-          >
-            <Feather name="save" size={18} color="#fff" />
-            <Text style={styles.saveBtnText}>
-              {editId ? "UPDATE RECORD" : "COMMIT LOG"}
-            </Text>
-          </TouchableOpacity>
 
           {/* Photos */}
           <View style={styles.photoSection}>
@@ -806,45 +1015,74 @@ export default function InspectionScreen() {
             ))}
           </View>
 
-          {/* Critical + Maintenance flags */}
-          <View style={styles.flagRow}>
-            <Pressable
-              style={[
-                styles.flagPill,
-                isCritical
-                  ? { backgroundColor: "#dc2626", borderColor: "#dc2626" }
-                  : { backgroundColor: c.secondary, borderColor: c.border },
-              ]}
-              onPress={() => {
-                setIsCritical(!isCritical);
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              }}
-            >
-              <Feather name="alert-triangle" size={13} color={isCritical ? "#fff" : c.mutedForeground} />
-              <Text style={[styles.flagPillText, { color: isCritical ? "#fff" : c.mutedForeground }]}>Critical</Text>
-            </Pressable>
-            <Pressable
-              style={[
-                styles.flagPill,
-                isMaintenance
-                  ? { backgroundColor: c.primary, borderColor: c.primary }
-                  : { backgroundColor: c.secondary, borderColor: c.border },
-              ]}
-              onPress={() => {
-                setIsMaintenance(!isMaintenance);
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              }}
-            >
-              <Feather name="tool" size={13} color={isMaintenance ? "#fff" : c.mutedForeground} />
-              <Text style={[styles.flagPillText, { color: isMaintenance ? "#fff" : c.mutedForeground }]}>Maintenance</Text>
-            </Pressable>
-          </View>
+          {/* Defect severity */}
+          <Text style={[styles.fieldLabel, { color: c.mutedForeground }]}>Defect Severity</Text>
+          <TouchableOpacity
+            style={[styles.picker, { backgroundColor: c.secondary, borderColor: c.border }]}
+            onPress={() => setSeverityPickerOpen((value) => !value)}
+            accessibilityRole="button"
+            accessibilityLabel="Defect severity"
+            accessibilityState={{ expanded: severityPickerOpen }}
+          >
+            <Text style={[styles.pickerValue, { color: isCritical ? "#dc2626" : isMaintenance ? c.primary : c.foreground }]}>
+              {isCritical ? "Critical" : isMaintenance ? "Maintenance" : "Standard"}
+            </Text>
+            <Feather name={severityPickerOpen ? "chevron-up" : "chevron-down"} size={16} color={c.mutedForeground} />
+          </TouchableOpacity>
+          {severityPickerOpen && (
+            <View style={[styles.dropdownList, { borderColor: c.border }]}>
+              {[
+                { label: "Standard", critical: false, maintenance: false },
+                { label: "Maintenance", critical: false, maintenance: true },
+                { label: "Critical", critical: true, maintenance: false },
+              ].map((option) => {
+                const selected = option.critical === isCritical && option.maintenance === isMaintenance;
+                return (
+                  <TouchableOpacity
+                    key={option.label}
+                    style={[
+                      styles.dropdownItem,
+                      selected && { backgroundColor: c.primary + "20" },
+                      { borderBottomColor: c.border },
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    onPress={() => {
+                      setIsCritical(option.critical);
+                      setIsMaintenance(option.maintenance);
+                      setSeverityPickerOpen(false);
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    }}
+                  >
+                    <Text style={[styles.dropdownItemText, { color: selected ? c.primary : c.foreground }]}>
+                      {option.label}
+                    </Text>
+                    {selected && <Feather name="check" size={14} color={c.primary} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+
+          {/* ── Commit ── */}
+          <TouchableOpacity
+            style={[styles.saveBtn, { backgroundColor: c.headerBg }]}
+            onPress={onSave}
+            testID="save-button"
+            accessibilityRole="button"
+            accessibilityLabel={editId ? "Save Defect" : "Enter Defect"}
+          >
+            <Feather name="save" size={18} color="#fff" />
+            <Text style={styles.saveBtnText}>
+              {editId ? "SAVE DEFECT" : "ENTER DEFECT"}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* ── Filters ── */}
         <View style={[styles.section, { backgroundColor: c.card, borderTopColor: c.border }]}>
           <View style={styles.filterHeader}>
-            <Text style={[styles.sectionLabel, { color: c.foreground }]}>Station Filters</Text>
+            <Text style={[styles.sectionLabel, { color: c.foreground }]}>Filter</Text>
             <View style={styles.filterHeaderRight}>
               <TouchableOpacity
                 style={[
@@ -1054,6 +1292,30 @@ const styles = StyleSheet.create({
   headerTitle: { flexDirection: "row", alignItems: "center", gap: 7 },
   headerTitleText: { fontSize: 14, fontWeight: "900", color: "#f8fafc", letterSpacing: -0.3, textTransform: "uppercase" },
   headerActions: { flexDirection: "row", alignItems: "center", gap: 8 },
+  headerQuickActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 8,
+  },
+  headerQuickAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "#0c1a2e",
+    borderColor: "#0369a1",
+    borderWidth: 1,
+    borderRadius: 9,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+  },
+  headerQuickActionText: {
+    color: "#bae6fd",
+    fontSize: 10,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
+  },
   moduleToggleHeaderBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -1087,6 +1349,34 @@ const styles = StyleSheet.create({
   menuItemTitle: { fontSize: 13, fontWeight: "800" },
   menuItemSub: { fontSize: 10, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.4, marginTop: 1 },
   menuDivider: { height: StyleSheet.hairlineWidth, marginVertical: 2 },
+  modeDropdown: {
+    position: "absolute",
+    top: 92,
+    width: 286,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 8,
+    zIndex: 21,
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 12,
+  },
+  modeHint: { fontSize: 11, lineHeight: 16, paddingHorizontal: 8, paddingBottom: 8 },
+  modeOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginTop: 5,
+  },
+  modeOptionIcon: { width: 30, height: 30, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  modeOptionTitle: { fontSize: 13, fontWeight: "800" },
+  modeOptionSub: { fontSize: 10, fontWeight: "600", marginTop: 1 },
   scroll: { flex: 1 },
   scrollContent: { padding: 12, gap: 12 },
   section: {
@@ -1103,6 +1393,20 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
   sectionLabel: { fontSize: 10, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.5 },
   fieldLabel: { fontSize: 9, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.3 },
+  elementFilterHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  resetFilterText: { fontSize: 11, fontWeight: "800" },
+  zoneFilterRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  zoneFilterBtn: {
+    minHeight: 32,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+  },
+  zoneFilterText: { fontSize: 10, fontWeight: "800" },
   notesLabelRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   picker: {
     flexDirection: "row",

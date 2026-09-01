@@ -82,6 +82,11 @@ export default function InspectionProgress({ sessionData, setSessionData }: Prop
     if (sessionDetail) {
       setSessionData({
         structureNumber: sessionDetail.structureNumber,
+        teamLeader: sessionDetail.teamLeader,
+        teamMembers: sessionDetail.teamMembers,
+        inspectionDate: sessionDetail.inspectionDate,
+        weather: sessionDetail.weather,
+        equipmentUsed: sessionDetail.equipmentUsed,
         defects: sessionDetail.defects as DefectRecord[],
         nbiRatings: sessionDetail.nbiRatings as NbiRating[],
         importSummary: (sessionDetail.importSummary as ImportSummary | null) ?? null,
@@ -247,8 +252,14 @@ export default function InspectionProgress({ sessionData, setSessionData }: Prop
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Last synced {formatRelativeTime(s.syncedAt)}
+                      {s.inspectionDate ? `Inspected ${s.inspectionDate}` : `Last synced ${formatRelativeTime(s.syncedAt)}`}
                     </p>
+                    {(s.teamLeader || s.teamMembers.length > 0) && (
+                      <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                        {s.teamLeader ? `Lead: ${s.teamLeader}` : "Team"}
+                        {s.teamMembers.length > 0 ? ` · ${s.teamMembers.join(", ")}` : ""}
+                      </p>
+                    )}
                   </div>
                   <div className="flex items-center gap-4 flex-shrink-0">
                     <div className="text-right">
@@ -352,6 +363,28 @@ export default function InspectionProgress({ sessionData, setSessionData }: Prop
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
               />
             </label>
+          </div>
+
+          <div className="bg-card border border-border rounded-lg p-4 mb-5">
+            <div className="flex items-center gap-2 mb-3">
+              <Cloud className="h-4 w-4 text-primary" />
+              <h2 className="text-sm font-semibold text-foreground">Supplemental Field Notes</h2>
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded px-1.5 py-0.5">Non-SNBI</span>
+            </div>
+            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+              {[
+                ["Team leader", sessionData.teamLeader],
+                ["Additional members", sessionData.teamMembers?.join(", ")],
+                ["Inspection date", sessionData.inspectionDate],
+                ["Weather", sessionData.weather],
+                ["Equipment used", sessionData.equipmentUsed],
+              ].map(([label, value]) => (
+                <div key={label}>
+                  <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</dt>
+                  <dd className="text-foreground mt-0.5">{value || "Not provided"}</dd>
+                </div>
+              ))}
+            </dl>
           </div>
 
           {/* Summary cards */}

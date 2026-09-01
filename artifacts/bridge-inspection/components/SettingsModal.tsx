@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,7 +19,9 @@ import { CUSTOM_SHORTCUTS_KEY, SC_FAVORITES_KEY, SC_HIDDEN_KEY, SC_OVERRIDES_KEY
 import { useColors } from "@/hooks/useColors";
 import {
   MATERIAL_OPTIONS,
+  INSPECTION_TYPES,
   NOMENCLATURES,
+  normalizeInspectionDateInput,
   SUBSTRUCTURE_TYPES,
   SUPERSTRUCTURE_TYPES,
   useInspection,
@@ -34,6 +37,8 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
   const {
     nomenclature,
     setNomenclature,
+    inspectionType,
+    setInspectionType,
     superstructureTypes,
     setSuperstructureTypes,
     substructureTypes,
@@ -59,6 +64,16 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
     setOpenAiKey,
     aiRephrase,
     setAiRephrase,
+    teamLeader,
+    setTeamLeader,
+    teamMembers,
+    setTeamMembers,
+    inspectionDate,
+    setInspectionDate,
+    weather,
+    setWeather,
+    equipmentUsed,
+    setEquipmentUsed,
   } = useInspection();
 
   const [aspectRatioInput, setAspectRatioInput] = React.useState(aspectRatio);
@@ -66,6 +81,11 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
 
   const [keyInput, setKeyInput] = React.useState("");
   const [keyVisible, setKeyVisible] = React.useState(false);
+  const [inspectionDateTouched, setInspectionDateTouched] = React.useState(false);
+  const [teamMembersInput, setTeamMembersInput] = React.useState(teamMembers.join(", "));
+  React.useEffect(() => {
+    if (visible) setTeamMembersInput(teamMembers.join(", "));
+  }, [visible]);
 
   const [scExpanded, setScExpanded] = React.useState(false);
   const [customShortcuts, setCustomShortcuts] = React.useState<TextShortcut[]>([]);
@@ -159,7 +179,7 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
   const hasInspectionData =
     savedDefects.length > 0 || !!structureNumber || !!importSummary;
 
-  type SyncStatus = "idle" | "syncing" | "success" | "queued" | "error";
+  type SyncStatus = "idle" | "syncing" | "success" | "queued" | "error" | "validation_error";
   const [syncStatus, setSyncStatus] = React.useState<SyncStatus>("idle");
   const [syncError, setSyncError] = React.useState("");
 
@@ -175,6 +195,18 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
 
   const handleSync = async () => {
     if (syncStatus === "syncing") return;
+    if (normalizeInspectionDateInput(inspectionDate) === null) {
+      const message = "Enter a real calendar date as YYYY-MM-DD or MM/DD/YYYY before syncing.";
+      setInspectionDateTouched(true);
+      setSyncError(message);
+      setSyncStatus("validation_error");
+      if (Platform.OS === "web" && typeof window !== "undefined") {
+        window.alert(message);
+      } else {
+        Alert.alert("Invalid Inspection Date", message);
+      }
+      return;
+    }
     setSyncStatus("syncing");
     setSyncError("");
     try {
@@ -229,6 +261,115 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
           contentContainerStyle={styles.body}
           showsVerticalScrollIndicator={false}
         >
+          {/* Supplemental field notes */}
+          <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
+            <View style={styles.cardHeader}>
+              <Feather name="clipboard" size={15} color={c.mutedForeground} />
+              <Text style={[styles.cardTitle, { color: c.foreground }]}>Inspection Team & Field Notes</Text>
+            </View>
+            <Text style={[styles.cardDesc, { color: c.mutedForeground }]}>
+              Optional supplemental information for identifying the field team and conditions. These notes are not mapped to SNBI or NBI rating fields.
+            </Text>
+
+            <Text style={[styles.matLabel, { color: c.mutedForeground }]}>Team leader</Text>
+            <View style={[styles.keyRow, { borderColor: c.border, backgroundColor: c.background }]}>
+              <TextInput
+                accessibilityLabel="Team leader"
+                style={[styles.keyInput, { color: c.foreground }]}
+                value={teamLeader}
+                onChangeText={setTeamLeader}
+                placeholder="Lead inspector's name"
+                placeholderTextColor={c.mutedForeground}
+                autoCapitalize="words"
+              />
+            </View>
+
+            <Text style={[styles.matLabel, { color: c.mutedForeground }]}>Additional team members</Text>
+            <TextInput
+              accessibilityLabel="Additional team members"
+              style={[styles.scInput, styles.scTextArea, { color: c.foreground, borderColor: c.border, backgroundColor: c.background }]}
+              value={teamMembersInput}
+              onChangeText={(value) => {
+                setTeamMembersInput(value);
+                setTeamMembers(value.split(/[,\n]/));
+              }}
+              placeholder="Separate names with commas or new lines"
+              placeholderTextColor={c.mutedForeground}
+              multiline
+              numberOfLines={2}
+              autoCapitalize="words"
+            />
+
+            <Text style={[styles.matLabel, { color: c.mutedForeground }]}>Inspection date</Text>
+            <View style={[styles.keyRow, { borderColor: c.border, backgroundColor: c.background }]}>
+              <TextInput
+                accessibilityLabel="Inspection date"
+                style={[styles.keyInput, { color: c.foreground }]}
+                value={inspectionDate}
+                onChangeText={(value) => {
+                  setInspectionDate(value);
+                  setInspectionDateTouched(false);
+                  if (syncStatus === "validation_error" || (syncStatus === "error" && syncError.includes("Inspection date"))) {
+                    setSyncStatus("idle");
+                    setSyncError("");
+                  }
+                }}
+                onBlur={() => {
+                  setInspectionDateTouched(true);
+                  const normalized = normalizeInspectionDateInput(inspectionDate);
+                  if (normalized === null) {
+                    const message = "Enter a real calendar date as YYYY-MM-DD or MM/DD/YYYY.";
+                    if (Platform.OS === "web" && typeof window !== "undefined") {
+                      window.alert(message);
+                    } else {
+                      Alert.alert("Invalid Inspection Date", message);
+                    }
+                    return;
+                  }
+                  if (normalized !== inspectionDate) setInspectionDate(normalized);
+                }}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={c.mutedForeground}
+                autoCapitalize="none"
+                keyboardType="numbers-and-punctuation"
+                maxLength={10}
+              />
+            </View>
+            {inspectionDateTouched && normalizeInspectionDateInput(inspectionDate) === null && (
+              <View style={[styles.syncErrorBox, { backgroundColor: "#1f0a0a", borderColor: "#7f1d1d" }]}>
+                <Feather name="alert-circle" size={13} color="#f87171" />
+                <Text style={styles.syncErrorText}>
+                  Enter a real calendar date as YYYY-MM-DD or MM/DD/YYYY.
+                </Text>
+              </View>
+            )}
+
+            <Text style={[styles.matLabel, { color: c.mutedForeground }]}>Weather</Text>
+            <View style={[styles.keyRow, { borderColor: c.border, backgroundColor: c.background }]}>
+              <TextInput
+                accessibilityLabel="Weather"
+                style={[styles.keyInput, { color: c.foreground }]}
+                value={weather}
+                onChangeText={setWeather}
+                placeholder="e.g. Clear, 72°F, light wind"
+                placeholderTextColor={c.mutedForeground}
+              />
+            </View>
+
+            <Text style={[styles.matLabel, { color: c.mutedForeground }]}>Equipment used</Text>
+            <TextInput
+              accessibilityLabel="Equipment used"
+              style={[styles.scInput, styles.scTextArea, { color: c.foreground, borderColor: c.border, backgroundColor: c.background }]}
+              value={equipmentUsed}
+              onChangeText={setEquipmentUsed}
+              placeholder="e.g. Bucket truck, sounding hammer, drone"
+              placeholderTextColor={c.mutedForeground}
+              multiline
+              numberOfLines={2}
+              autoCapitalize="sentences"
+            />
+          </View>
+
           {/* State / Nomenclature */}
           <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
             <View style={styles.cardHeader}>
@@ -267,6 +408,31 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
               <TouchableOpacity
                 style={[
                   styles.optionBtn,
+                  nomenclature === NOMENCLATURES.SCDOT
+                    ? { backgroundColor: c.primary, borderColor: c.primary }
+                    : { backgroundColor: c.secondary, borderColor: c.border },
+                ]}
+                onPress={() => setNomenclature(NOMENCLATURES.SCDOT)}
+              >
+                <View style={styles.optionInner}>
+                  <View style={[styles.optionIcon, { backgroundColor: nomenclature === NOMENCLATURES.SCDOT ? "rgba(255,255,255,0.2)" : c.card }]}>
+                    <Text style={[styles.optionIconText, { color: nomenclature === NOMENCLATURES.SCDOT ? "#fff" : c.primary }]}>SC</Text>
+                  </View>
+                  <View style={styles.optionText}>
+                    <Text style={[styles.optionTitle, { color: nomenclature === NOMENCLATURES.SCDOT ? "#fff" : c.foreground }]}>South Carolina (SCDOT)</Text>
+                    <Text style={[styles.optionSub, { color: nomenclature === NOMENCLATURES.SCDOT ? "rgba(255,255,255,0.75)" : c.mutedForeground }]}>
+                      End Bent · Interior Bent · Pile
+                    </Text>
+                  </View>
+                  {nomenclature === NOMENCLATURES.SCDOT && (
+                    <Feather name="check-circle" size={18} color="#fff" />
+                  )}
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.optionBtn,
                   nomenclature === NOMENCLATURES.NCDOT
                     ? { backgroundColor: c.primary, borderColor: c.primary }
                     : { backgroundColor: c.secondary, borderColor: c.border },
@@ -287,6 +453,70 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
                     <Feather name="check-circle" size={18} color="#fff" />
                   )}
                 </View>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Inspection assignment */}
+          <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
+            <View style={styles.cardHeader}>
+              <Feather name="users" size={15} color={c.mutedForeground} />
+              <Text style={[styles.cardTitle, { color: c.foreground }]}>Inspection Assignment</Text>
+            </View>
+            <Text style={[styles.cardDesc, { color: c.mutedForeground }]}>
+              Choose the work this inspector is assigned to. Topside inspectors can switch between topside and underside work; underwater inspectors use the dedicated underwater workflow.
+            </Text>
+            <View style={styles.assignmentGroup}>
+              <TouchableOpacity
+                style={[
+                  styles.assignmentBtn,
+                  inspectionType !== INSPECTION_TYPES.UNDERWATER
+                    ? { backgroundColor: c.primary, borderColor: c.primary }
+                    : { backgroundColor: c.secondary, borderColor: c.border },
+                ]}
+                onPress={() => {
+                  if (inspectionType === INSPECTION_TYPES.UNDERWATER) {
+                    setInspectionType(INSPECTION_TYPES.TOPSIDE);
+                  }
+                }}
+              >
+                <View style={[styles.assignmentIcon, { backgroundColor: inspectionType !== INSPECTION_TYPES.UNDERWATER ? "rgba(255,255,255,0.2)" : c.card }]}>
+                  <Feather name="layers" size={16} color={inspectionType !== INSPECTION_TYPES.UNDERWATER ? "#fff" : c.primary} />
+                </View>
+                <View style={styles.optionText}>
+                  <Text style={[styles.optionTitle, { color: inspectionType !== INSPECTION_TYPES.UNDERWATER ? "#fff" : c.foreground }]}>
+                    Topside + Underside
+                  </Text>
+                  <Text style={[styles.optionSub, { color: inspectionType !== INSPECTION_TYPES.UNDERWATER ? "rgba(255,255,255,0.75)" : c.mutedForeground }]}>
+                    Deck, roadway, superstructure, and supports
+                  </Text>
+                </View>
+                {inspectionType !== INSPECTION_TYPES.UNDERWATER && <Feather name="check-circle" size={18} color="#fff" />}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                disabled={nomenclature !== NOMENCLATURES.SCDOT}
+                style={[
+                  styles.assignmentBtn,
+                  inspectionType === INSPECTION_TYPES.UNDERWATER
+                    ? { backgroundColor: c.primary, borderColor: c.primary }
+                    : { backgroundColor: c.secondary, borderColor: c.border },
+                  nomenclature !== NOMENCLATURES.SCDOT && { opacity: 0.45 },
+                ]}
+                onPress={() => setInspectionType(INSPECTION_TYPES.UNDERWATER)}
+              >
+                <View style={[styles.assignmentIcon, { backgroundColor: inspectionType === INSPECTION_TYPES.UNDERWATER ? "rgba(255,255,255,0.2)" : c.card }]}>
+                  <Feather name="droplet" size={16} color={inspectionType === INSPECTION_TYPES.UNDERWATER ? "#fff" : c.primary} />
+                </View>
+                <View style={styles.optionText}>
+                  <Text style={[styles.optionTitle, { color: inspectionType === INSPECTION_TYPES.UNDERWATER ? "#fff" : c.foreground }]}>
+                    Underwater
+                  </Text>
+                  <Text style={[styles.optionSub, { color: inspectionType === INSPECTION_TYPES.UNDERWATER ? "rgba(255,255,255,0.75)" : c.mutedForeground }]}>
+                    {nomenclature === NOMENCLATURES.SCDOT ? "SCDOT dive inspection and photo checklist" : "Select South Carolina (SCDOT) first"}
+                  </Text>
+                </View>
+                {inspectionType === INSPECTION_TYPES.UNDERWATER && <Feather name="check-circle" size={18} color="#fff" />}
               </TouchableOpacity>
             </View>
           </View>
@@ -616,7 +846,7 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
               <Text style={[styles.cardTitle, { color: c.foreground }]}>AI Transcription</Text>
             </View>
             <Text style={[styles.cardDesc, { color: c.mutedForeground }]}>
-              Dictate inspection notes using the mic button on the Inspection and NBI tabs. Whisper transcribes your speech; optionally GPT-4o-mini reformats it into a professional narrative.
+              Dictate inspection notes using the mic button on the Elements and NBI tabs. Whisper transcribes your speech; optionally GPT-4o-mini reformats it into a professional narrative.
             </Text>
 
             {/* API key input */}
@@ -957,7 +1187,7 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
                 </Text>
               </View>
             )}
-            {lastSynced && syncStatus !== "error" && syncStatus !== "queued" && pendingSyncCount === 0 && (
+            {lastSynced && syncStatus !== "error" && syncStatus !== "validation_error" && syncStatus !== "queued" && pendingSyncCount === 0 && (
               <View style={styles.syncMeta}>
                 <Feather name="clock" size={11} color="#475569" />
                 <Text style={[styles.syncMetaText, { color: "#475569" }]}>
@@ -965,10 +1195,12 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
                 </Text>
               </View>
             )}
-            {syncStatus === "error" && (
+            {(syncStatus === "error" || syncStatus === "validation_error") && (
               <View style={[styles.syncErrorBox, { backgroundColor: "#1f0a0a", borderColor: "#7f1d1d" }]}>
                 <Feather name="alert-circle" size={13} color="#f87171" />
-                <Text style={styles.syncErrorText}>{syncError} Queued for retry.</Text>
+                <Text style={styles.syncErrorText}>
+                  {syncError}{syncStatus === "error" ? " Queued for retry." : ""}
+                </Text>
               </View>
             )}
             <TouchableOpacity
@@ -980,7 +1212,7 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
                     : syncStatus === "queued" ? "#1c1917"
                     : "#0c4a6e",
                   borderColor:
-                    syncStatus === "error" ? "#7f1d1d"
+                    syncStatus === "error" || syncStatus === "validation_error" ? "#7f1d1d"
                     : syncStatus === "success" ? "#064e3b"
                     : syncStatus === "queued" ? "#78350f"
                     : "#0284c7",
@@ -996,6 +1228,7 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
                 <Feather
                   name={
                     syncStatus === "success" ? "check-circle"
+                    : syncStatus === "validation_error" ? "alert-circle"
                     : syncStatus === "error" ? "refresh-cw"
                     : syncStatus === "queued" ? "clock"
                     : "upload"
@@ -1003,7 +1236,7 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
                   size={16}
                   color={
                     syncStatus === "success" ? "#34d399"
-                    : syncStatus === "error" ? "#f87171"
+                    : syncStatus === "error" || syncStatus === "validation_error" ? "#f87171"
                     : syncStatus === "queued" ? "#fbbf24"
                     : "#38bdf8"
                   }
@@ -1014,13 +1247,14 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
                 {
                   color:
                     syncStatus === "success" ? "#34d399"
-                    : syncStatus === "error" ? "#fca5a5"
+                    : syncStatus === "error" || syncStatus === "validation_error" ? "#fca5a5"
                     : syncStatus === "queued" ? "#fde68a"
                     : "#f8fafc",
                 },
               ]}>
                 {syncStatus === "syncing" ? "Syncing…"
                   : syncStatus === "success" ? "Synced!"
+                  : syncStatus === "validation_error" ? "Correct Date to Sync"
                   : syncStatus === "error" ? "Retry Sync"
                   : syncStatus === "queued" ? "Queued — tap to retry"
                   : "Sync to Cloud"}
@@ -1066,6 +1300,16 @@ const styles = StyleSheet.create({
   optionText: { flex: 1 },
   optionTitle: { fontSize: 14, fontWeight: "800" },
   optionSub: { fontSize: 11, fontWeight: "500", marginTop: 1 },
+  assignmentGroup: { gap: 8 },
+  assignmentBtn: {
+    borderRadius: 12,
+    borderWidth: 1.5,
+    padding: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  assignmentIcon: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   // Structural build
   structSection: { gap: 8 },
   structLabelRow: { flexDirection: "row", alignItems: "center", gap: 7 },

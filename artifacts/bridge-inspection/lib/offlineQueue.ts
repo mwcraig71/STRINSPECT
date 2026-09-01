@@ -20,6 +20,11 @@ export interface SyncQueueEntry {
   payload: {
     status?: "in_progress" | "finalized";
     finalizedAt?: string | null;
+    teamLeader?: string | null;
+    teamMembers?: string[];
+    inspectionDate?: string | null;
+    weather?: string | null;
+    equipmentUsed?: string | null;
     defects: unknown[];
     nbiRatings: unknown[];
     importSummary: unknown | null;

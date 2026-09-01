@@ -22,15 +22,11 @@ function NativeTabLayout({ missingPhotoCount }: { missingPhotoCount: number }) {
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="index">
         <Icon sf={{ default: "doc.text", selected: "doc.text.fill" }} />
-        <Label>Inspection</Label>
+        <Label>Elements</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="nbi">
         <Icon sf={{ default: "chart.bar", selected: "chart.bar.fill" }} />
         <Label>NBI</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="summary">
-        <Icon sf={{ default: "list.bullet.clipboard", selected: "list.bullet.clipboard.fill" }} />
-        <Label>Summary</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="photos">
         <View style={nativeBadgeStyles.iconWrap}>
@@ -44,6 +40,10 @@ function NativeTabLayout({ missingPhotoCount }: { missingPhotoCount: number }) {
           )}
         </View>
         <Label>Photos</Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="summary">
+        <Icon sf={{ default: "list.bullet.clipboard", selected: "list.bullet.clipboard.fill" }} />
+        <Label>Summary</Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );
@@ -115,7 +115,7 @@ function ClassicTabLayoutWithSync({ pendingCount, missingPhotoCount }: { pending
       <Tabs.Screen
         name="index"
         options={{
-          title: "Inspection",
+          title: "Elements",
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="doc.text" tintColor={color} size={22} />
@@ -137,18 +137,6 @@ function ClassicTabLayoutWithSync({ pendingCount, missingPhotoCount }: { pending
         }}
       />
       <Tabs.Screen
-        name="summary"
-        options={{
-          title: "Summary",
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="list.bullet.clipboard" tintColor={color} size={22} />
-            ) : (
-              <Feather name="list" size={21} color={color} />
-            ),
-        }}
-      />
-      <Tabs.Screen
         name="photos"
         options={{
           title: "Photos",
@@ -162,6 +150,18 @@ function ClassicTabLayoutWithSync({ pendingCount, missingPhotoCount }: { pending
             ),
         }}
       />
+      <Tabs.Screen
+        name="summary"
+        options={{
+          title: "Summary",
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="list.bullet.clipboard" tintColor={color} size={22} />
+            ) : (
+              <Feather name="list" size={21} color={color} />
+            ),
+        }}
+      />
     </Tabs>
   );
 }
@@ -170,7 +170,8 @@ function TabContent() {
   const { toastVisible, toastKey, pendingCount } = useAutoSync();
   const { standardPhotos } = useInspection();
   const missingPhotoCount = standardPhotos.filter((s) => !s.photoUri).length;
-  const tabNav = isLiquidGlassAvailable()
+
+  const tabNav = Platform.OS === "ios" && isLiquidGlassAvailable()
     ? <NativeTabLayout missingPhotoCount={missingPhotoCount} />
     : <ClassicTabLayoutWithSync pendingCount={pendingCount} missingPhotoCount={missingPhotoCount} />;
   return (

@@ -64,6 +64,11 @@ export interface ImportSummary {
 
 export interface SessionData {
   structureNumber?: string;
+  teamLeader?: string | null;
+  teamMembers?: string[];
+  inspectionDate?: string | null;
+  weather?: string | null;
+  equipmentUsed?: string | null;
   defects?: DefectRecord[];
   nbiRatings?: NbiRating[];
   importSummary?: ImportSummary | null;

@@ -55,6 +55,8 @@ export interface ParsedReport {
   elements: ParsedElementRow[];
   nbi: ParsedNbiEntry[];
   isSnbi: boolean;
+  agency?: "TXDOT" | "SCDOT";
+  inspectionType?: "Underwater";
   underclearance?: ParsedUnderclearance;
   channelCrossSection?: ParsedChannelCrossSection;
 }
@@ -371,21 +373,21 @@ const NBI_COMPONENT_ALIASES: Record<string, string> = {
 
 export function detectSnbiFormat(pages: string[][]): boolean {
   const text = pages.flat().join(" ");
-  return /\(B\.C\.0[1-9]\)|\(B\.C\.1[01]\)/.test(text);
+  return /[\[(]B\.C\.0[1-9][\])]|[\[(]B\.C\.1[01][\])]/.test(text);
 }
 
 const SNBI_SECTION_PATTERNS: { pattern: RegExp; item: string }[] = [
-  { pattern: /\(B\.C\.01\)/i, item: "BC01" },
-  { pattern: /\(B\.C\.02\)/i, item: "BC02" },
-  { pattern: /\(B\.C\.03\)/i, item: "BC03" },
-  { pattern: /\(B\.C\.04\)/i, item: "BC04" },
-  { pattern: /\(B\.C\.05\)/i, item: "BC05" },
-  { pattern: /\(B\.C\.06\)/i, item: "BC06" },
-  { pattern: /\(B\.C\.07\)/i, item: "BC07" },
-  { pattern: /\(B\.C\.08\)/i, item: "BC08" },
-  { pattern: /\(B\.C\.09\)/i, item: "BC09" },
-  { pattern: /\(B\.C\.10\)/i, item: "BC10" },
-  { pattern: /\(B\.C\.11\)/i, item: "BC11" },
+  { pattern: /[\[(]B\.C\.01[\])]/i, item: "BC01" },
+  { pattern: /[\[(]B\.C\.02[\])]/i, item: "BC02" },
+  { pattern: /[\[(]B\.C\.03[\])]/i, item: "BC03" },
+  { pattern: /[\[(]B\.C\.04[\])]/i, item: "BC04" },
+  { pattern: /[\[(]B\.C\.05[\])]/i, item: "BC05" },
+  { pattern: /[\[(]B\.C\.06[\])]/i, item: "BC06" },
+  { pattern: /[\[(]B\.C\.07[\])]/i, item: "BC07" },
+  { pattern: /[\[(]B\.C\.08[\])]/i, item: "BC08" },
+  { pattern: /[\[(]B\.C\.09[\])]/i, item: "BC09" },
+  { pattern: /[\[(]B\.C\.10[\])]/i, item: "BC10" },
+  { pattern: /[\[(]B\.C\.11[\])]/i, item: "BC11" },
 ];
 
 const SNBI_COMPONENT_ALIASES: Record<string, string> = {
@@ -506,7 +508,7 @@ export function parseSnbiRatings(pages: string[][]): ParsedNbiEntry[] {
     }
 
     if (!currentItem) continue;
-    if (/\(B\.C\.\d\d\)/i.test(line)) continue;
+    if (/[\[(]B\.C\.\d\d[\])]/i.test(line)) continue;
 
     let matched: { rawName: string; desc: string; min: string; rating: string; comment: string } | null = null;
 
@@ -1378,6 +1380,16 @@ export function parseChannelMeasurementReport(
 
 export async function parseReport(source: PdfSource): Promise<ParsedReport> {
   const pages = await loadPdfText(source);
+  const reportText = pages.join("\n");
+  const agency =
+    /\bSCDOT\b|SOUTH\s+CAROLINA\s+DEPARTMENT\s+OF\s+TRANSPORTATION/i.test(reportText)
+      ? "SCDOT"
+      : /\bTXDOT\b|TEXAS\s+DEPARTMENT\s+OF\s+TRANSPORTATION/i.test(reportText)
+        ? "TXDOT"
+        : undefined;
+  const inspectionType = /Inspection\s+Type(?:\(s\))?:.*\bUnderwater\b/i.test(reportText)
+    ? "Underwater"
+    : undefined;
   const structureNumber = parseStructureNumber(pages);
   const elements = parseElementsTable(pages);
   const isSnbi = detectSnbiFormat(pages);
@@ -1388,5 +1400,5 @@ export async function parseReport(source: PdfSource): Promise<ParsedReport> {
     parseChannelCrossSection(pages) ??
     parseChannelMeasurementReport(pages) ??
     undefined;
-  return { structureNumber, elements, nbi, isSnbi, underclearance, channelCrossSection };
+  return { structureNumber, elements, nbi, isSnbi, agency, inspectionType, underclearance, channelCrossSection };
 }

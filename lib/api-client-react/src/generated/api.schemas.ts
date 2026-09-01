@@ -9,9 +9,19 @@ export interface HealthStatus {
   status: string;
 }
 
-export type SessionSource = "mobile_sync" | "pdf_import";
+export type SessionSource = (typeof SessionSource)[keyof typeof SessionSource];
 
-export type SessionStatus = "in_progress" | "finalized";
+export const SessionSource = {
+  mobile_sync: "mobile_sync",
+  pdf_import: "pdf_import",
+} as const;
+
+export type SessionStatus = (typeof SessionStatus)[keyof typeof SessionStatus];
+
+export const SessionStatus = {
+  in_progress: "in_progress",
+  finalized: "finalized",
+} as const;
 
 export interface SessionSummary {
   id: string;
@@ -19,6 +29,18 @@ export interface SessionSummary {
   source: SessionSource;
   status: SessionStatus;
   finalizedAt?: string | null;
+  /** @nullable */
+  teamLeader?: string | null;
+  teamMembers: string[];
+  /**
+   * @nullable
+   * @pattern ^\d{4}-\d{2}-\d{2}$
+   */
+  inspectionDate?: string | null;
+  /** @nullable */
+  weather?: string | null;
+  /** @nullable */
+  equipmentUsed?: string | null;
   defectCount: number;
   cs4Count: number;
   syncedAt: string;
@@ -30,6 +52,18 @@ export interface SessionDetail {
   source: SessionSource;
   status: SessionStatus;
   finalizedAt?: string | null;
+  /** @nullable */
+  teamLeader?: string | null;
+  teamMembers: string[];
+  /**
+   * @nullable
+   * @pattern ^\d{4}-\d{2}-\d{2}$
+   */
+  inspectionDate?: string | null;
+  /** @nullable */
+  weather?: string | null;
+  /** @nullable */
+  equipmentUsed?: string | null;
   defectCount: number;
   cs4Count: number;
   syncedAt: string;
@@ -44,6 +78,18 @@ export interface UpsertSessionBody {
   source?: SessionSource;
   status?: SessionStatus;
   finalizedAt?: string | null;
+  /** @nullable */
+  teamLeader?: string | null;
+  teamMembers?: string[];
+  /**
+   * @nullable
+   * @pattern ^\d{4}-\d{2}-\d{2}$
+   */
+  inspectionDate?: string | null;
+  /** @nullable */
+  weather?: string | null;
+  /** @nullable */
+  equipmentUsed?: string | null;
   defects?: unknown[];
   nbiRatings?: unknown[];
   importSummary?: unknown;

@@ -1,4 +1,4 @@
-import { pgTable, text, integer, timestamp, jsonb, uuid, uniqueIndex } from "drizzle-orm/pg-core";
+import { date, pgTable, text, integer, timestamp, jsonb, uuid, uniqueIndex } from "drizzle-orm/pg-core";
 import { customType } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -23,6 +23,11 @@ export const inspectionSessionsTable = pgTable(
     source: text("source").$type<SessionSource>().notNull().default("mobile_sync"),
     status: text("status").$type<SessionStatus>().notNull().default("in_progress"),
     finalizedAt: timestamp("finalized_at", { withTimezone: true }),
+    teamLeader: text("team_leader"),
+    teamMembers: jsonb("team_members").$type<string[]>().notNull().default([]),
+    inspectionDate: date("inspection_date", { mode: "string" }),
+    weather: text("weather"),
+    equipmentUsed: text("equipment_used"),
     defectCount: integer("defect_count").notNull().default(0),
     cs4Count: integer("cs4_count").notNull().default(0),
     syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),

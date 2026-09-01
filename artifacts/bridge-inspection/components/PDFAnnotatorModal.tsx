@@ -12,6 +12,7 @@ import {
 import { Feather } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { WebView } from "react-native-webview";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getPdfAnnotatorHtml } from "./pdfAnnotatorHtml";
 import { SC_FAVORITES_KEY, CUSTOM_SHORTCUTS_KEY, SC_OVERRIDES_KEY, SC_HIDDEN_KEY, mergeShortcuts } from "@/data/textShortcuts";
 
@@ -26,6 +27,7 @@ interface Props {
 }
 
 export default function PDFAnnotatorModal({ visible, pdfPath, annotations, onSave, onClose }: Props) {
+  const insets = useSafeAreaInsets();
   const webViewRef = useRef<WebView>(null);
   const iframeRef = useRef<any>(null);
   const [ready, setReady] = useState(false);
@@ -250,7 +252,15 @@ export default function PDFAnnotatorModal({ visible, pdfPath, annotations, onSav
     if (!visible) return null;
     return (
       <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
-        <View style={styles.root}>
+        <View
+          style={[
+            styles.root,
+            Platform.OS !== "web" && {
+              paddingTop: insets.top,
+              paddingBottom: insets.bottom,
+            },
+          ]}
+        >
           {React.createElement("iframe", {
             key: sessionKey,
             ref: iframeRef,
@@ -299,8 +309,23 @@ export default function PDFAnnotatorModal({ visible, pdfPath, annotations, onSav
   }
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
-      <View style={styles.root}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="fullScreen"
+      statusBarTranslucent={false}
+      navigationBarTranslucent={false}
+      onRequestClose={onClose}
+    >
+      <View
+        style={[
+          styles.root,
+          {
+            paddingTop: insets.top,
+            paddingBottom: insets.bottom,
+          },
+        ]}
+      >
         {loadError ? (
           <View style={styles.errorWrap}>
             <Text style={styles.errorTitle}>Cannot Open PDF</Text>

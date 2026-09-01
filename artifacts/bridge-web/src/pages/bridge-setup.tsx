@@ -5,7 +5,10 @@ import { useUpsertSession } from "@workspace/api-client-react";
 interface BridgeConfig {
   structureNumber: string;
   inspectionDate: string;
-  inspectorName: string;
+  teamLeader: string;
+  teamMembers: string;
+  weather: string;
+  equipmentUsed: string;
   bridgeName: string;
   location: string;
   numberOfSpans: number;
@@ -33,7 +36,10 @@ export default function BridgeSetup() {
   const [form, setForm] = useState<FormFields>({
     structureNumber: "",
     inspectionDate: new Date().toISOString().split("T")[0],
-    inspectorName: "",
+    teamLeader: "",
+    teamMembers: "",
+    weather: "",
+    equipmentUsed: "",
     bridgeName: "",
     location: "",
     numberOfSpans: 1,
@@ -48,7 +54,7 @@ export default function BridgeSetup() {
   const set = (field: keyof FormFields, value: string | number) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
-  const isValid = form.structureNumber.trim() !== "" && form.inspectorName.trim() !== "";
+  const isValid = form.structureNumber.trim() !== "" && form.teamLeader.trim() !== "";
 
   const downloadConfig = () => {
     const config: BridgeConfig = { ...form, createdAt: new Date().toISOString() };
@@ -68,7 +74,18 @@ export default function BridgeSetup() {
     setCloudError("");
     setCloudSaved(false);
     upsertSession.mutate(
-      { data: { structureNumber: form.structureNumber.trim(), defects: [], nbiRatings: [] } },
+      {
+        data: {
+          structureNumber: form.structureNumber.trim(),
+          teamLeader: form.teamLeader.trim() || null,
+          teamMembers: form.teamMembers.split(/[,\n]/).map((name) => name.trim()).filter(Boolean),
+          inspectionDate: form.inspectionDate || null,
+          weather: form.weather.trim() || null,
+          equipmentUsed: form.equipmentUsed.trim() || null,
+          defects: [],
+          nbiRatings: [],
+        },
+      },
       {
         onSuccess: () => setCloudSaved(true),
         onError: () => setCloudError("Could not reach the API server. Check that it is running."),
@@ -107,15 +124,53 @@ export default function BridgeSetup() {
           </Field>
         </div>
 
-        <Field label="Inspector Name" required>
+        <div className="rounded-md border border-border bg-secondary/20 p-4 space-y-4">
+          <div>
+            <p className="text-sm font-semibold text-foreground">Inspection Team & Field Notes</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Supplemental information only. These values are not mapped to SNBI or NBI rating fields.
+            </p>
+          </div>
+        <Field label="Team Leader" required>
           <input
             data-testid="input-inspector-name"
             className={inputClass}
-            value={form.inspectorName}
-            onChange={(e) => set("inspectorName", e.target.value)}
+            value={form.teamLeader}
+            onChange={(e) => set("teamLeader", e.target.value)}
             placeholder="Full name of lead inspector"
           />
         </Field>
+        <Field label="Additional Team Members">
+          <textarea
+            data-testid="input-team-members"
+            className={inputClass}
+            value={form.teamMembers}
+            onChange={(e) => set("teamMembers", e.target.value)}
+            placeholder="Separate names with commas or new lines"
+            rows={2}
+          />
+        </Field>
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Weather">
+            <input
+              data-testid="input-weather"
+              className={inputClass}
+              value={form.weather}
+              onChange={(e) => set("weather", e.target.value)}
+              placeholder="e.g. Clear, 72°F"
+            />
+          </Field>
+          <Field label="Equipment Used">
+            <input
+              data-testid="input-equipment"
+              className={inputClass}
+              value={form.equipmentUsed}
+              onChange={(e) => set("equipmentUsed", e.target.value)}
+              placeholder="e.g. Bucket truck, drone"
+            />
+          </Field>
+        </div>
+        </div>
 
         <Field label="Bridge Name / Feature Crossed">
           <input
@@ -201,7 +256,7 @@ export default function BridgeSetup() {
             </span>
           )}
           {!isValid && !upsertSession.isPending && (
-            <span className="text-xs text-muted-foreground">Structure number and inspector name required</span>
+            <span className="text-xs text-muted-foreground">Structure number and team leader required</span>
           )}
         </div>
       </div>
