@@ -86,7 +86,7 @@ export default function BridgesScreen() {
     }
   };
 
-  const handleLoadSampleReport = async () => {
+  const loadSampleReport = async () => {
     try {
       const module = require("@/assets/docs/sample-inspection-report.pdf");
       const asset = Asset.fromModule(module);
@@ -100,6 +100,19 @@ export default function BridgesScreen() {
       const message = err instanceof Error ? err.message : "Could not load sample report.";
       Alert.alert("Error", message);
     }
+  };
+
+  const handleLoadSampleReport = () => {
+    Alert.alert(
+      "Load South Carolina DOT Sample?",
+      hasActiveSession
+        ? "This will replace the current inspection with the bundled SCDOT sample report."
+        : "This will open the bundled SCDOT sample report as a new inspection.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Load Sample", style: "destructive", onPress: () => { void loadSampleReport(); } },
+      ],
+    );
   };
 
   const {
@@ -505,16 +518,16 @@ export default function BridgesScreen() {
                   </Text>
                 </TouchableOpacity>
 
-                {!importedPdfPath && !parsingActive && (
-                  <TouchableOpacity
-                    style={[styles.newBtn, { backgroundColor: "#0c1a2e", borderColor: "#334155" }]}
-                    onPress={handleLoadSampleReport}
-                  >
-                    <Feather name="download" size={13} color="#94a3b8" />
-                    <Text style={[styles.newBtnText, { color: "#94a3b8" }]}>Load SC DOT Sample Report</Text>
-                  </TouchableOpacity>
-                )}
               </View>
+              {!parsingActive && (
+                <TouchableOpacity
+                  style={[styles.newBtn, styles.sampleBtn, { backgroundColor: "#0c1a2e", borderColor: "#334155" }]}
+                  onPress={handleLoadSampleReport}
+                >
+                  <Feather name="download" size={13} color="#94a3b8" />
+                  <Text style={[styles.newBtnText, { color: "#94a3b8" }]}>Load South Carolina DOT Sample Report</Text>
+                </TouchableOpacity>
+              )}
             </View>
           ) : (
             <View style={[styles.emptyCard, { backgroundColor: c.card, borderColor: c.border }]}>
@@ -529,6 +542,16 @@ export default function BridgesScreen() {
               >
                 <Feather name="plus" size={14} color="#fff" />
                 <Text style={styles.emptyStartBtnText}>Start New Inspection</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.emptyStartBtn, styles.sampleStartBtn]}
+                onPress={handleLoadSampleReport}
+                disabled={parsingActive}
+              >
+                <Feather name="download" size={14} color="#38bdf8" />
+                <Text style={[styles.emptyStartBtnText, { color: "#38bdf8" }]}>
+                  Load South Carolina DOT Sample Report
+                </Text>
               </TouchableOpacity>
             </View>
           )}
@@ -698,6 +721,7 @@ const styles = StyleSheet.create({
   fieldNotesRow: { flexDirection: "row", alignItems: "center", gap: 5 },
   fieldNotesText: { fontSize: 10, fontWeight: "600", flex: 1 },
   cardActions: { flexDirection: "row", gap: 8 },
+  sampleBtn: { alignSelf: "stretch", marginTop: 8 },
   submitBtn: {
     flex: 1,
     flexDirection: "row",
@@ -748,6 +772,11 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     borderRadius: 12,
     marginTop: 6,
+  },
+  sampleStartBtn: {
+    backgroundColor: "#0c1a2e",
+    borderWidth: 1,
+    borderColor: "#0369a1",
   },
   emptyStartBtnText: { color: "#fff", fontSize: 13, fontWeight: "900" },
   modalBackdrop: {
