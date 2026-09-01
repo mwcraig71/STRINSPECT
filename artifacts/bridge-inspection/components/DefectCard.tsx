@@ -9,7 +9,7 @@ import {
 } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
-import { DefectRecord, useInspection } from "@/context/InspectionContext";
+import { DefectRecord, getConditionQuantities, useInspection } from "@/context/InspectionContext";
 import colors from "@/constants/colors";
 
 interface DefectCardProps {
@@ -29,6 +29,7 @@ export function DefectCard({ record, isLegacy, onEdit }: DefectCardProps) {
   const c = useColors();
   const { deleteDefect, verifyDefect } = useInspection();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const conditionQuantities = getConditionQuantities(record);
 
   const borderColor = record.isCritical
     ? "#dc2626"
@@ -73,9 +74,14 @@ export function DefectCard({ record, isLegacy, onEdit }: DefectCardProps) {
             {record.element}: {record.defect}
           </Text>
           <View style={styles.badges}>
-            <View style={[styles.csBadge, { backgroundColor: CS_COLORS[record.cs] || c.primary }]}>
-              <Text style={styles.csBadgeText}>{record.cs}</Text>
-            </View>
+            {(["CS1", "CS2", "CS3", "CS4"] as const).map((state) => {
+              const value = conditionQuantities[state];
+              return value && (parseFloat(value) || 0) > 0 ? (
+                <View key={state} style={[styles.csBadge, { backgroundColor: CS_COLORS[state] || c.primary }]}>
+                  <Text style={styles.csBadgeText}>{state} {value}</Text>
+                </View>
+              ) : null;
+            })}
             <Text style={[styles.qty, { color: c.mutedForeground }]}>{record.quantity}</Text>
             {record.isCritical && (
               <View style={[styles.flagBadge, { backgroundColor: "#fef2f2" }]}>
@@ -95,7 +101,7 @@ export function DefectCard({ record, isLegacy, onEdit }: DefectCardProps) {
                 <Text style={[styles.flagText, { color: "#f97316" }]}>Imported</Text>
               </View>
             )}
-            {record.needsVerification && record.cs !== "CS1" && (
+            {record.needsVerification && (conditionQuantities.CS2 || conditionQuantities.CS3 || conditionQuantities.CS4) && (
               <Feather name="shield" size={14} color="#d97706" />
             )}
             {record.photosCount > 0 && (
@@ -133,7 +139,7 @@ export function DefectCard({ record, isLegacy, onEdit }: DefectCardProps) {
           </View>
         ) : (
           <View style={styles.actions}>
-            {record.needsVerification && record.cs !== "CS1" && (
+            {record.needsVerification && (conditionQuantities.CS2 || conditionQuantities.CS3 || conditionQuantities.CS4) && (
               <TouchableOpacity
                 style={[styles.actionBtn, { backgroundColor: "#dcfce7" }]}
                 onPress={() => verifyDefect(record.id)}

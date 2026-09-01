@@ -117,17 +117,28 @@ export default function InspectionProgress({ sessionData, setSessionData }: Prop
   const defects = sessionData?.defects ?? [];
   const nbiRatings = sessionData?.nbiRatings ?? [];
 
+  const getConditionQuantities = (defect: DefectRecord) => {
+    if (defect.conditionQuantities && Object.values(defect.conditionQuantities).some(Boolean)) {
+      return defect.conditionQuantities;
+    }
+    return { [defect.cs]: defect.quantityValue };
+  };
+
   const csDist = (["CS1", "CS2", "CS3", "CS4"] as const).map((cs) => ({
     cs,
-    count: defects.filter((d) => d.cs === cs).length,
+    quantity: defects.reduce(
+      (sum, defect) => sum + (parseFloat(getConditionQuantities(defect)[cs] || "") || 0),
+      0,
+    ),
   }));
 
-  const elementMap: Record<string, { name: string; count: number; cs3: number; cs4: number }> = {};
+  const elementMap: Record<string, { name: string; count: number; cs3Qty: number; cs4Qty: number }> = {};
   defects.forEach((d) => {
-    if (!elementMap[d.elementId]) elementMap[d.elementId] = { name: d.element, count: 0, cs3: 0, cs4: 0 };
+    if (!elementMap[d.elementId]) elementMap[d.elementId] = { name: d.element, count: 0, cs3Qty: 0, cs4Qty: 0 };
     elementMap[d.elementId].count++;
-    if (d.cs === "CS3") elementMap[d.elementId].cs3++;
-    if (d.cs === "CS4") elementMap[d.elementId].cs4++;
+    const quantities = getConditionQuantities(d);
+    elementMap[d.elementId].cs3Qty += parseFloat(quantities.CS3 || "") || 0;
+    elementMap[d.elementId].cs4Qty += parseFloat(quantities.CS4 || "") || 0;
   });
   const elementCoverage = Object.entries(elementMap).sort((a, b) => b[1].count - a[1].count);
 
@@ -508,7 +519,7 @@ export default function InspectionProgress({ sessionData, setSessionData }: Prop
           <div className="grid grid-cols-2 gap-4 mb-4">
             {/* CS Distribution chart */}
             <div className="bg-card border border-border rounded-lg p-4">
-              <h2 className="text-sm font-semibold text-foreground mb-4">CS Distribution</h2>
+              <h2 className="text-sm font-semibold text-foreground mb-4">Condition Quantity Distribution</h2>
               <ResponsiveContainer width="100%" height={170}>
                 <BarChart data={csDist} barSize={36} margin={{ left: -10, right: 4 }}>
                   <XAxis
@@ -522,7 +533,6 @@ export default function InspectionProgress({ sessionData, setSessionData }: Prop
                     axisLine={false}
                     tickLine={false}
                     width={26}
-                    allowDecimals={false}
                   />
                   <Tooltip
                     contentStyle={{
@@ -533,9 +543,9 @@ export default function InspectionProgress({ sessionData, setSessionData }: Prop
                       color: "#f8fafc",
                     }}
                     cursor={{ fill: "rgba(255,255,255,0.03)" }}
-                    formatter={(v: number) => [v, "Records"]}
+                    formatter={(v: number) => [v, "Quantity"]}
                   />
-                  <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                  <Bar dataKey="quantity" radius={[4, 4, 0, 0]}>
                     {csDist.map((entry) => (
                       <Cell key={entry.cs} fill={CS_COLORS[entry.cs]} />
                     ))}
@@ -613,22 +623,22 @@ export default function InspectionProgress({ sessionData, setSessionData }: Prop
                     <tr className="border-b border-border bg-secondary/30">
                       <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Element</th>
                       <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Records</th>
-                      <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">CS3</th>
-                      <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">CS4</th>
+                      <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">CS3 Qty</th>
+                      <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">CS4 Qty</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {elementCoverage.map(([id, { name, count, cs3, cs4 }]) => (
+                    {elementCoverage.map(([id, { name, count, cs3Qty, cs4Qty }]) => (
                       <tr key={id} className="border-b border-border/40 hover:bg-secondary/20 transition-colors">
                         <td className="px-4 py-2.5 text-foreground text-xs">
                           <span className="text-muted-foreground mr-1.5">{id}</span>{name}
                         </td>
                         <td className="px-4 py-2.5 text-right text-xs text-muted-foreground">{count}</td>
                         <td className="px-4 py-2.5 text-right text-xs">
-                          {cs3 > 0 ? <span className="text-orange-400 font-semibold">{cs3}</span> : <span className="text-muted-foreground/50">—</span>}
+                          {cs3Qty > 0 ? <span className="text-orange-400 font-semibold">{cs3Qty}</span> : <span className="text-muted-foreground/50">—</span>}
                         </td>
                         <td className="px-4 py-2.5 text-right text-xs">
-                          {cs4 > 0 ? <span className="text-red-400 font-semibold">{cs4}</span> : <span className="text-muted-foreground/50">—</span>}
+                          {cs4Qty > 0 ? <span className="text-red-400 font-semibold">{cs4Qty}</span> : <span className="text-muted-foreground/50">—</span>}
                         </td>
                       </tr>
                     ))}

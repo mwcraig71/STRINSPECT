@@ -13,6 +13,7 @@ export interface DefectRecord {
   defect: string;
   defectId: string;
   cs: "CS1" | "CS2" | "CS3" | "CS4";
+  conditionQuantities?: Partial<Record<"CS1" | "CS2" | "CS3" | "CS4", string>>;
   quantityValue: string;
   maintenanceQuantityValue: string;
   quantity: string;

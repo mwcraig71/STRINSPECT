@@ -65,6 +65,23 @@ function drawText(ctx: CanvasRenderingContext2D, ann: Annotation, sx: number, sy
 const CS_COLORS: Record<string, string> = {
   CS1: "#22c55e", CS2: "#eab308", CS3: "#f97316", CS4: "#ef4444",
 };
+
+const CS_STATES = ["CS1", "CS2", "CS3", "CS4"] as const;
+
+function conditionQuantities(defect: DefectRecord) {
+  if (defect.conditionQuantities && Object.values(defect.conditionQuantities).some(Boolean)) {
+    return defect.conditionQuantities;
+  }
+  return { [defect.cs]: defect.quantityValue };
+}
+
+function conditionBreakdown(defect: DefectRecord) {
+  const quantities = conditionQuantities(defect);
+  return CS_STATES
+    .filter((state) => (parseFloat(quantities[state] || "") || 0) > 0)
+    .map((state) => `${state}: ${quantities[state]}`)
+    .join(" · ");
+}
 const CS_BG: Record<string, string> = {
   CS1: "rgba(34,197,94,0.12)", CS2: "rgba(234,179,8,0.12)",
   CS3: "rgba(249,115,22,0.12)", CS4: "rgba(239,68,68,0.12)",
@@ -245,7 +262,7 @@ function buildReportContentHtml(data: SessionData, header: ReportHeader = EMPTY_
         <table style="border-collapse:collapse;width:100%;max-width:640px;font-size:11px">
           <tr><td style="padding:4px 16px 4px 0;color:#6b7280;font-weight:600;white-space:nowrap">Bridge Component</td><td style="padding:4px 0">${esc(d.element)}</td></tr>
           <tr><td style="padding:4px 16px 4px 0;color:#6b7280;font-weight:600;white-space:nowrap">Defect Type</td><td style="padding:4px 0">${esc(d.defect)}</td></tr>
-          <tr><td style="padding:4px 16px 4px 0;color:#6b7280;font-weight:600;white-space:nowrap">Condition State</td><td style="padding:4px 0;font-weight:700;color:${CS_COLORS[d.cs] ?? "#000"}">${d.cs}</td></tr>
+          <tr><td style="padding:4px 16px 4px 0;color:#6b7280;font-weight:600;white-space:nowrap">Condition States</td><td style="padding:4px 0;font-weight:700;color:${CS_COLORS[d.cs] ?? "#000"}">${esc(conditionBreakdown(d))}</td></tr>
           <tr><td style="padding:4px 16px 4px 0;color:#6b7280;font-weight:600;white-space:nowrap">Location</td><td style="padding:4px 0">${esc(d.location)}</td></tr>
           ${d.locationDesc ? `<tr><td style="padding:4px 16px 4px 0;color:#6b7280;font-weight:600;white-space:nowrap">Description / Notes</td><td style="padding:4px 0">${esc(d.locationDesc)}</td></tr>` : ""}
           <tr><td style="padding:4px 16px 4px 0;color:#6b7280;font-weight:600;white-space:nowrap">Recommendation</td><td style="padding:4px 0">&nbsp;</td></tr>
@@ -358,7 +375,7 @@ function buildReportContentHtml(data: SessionData, header: ReportHeader = EMPTY_
           <span style="font-weight:500"> &mdash; ${esc(d.element)}</span>
         </td>
         <td style="padding:6px 8px;font-size:11px">${esc(d.defect)}</td>
-        <td style="padding:6px 8px;text-align:center;font-weight:700;color:${CS_COLORS[d.cs] ?? "#000"};font-size:11px">${d.cs}</td>
+        <td style="padding:6px 8px;text-align:center;font-weight:700;color:${CS_COLORS[d.cs] ?? "#000"};font-size:11px">${esc(conditionBreakdown(d))}</td>
         <td style="padding:6px 8px;text-align:center;font-size:11px">${esc(d.quantityValue || d.quantity)}</td>
         <td style="padding:6px 8px;font-size:11px;color:#64748b">${esc(d.locationDesc || "")}</td>
         <td style="padding:6px 8px;font-size:10px">${flags || "—"}</td>
@@ -692,22 +709,33 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
         ["Maintenance Items", defects.filter((d) => d.isMaintenance).length],
         ["Needs Verification", defects.filter((d) => d.needsVerification).length],
         [],
-        ["CS Distribution"],
-        ["CS", "Count", "Percentage"],
-        ...["CS1", "CS2", "CS3", "CS4"].map((cs) => {
-          const n = defects.filter((d) => d.cs === cs).length;
-          return [cs, n, defects.length ? `${Math.round((n / defects.length) * 100)}%` : "0%"];
+        ["CS Quantity Distribution"],
+        ["CS", "Quantity", "Percentage"],
+        ...CS_STATES.map((cs) => {
+          const quantity = defects.reduce(
+            (sum, defect) => sum + (parseFloat(conditionQuantities(defect)[cs] || "") || 0),
+            0,
+          );
+          const totalQuantity = defects.reduce(
+            (sum, defect) => sum + CS_STATES.reduce(
+              (stateSum, state) => stateSum + (parseFloat(conditionQuantities(defect)[state] || "") || 0),
+              0,
+            ),
+            0,
+          );
+          return [cs, quantity, totalQuantity ? `${Math.round((quantity / totalQuantity) * 100)}%` : "0%"];
         }),
       ];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryRows), "Summary");
 
       const headers = [
-        "Location", "Element ID", "Element", "Defect", "CS",
-        "Quantity", "Maint Qty", "Environment", "Size", "Location Desc",
+        "Location", "Element ID", "Element", "Defect", "CS", "CS1 Qty", "CS2 Qty", "CS3 Qty", "CS4 Qty",
+        "Total Quantity", "Maint Qty", "Environment", "Size", "Location Desc",
         "Critical", "Maintenance", "Needs Verify", "Legacy", "Photos", "Photo Directions",
       ];
       const rows = defects.map((d) => [
-        d.location, d.elementId, d.element, d.defect, d.cs,
+        d.location, d.elementId, d.element, d.defect, conditionBreakdown(d),
+        ...CS_STATES.map((state) => conditionQuantities(d)[state] || ""),
         d.quantityValue || d.quantity, d.maintenanceQuantityValue, d.environment,
         d.size, d.locationDesc,
         d.isCritical ? "Yes" : "",
@@ -737,7 +765,7 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
       sortedLocations(defects).slice(0, 20).forEach((loc) => {
         const locDefects = defects.filter((d) => d.location === loc);
         const locRows = locDefects.map((d) => [
-          d.elementId, d.element, d.defect, d.cs,
+          d.elementId, d.element, d.defect, conditionBreakdown(d),
           d.quantityValue || d.quantity, d.locationDesc,
           d.isCritical ? "Yes" : "", d.needsVerification ? "Yes" : "",
         ]);
@@ -902,8 +930,8 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
               new TableCell({ children: [new Paragraph(d.defect || "")] }),
             ]}),
             new TableRow({ children: [
-              new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Condition State", bold: true })] })] }),
-              new TableCell({ children: [new Paragraph(d.cs)] }),
+              new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Condition States", bold: true })] })] }),
+              new TableCell({ children: [new Paragraph(conditionBreakdown(d))] }),
             ]}),
             new TableRow({ children: [
               new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Location", bold: true })] })] }),
@@ -1010,7 +1038,7 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
                   children: [
                     `${d.elementId} \u2014 ${d.element}`,
                     d.defect,
-                    d.cs,
+                    conditionBreakdown(d),
                     d.quantityValue || d.quantity,
                     d.locationDesc || "",
                     flags || "\u2014",

@@ -507,6 +507,7 @@ export interface DefectRecord {
   defect: string;
   defectId: string;
   cs: ConditionState;
+  conditionQuantities?: Partial<Record<ConditionState, string>>;
   quantityValue: string;
   maintenanceQuantityValue: string;
   quantity: string;
@@ -519,6 +520,47 @@ export interface DefectRecord {
   needsVerification: boolean;
   isLegacy: boolean;
   isImported?: boolean;
+}
+
+export type ConditionQuantities = Partial<Record<ConditionState, string>>;
+
+export function getConditionQuantities(record: DefectRecord): ConditionQuantities {
+  if (record.conditionQuantities && Object.values(record.conditionQuantities).some((value) => value?.trim())) {
+    return record.conditionQuantities;
+  }
+  return record.quantityValue?.trim() ? { [record.cs]: record.quantityValue } : {};
+}
+
+export function getConditionQuantity(record: DefectRecord, state: ConditionState): number {
+  return parseFloat(getConditionQuantities(record)[state] || "") || 0;
+}
+
+export function getTotalConditionQuantity(record: DefectRecord): number {
+  return (["CS1", "CS2", "CS3", "CS4"] as ConditionState[])
+    .reduce((total, state) => total + getConditionQuantity(record, state), 0);
+}
+
+export function getWorstConditionState(quantities: ConditionQuantities): ConditionState {
+  if ((parseFloat(quantities.CS4 || "") || 0) > 0) return "CS4";
+  if ((parseFloat(quantities.CS3 || "") || 0) > 0) return "CS3";
+  if ((parseFloat(quantities.CS2 || "") || 0) > 0) return "CS2";
+  return "CS1";
+}
+
+function normalizeDefectRecord(record: DefectRecord): DefectRecord {
+  const quantities = getConditionQuantities(record);
+  const total = (["CS1", "CS2", "CS3", "CS4"] as ConditionState[])
+    .reduce((sum, state) => sum + (parseFloat(quantities[state] || "") || 0), 0);
+  const unit = record.quantityValue
+    ? record.quantity.replace(record.quantityValue, "").trim()
+    : record.quantity.split(" ").slice(1).join(" ");
+  return {
+    ...record,
+    conditionQuantities: quantities,
+    cs: getWorstConditionState(quantities),
+    quantityValue: String(total),
+    quantity: `${total} ${unit || "ea"}`,
+  };
 }
 
 export interface SubComponent {
@@ -1303,6 +1345,8 @@ interface InspectionContextType {
   setDefect: (v: DefectType | null) => void;
   conditionState: ConditionState;
   setConditionState: (v: ConditionState) => void;
+  conditionQuantities: ConditionQuantities;
+  setConditionQuantities: (v: ConditionQuantities) => void;
   quantity: string;
   setQuantity: (v: string) => void;
   maintenanceQuantity: string;
@@ -1685,7 +1729,8 @@ function applyFilters(
         CS2: 2,
         CS1: 3,
       };
-      return (order[a.cs] ?? 4) - (order[b.cs] ?? 4);
+      return (order[getWorstConditionState(getConditionQuantities(a))] ?? 4)
+        - (order[getWorstConditionState(getConditionQuantities(b))] ?? 4);
     }
     return String(a.element).localeCompare(String(b.element));
   });
@@ -1834,6 +1879,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const [environment, setEnvironment] = useState("2");
   const [defect, setDefect] = useState<DefectType | null>(null);
   const [conditionState, setConditionState] = useState<ConditionState>("CS1");
+  const [conditionQuantities, setConditionQuantities] = useState<ConditionQuantities>({});
   const [quantity, setQuantity] = useState("");
   const [maintenanceQuantity, setMaintenanceQuantity] = useState("");
   const [size, setSize] = useState("");
@@ -2013,7 +2059,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
             setExtraPhotosState(JSON.parse(extraPhotosStr) as StandardPhotoSlot[]);
           } catch {}
         }
-        if (defects) setSavedDefectsState(JSON.parse(defects));
+        if (defects) setSavedDefectsState((JSON.parse(defects) as DefectRecord[]).map(normalizeDefectRecord));
         if (nbi) setNbiRatingsState(JSON.parse(nbi));
         if (impSummary) {
           try {
@@ -2175,8 +2221,9 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   }, []);
 
   const setSavedDefects = useCallback((v: DefectRecord[]) => {
-    setSavedDefectsState(v);
-    AsyncStorage.setItem(STORAGE_KEYS.SAVED_DEFECTS, JSON.stringify(v)).catch(() => {});
+    const normalized = v.map(normalizeDefectRecord);
+    setSavedDefectsState(normalized);
+    AsyncStorage.setItem(STORAGE_KEYS.SAVED_DEFECTS, JSON.stringify(normalized)).catch(() => {});
     bumpLastModified();
   }, [bumpLastModified]);
 
@@ -2799,10 +2846,12 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           total: 0,
         };
       }
-      const qty = parseFloat(d.quantityValue) || 0;
+      const qty = getTotalConditionQuantity(d);
       const mQty = parseFloat(d.maintenanceQuantityValue) || qty;
       const row = summary[elKey];
-      row[d.cs] += qty;
+      (["CS1", "CS2", "CS3", "CS4"] as ConditionState[]).forEach((state) => {
+        row[state] += getConditionQuantity(d, state);
+      });
       row.total += qty;
       if (d.isMaintenance) row.maintQty += mQty;
       if (d.isCritical) row.critQty += qty;
@@ -2835,7 +2884,10 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     });
 
     // 2. No imported defects awaiting verification (CS1 defects pass through automatically)
-    const unverified = savedDefects.filter((d) => d.needsVerification && d.cs !== "CS1");
+    const unverified = savedDefects.filter(
+      (d) => d.needsVerification
+        && (getConditionQuantity(d, "CS2") > 0 || getConditionQuantity(d, "CS3") > 0 || getConditionQuantity(d, "CS4") > 0)
+    );
     checks.push({
       id: "unverifiedDefects",
       label: "Imported defects verified",
@@ -2898,8 +2950,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     const incomplete = savedDefects.filter((d) => {
       const hasElement = !!(d.elementId || d.element);
       const hasDefect = !!(d.defectId || d.defect);
-      const hasCs = !!(d.cs && d.cs.trim());
-      const hasQty = !!(d.quantityValue?.trim() || d.maintenanceQuantityValue?.trim());
+      const hasCs = Object.values(getConditionQuantities(d)).some((value) => value?.trim());
+      const hasQty = getTotalConditionQuantity(d) > 0 || !!d.maintenanceQuantityValue?.trim();
       return !(hasElement && hasDefect && hasCs && hasQty);
     });
     checks.push({
@@ -2914,7 +2966,9 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     });
 
     // 6. Critical findings acknowledged (CS1 defects do not require acknowledgement)
-    const nonCS1Criticals = criticalFindingsSummary.filter((d) => d.cs !== "CS1");
+    const nonCS1Criticals = criticalFindingsSummary.filter(
+      (d) => getConditionQuantity(d, "CS2") > 0 || getConditionQuantity(d, "CS3") > 0 || getConditionQuantity(d, "CS4") > 0
+    );
     const critPass = nonCS1Criticals.length === 0 || criticalFindingsAcknowledged;
     checks.push({
       id: "criticalFindings",
@@ -2989,6 +3043,12 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const handleSave = useCallback(() => {
     if (!element || !defect) return;
     const id = editId || (Date.now().toString() + Math.random().toString(36).substr(2, 9));
+    const normalizedQuantities = Object.fromEntries(
+      Object.entries(conditionQuantities).filter(([, value]) => value?.trim())
+    ) as ConditionQuantities;
+    const totalQuantity = (["CS1", "CS2", "CS3", "CS4"] as ConditionState[])
+      .reduce((sum, state) => sum + (parseFloat(normalizedQuantities[state] || "") || 0), 0);
+    const worstState = getWorstConditionState(normalizedQuantities);
     const record: DefectRecord = {
       id,
       location: currentLocation,
@@ -2997,10 +3057,11 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
       environment,
       defect: defect.name,
       defectId: defect.id,
-      cs: conditionState,
-      quantityValue: quantity,
-      maintenanceQuantityValue: maintenanceQuantity || quantity,
-      quantity: `${quantity} ${defect.unit}`,
+      cs: worstState,
+      conditionQuantities: normalizedQuantities,
+      quantityValue: String(totalQuantity),
+      maintenanceQuantityValue: maintenanceQuantity || String(totalQuantity),
+      quantity: `${totalQuantity} ${defect.unit}`,
       size,
       locationDesc,
       photosCount: photos.length,
@@ -3046,6 +3107,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     }
 
     setQuantity("");
+    setConditionQuantities({});
     setMaintenanceQuantity("");
     setSize("");
     setLocationDesc("");
@@ -3058,7 +3120,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     defect,
     currentLocation,
     environment,
-    conditionState,
+    conditionQuantities,
     quantity,
     maintenanceQuantity,
     size,
@@ -3101,7 +3163,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
       );
       setEnvironment(record.environment);
       setConditionState(record.cs);
-      setQuantity(record.quantityValue);
+      setConditionQuantities(getConditionQuantities(record));
+      setQuantity(String(getTotalConditionQuantity(record)));
       setMaintenanceQuantity(record.maintenanceQuantityValue || "");
       setSize(record.size);
       setLocationDesc(record.locationDesc);
@@ -3282,8 +3345,11 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
             );
             currentParentElementName = match?.name || row.elementName;
 
-            for (const [cs, qty] of csMap) {
-              if (qty <= 0) continue;
+            const conditionQuantities = Object.fromEntries(
+              csMap.filter(([, qty]) => qty > 0).map(([cs, qty]) => [cs, String(qty)])
+            ) as ConditionQuantities;
+            const total = csMap.reduce((sum, [, qty]) => sum + Math.max(0, qty), 0);
+            if (total > 0) {
               const defects = DEFECTS_BY_ELEMENT[row.elementId];
               const defaultDefect = defects?.[0] || { id: "other", name: "General Defect", unit: row.unit || "ea" };
               recIndex++;
@@ -3295,12 +3361,13 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
                 environment: row.environment || "2",
                 defect: defaultDefect.name,
                 defectId: defaultDefect.id,
-                cs,
-                quantityValue: String(qty),
-                maintenanceQuantityValue: String(qty),
-                quantity: `${qty} ${row.unit || "ea"}`,
+                cs: getWorstConditionState(conditionQuantities),
+                conditionQuantities,
+                quantityValue: String(total),
+                maintenanceQuantityValue: String(total),
+                quantity: `${total} ${row.unit || "ea"}`,
                 size: "",
-                locationDesc: `${currentParentElementName} — ${cs} — Imported`,
+                locationDesc: `${currentParentElementName} — Imported`,
                 needsVerification: true,
                 isLegacy: true,
                 isImported: true,
@@ -3321,8 +3388,11 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
               DEFECTS_BY_ELEMENT[currentParentElementId]?.find((d) => d.id === internalDefectId)?.unit ||
               "ea";
 
-            for (const [cs, qty] of csMap) {
-              if (qty <= 0) continue;
+            const conditionQuantities = Object.fromEntries(
+              csMap.filter(([, qty]) => qty > 0).map(([cs, qty]) => [cs, String(qty)])
+            ) as ConditionQuantities;
+            const total = csMap.reduce((sum, [, qty]) => sum + Math.max(0, qty), 0);
+            if (total > 0) {
               recIndex++;
               newDefects.push({
                 id: `pdf-${ts}-${recIndex}`,
@@ -3332,12 +3402,13 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
                 environment: row.environment || "2",
                 defect: defectName,
                 defectId: internalDefectId,
-                cs,
-                quantityValue: String(qty),
-                maintenanceQuantityValue: String(qty),
-                quantity: `${qty} ${unit}`,
+                cs: getWorstConditionState(conditionQuantities),
+                conditionQuantities,
+                quantityValue: String(total),
+                maintenanceQuantityValue: String(total),
+                quantity: `${total} ${unit}`,
                 size: "",
-                locationDesc: `${defectName} — ${cs} — Imported`,
+                locationDesc: `${defectName} — Imported`,
                 needsVerification: true,
                 isLegacy: true,
                 isImported: true,
@@ -3696,6 +3767,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     setDefect,
     conditionState,
     setConditionState,
+    conditionQuantities,
+    setConditionQuantities,
     quantity,
     setQuantity,
     maintenanceQuantity,

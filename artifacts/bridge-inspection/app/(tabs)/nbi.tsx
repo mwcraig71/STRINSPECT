@@ -13,7 +13,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
-import { useInspection } from "@/context/InspectionContext";
+import { getConditionQuantities, useInspection } from "@/context/InspectionContext";
 import { SettingsModal } from "@/components/SettingsModal";
 import { SpeechToTextButton } from "@/components/SpeechToTextButton";
 
@@ -349,7 +349,10 @@ export default function NBIScreen() {
                         <View key={d.id} style={[styles.linkedDefect, { backgroundColor: c.card, borderColor: c.border }]}>
                           <View style={styles.linkedDefectLeft}>
                             <Text style={[styles.linkedDefectLoc, { color: c.primary }]}>
-                              {d.location} • CS {d.cs}
+                              {d.location} • {Object.entries(getConditionQuantities(d))
+                                .filter(([, value]) => (parseFloat(value || "") || 0) > 0)
+                                .map(([state, value]) => `${state} ${value}`)
+                                .join(" · ")}
                             </Text>
                             <Text style={[styles.linkedDefectName, { color: c.foreground }]}>
                               {d.element}: {d.defect}
