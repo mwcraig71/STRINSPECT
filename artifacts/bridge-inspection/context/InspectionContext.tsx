@@ -8,6 +8,8 @@ import React, {
   useState,
 } from "react";
 import { nbiSubNameMatchScore, parseReport, ParsedUnderclearance, ParsedChannelCrossSection } from "../utils/pdfParser";
+import type { ScdotElementRow } from "../utils/scdotParser";
+import { scdotLocationLabel, scdotNoteDescription } from "../utils/scdotImport";
 import { setBaseUrl, setAuthTokenGetter, upsertSession } from "@workspace/api-client-react";
 import { Platform } from "react-native";
 import * as Network from "expo-network";
@@ -614,6 +616,13 @@ export interface ImportSummary {
   sections: ImportSectionAudit[];
   emptySections: ImportSectionAudit[];
   unmatchedComponents: string[];
+  /** Agency asset identifier when it differs from the structure number (SCDOT Asset ID). */
+  assetId?: string;
+  agency?: string;
+  /** Records created from itemised "[elem, CSn, Qn]" defect notes (SCDOT). */
+  taggedDefectRecords?: number;
+  /** Parser notes for the inspector: roll-up mismatches, ambiguous values, unattributed captions. */
+  warnings?: string[];
 }
 
 export interface CifData {
@@ -1454,6 +1463,9 @@ interface InspectionContextType {
   // Structure number
   structureNumber: string;
   setStructureNumber: (v: string) => void;
+  /** Agency asset identifier (SCDOT "Asset ID"); empty when the agency uses the structure number only. */
+  assetId: string;
+  setAssetId: (v: string) => void;
   teamLeader: string;
   setTeamLeader: (v: string) => void;
   teamMembers: string[];
@@ -1764,6 +1776,7 @@ const STORAGE_KEYS = {
   SUPERSTRUCTURE_MATERIAL: "@bridge_superstructure_material",
   SUBSTRUCTURE_MATERIAL: "@bridge_substructure_material",
   STRUCTURE_NUMBER: "@bridge_structure_number",
+  ASSET_ID: "@bridge_asset_id",
   UNDERCLEARANCE: "@bridge_underclearance",
   CHANNEL: "@bridge_channel",
   SAFETY_BRIEFING: "@bridge_safety_briefing",
@@ -1881,6 +1894,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const [savedDefects, setSavedDefectsState] = useState<DefectRecord[]>([]);
   const [nbiRatings, setNbiRatingsState] = useState<NbiRating[]>(INITIAL_SNBI_RATINGS);
   const [structureNumber, setStructureNumberState] = useState("");
+  const [assetId, setAssetIdState] = useState("");
   const [teamLeader, setTeamLeaderState] = useState("");
   const [teamMembers, setTeamMembersState] = useState<string[]>([]);
   const [inspectionDate, setInspectionDateState] = useState("");
@@ -1956,6 +1970,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
             STORAGE_KEYS.SAVED_DEFECTS,
             STORAGE_KEYS.NBI_RATINGS,
             STORAGE_KEYS.STRUCTURE_NUMBER,
+            STORAGE_KEYS.ASSET_ID,
             STORAGE_KEYS.IMPORT_SUMMARY,
             STORAGE_KEYS.NOMENCLATURE,
             STORAGE_KEYS.INSPECTION_TYPE,
@@ -1982,7 +1997,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
             "@bridge_demo_mode",
           ]);
         }
-        const [defects, nbi, nom, insType, superType, subType, superMat, subMat, structNum, uc, ch, sb, sn, spp, impSummary, lastJoint, lastSync, lastMod, pdfPath, pdfAnns, pdfUploadedStr, imgSz, aspectRatioStr, dateStampStr, finalizedAtStr, importAuditAckStr, criticalAckStr, stdPhotosStr, openAiKeyStr, aiRephraseStr, extraPhotosStr, ucChannelOverrideStr, isSnbiFormatStr, teamLeaderStr, teamMembersStr, inspectionDateStr, weatherStr, equipmentUsedStr, elementZoneStr, activeElementIdsStr, lastPhotoSourceStr] = await Promise.all([
+        const [defects, nbi, nom, insType, superType, subType, superMat, subMat, structNum, uc, ch, sb, sn, spp, impSummary, lastJoint, lastSync, lastMod, pdfPath, pdfAnns, pdfUploadedStr, imgSz, aspectRatioStr, dateStampStr, finalizedAtStr, importAuditAckStr, criticalAckStr, stdPhotosStr, openAiKeyStr, aiRephraseStr, extraPhotosStr, ucChannelOverrideStr, isSnbiFormatStr, teamLeaderStr, teamMembersStr, inspectionDateStr, weatherStr, equipmentUsedStr, elementZoneStr, activeElementIdsStr, lastPhotoSourceStr, assetIdStr] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.SAVED_DEFECTS),
           AsyncStorage.getItem(STORAGE_KEYS.NBI_RATINGS),
           AsyncStorage.getItem(STORAGE_KEYS.NOMENCLATURE),
@@ -2024,6 +2039,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           AsyncStorage.getItem(STORAGE_KEYS.ELEMENT_ZONE_FILTER),
           AsyncStorage.getItem(STORAGE_KEYS.ACTIVE_ELEMENT_IDS),
           AsyncStorage.getItem(STORAGE_KEYS.LAST_PHOTO_SOURCE),
+          AsyncStorage.getItem(STORAGE_KEYS.ASSET_ID),
         ]);
         if (lastJoint) setLastJointElementIdState(lastJoint);
         if (lastSync) setLastSynced(lastSync);
@@ -2045,6 +2061,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         if (openAiKeyStr) setOpenAiKeyState(openAiKeyStr);
         if (aiRephraseStr !== null) setAiRephraseState(aiRephraseStr !== "0");
         if (teamLeaderStr) setTeamLeaderState(teamLeaderStr);
+        if (assetIdStr) setAssetIdState(assetIdStr);
         if (teamMembersStr) {
           try {
             const parsed = JSON.parse(teamMembersStr);
@@ -2530,6 +2547,12 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     AsyncStorage.setItem(STORAGE_KEYS.CRITICAL_FINDINGS_ACK, "1").catch(() => {});
   }, []);
 
+  const setAssetId = useCallback((v: string) => {
+    setAssetIdState(v);
+    AsyncStorage.setItem(STORAGE_KEYS.ASSET_ID, v).catch(() => {});
+    bumpLastModified();
+  }, [bumpLastModified]);
+
   const setStructureNumber = useCallback((v: string) => {
     setStructureNumberState(v);
     AsyncStorage.setItem(STORAGE_KEYS.STRUCTURE_NUMBER, v).catch(() => {});
@@ -2588,6 +2611,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     AsyncStorage.removeItem(STORAGE_KEYS.WEATHER).catch(() => {});
     setEquipmentUsedState("");
     AsyncStorage.removeItem(STORAGE_KEYS.EQUIPMENT_USED).catch(() => {});
+    setAssetIdState("");
+    AsyncStorage.removeItem(STORAGE_KEYS.ASSET_ID).catch(() => {});
     resetElementFilters();
     setImportSummary(null);
     setLastModifiedState(null);
@@ -3377,6 +3402,9 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           inspectionType: parsedInspectionType,
           underclearance: parsedUnderclearance,
           channelCrossSection: parsedChannelCrossSection,
+          assetId: parsedAssetId,
+          scdot: parsedScdot,
+          warnings: parsedWarnings,
         } = await parseReport(source);
 
         if (parsedAgency === "SCDOT") {
@@ -3407,15 +3435,78 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         if (parsedNum) {
           setStructureNumber(parsedNum);
         }
+        if (parsedAssetId) {
+          setAssetId(parsedAssetId);
+        }
+
+        // SCDOT reports carry the inspection header on the cover page.
+        if (parsedScdot) {
+          const h = parsedScdot.header;
+          if (h.teamLeader) setTeamLeader(h.teamLeader);
+          if (h.teamMembers.length > 0) setTeamMembers(h.teamMembers);
+          if (h.inspectionDate) setInspectionDate(h.inspectionDate);
+          if (h.weather) setWeather(h.weather);
+          if (parsedScdot.equipment.length > 0) {
+            setEquipmentUsed(parsedScdot.equipment.map((e) => e.name).join(", "));
+          }
+        }
 
         const ts = Date.now();
         const newDefects: DefectRecord[] = [];
         let recIndex = 0;
+        let taggedDefectRecords = 0;
 
         let currentParentElementId = "";
         let currentParentElementName = "";
+        // SCDOT: the parsed element the current parent row came from (same order as `elements`).
+        let currentScdotParent: ScdotElementRow | null = null;
 
-        for (const row of elements) {
+        // One record per itemised "[elem, CSn, Qn]" note, keeping the note's
+        // location, size and sentence. Returns the quantity attributed per CS.
+        const pushTaggedRecords = (
+          notes: ScdotElementRow["defects"],
+          elementId: string,
+          elementName: string,
+          environment: string,
+          defectName: string,
+          defectId: string,
+          unit: string
+        ): Record<ConditionState, number> => {
+          const attributed: Record<ConditionState, number> = { CS1: 0, CS2: 0, CS3: 0, CS4: 0 };
+          for (const note of notes) {
+            const cs = `CS${note.cs}` as ConditionState;
+            attributed[cs] += note.qty;
+            recIndex++;
+            taggedDefectRecords++;
+            newDefects.push({
+              id: `pdf-${ts}-${recIndex}`,
+              location: scdotLocationLabel(note.location),
+              elementId,
+              element: elementName,
+              environment,
+              defect: defectName,
+              defectId,
+              cs,
+              conditionQuantities: { [cs]: String(note.qty) } as ConditionQuantities,
+              quantityValue: String(note.qty),
+              maintenanceQuantityValue: String(note.qty),
+              quantity: `${note.qty} ${unit}`,
+              size: note.size,
+              locationDesc: scdotNoteDescription(note),
+              needsVerification: true,
+              isLegacy: true,
+              isImported: true,
+              photos: [],
+              photosCount: 0,
+              isCritical: false,
+              isMaintenance: false,
+            });
+          }
+          return attributed;
+        };
+
+        for (let rowIndex = 0; rowIndex < elements.length; rowIndex++) {
+          const row = elements[rowIndex];
           const csMap: [ConditionState, number][] = [
             ["CS1", row.cs1],
             ["CS2", row.cs2],
@@ -3425,6 +3516,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
 
           if (!row.isDefect) {
             currentParentElementId = row.elementId;
+            currentScdotParent = parsedScdot?.elements[rowIndex] ?? null;
             const match = (SNBI_ELEMENTS as readonly { id: string; name: string }[]).find(
               (e) => e.id === row.elementId
             );
@@ -3462,6 +3554,21 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
                 isMaintenance: false,
               });
             }
+            // SCDOT notes tagged "[CSn, Qn]" with no defect code describe the
+            // element itself; file them under its default defect.
+            const untypedNotes = currentScdotParent?.defects.filter((d) => !d.defectCode) ?? [];
+            if (untypedNotes.length > 0) {
+              const defaultDefect = DEFECTS_BY_ELEMENT[row.elementId]?.[0] || { id: "other", name: "General Defect", unit: row.unit || "ea" };
+              pushTaggedRecords(
+                untypedNotes,
+                row.elementId,
+                currentParentElementName,
+                row.environment || "2",
+                defaultDefect.name,
+                defaultDefect.id,
+                row.unit || defaultDefect.unit
+              );
+            }
           } else {
             const defectName = row.elementName;
             const snbiCode = row.defectCode || "";
@@ -3473,10 +3580,24 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
               DEFECTS_BY_ELEMENT[currentParentElementId]?.find((d) => d.id === internalDefectId)?.unit ||
               "ea";
 
+            // SCDOT: itemised notes for this defect become individual records;
+            // whatever the row still carries beyond them becomes one remainder record.
+            const taggedNotes = currentScdotParent?.defects.filter((d) => d.defectCode === snbiCode) ?? [];
+            const attributed = pushTaggedRecords(
+              taggedNotes,
+              currentParentElementId,
+              currentParentElementName,
+              row.environment || "2",
+              defectName,
+              internalDefectId,
+              row.unit || unit
+            );
+            const remainder: [ConditionState, number][] = csMap.map(([cs, qty]) => [cs, Math.max(0, qty - attributed[cs])]);
+
             const conditionQuantities = Object.fromEntries(
-              csMap.filter(([, qty]) => qty > 0).map(([cs, qty]) => [cs, String(qty)])
+              remainder.filter(([, qty]) => qty > 0).map(([cs, qty]) => [cs, String(qty)])
             ) as ConditionQuantities;
-            const total = csMap.reduce((sum, [, qty]) => sum + Math.max(0, qty), 0);
+            const total = remainder.reduce((sum, [, qty]) => sum + qty, 0);
             if (total > 0) {
               recIndex++;
               newDefects.push({
@@ -3491,9 +3612,9 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
                 conditionQuantities,
                 quantityValue: String(total),
                 maintenanceQuantityValue: String(total),
-                quantity: `${total} ${unit}`,
+                quantity: `${total} ${row.unit || unit}`,
                 size: "",
-                locationDesc: `${defectName} — Imported`,
+                locationDesc: taggedNotes.length > 0 ? `${defectName} — Imported (not itemised in element notes)` : `${defectName} — Imported`,
                 needsVerification: true,
                 isLegacy: true,
                 isImported: true,
@@ -3738,6 +3859,10 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           sections: sectionAudits,
           emptySections,
           unmatchedComponents: unmatchedNames,
+          assetId: parsedAssetId,
+          agency: parsedAgency,
+          taggedDefectRecords,
+          warnings: parsedWarnings,
         };
         setImportSummary(summary);
 
@@ -3790,12 +3915,21 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         const chNote = parsedChannelCrossSection
           ? `\nChannel Cross-Section (Form 2600): ${parsedChannelCrossSection.upstream.length} upstream, ${parsedChannelCrossSection.downstream.length} downstream measurement(s) imported.`
           : "";
+        const taggedNote =
+          taggedDefectRecords > 0 ? `\n${taggedDefectRecords} record(s) came from itemised element notes with location and size.` : "";
+        const warningNote =
+          parsedWarnings.length > 0
+            ? `\n\n${parsedWarnings.length} parser note(s) to review:\n${parsedWarnings.slice(0, 5).join("\n")}${
+                parsedWarnings.length > 5 ? `\n…and ${parsedWarnings.length - 5} more (see the import audit).` : ""
+              }`
+            : "";
+        const idLine = parsedNum
+          ? `Structure: ${parsedNum}${parsedAssetId ? ` (Asset ID ${parsedAssetId})` : ""}`
+          : "Structure number not found.";
         const { Alert } = require("react-native");
         Alert.alert(
           "Import Complete",
-          `Imported ${newDefects.length} element record(s) across ${elementsFound} elements.\n${nbiFilledCount} of ${nbiTotalCount} condition-rating field(s) pre-filled.${ucNote}${chNote}${emptySummary}${unmatchedSummary}\n\n${
-            parsedNum ? `Structure: ${parsedNum}` : "Structure number not found."
-          }\n\nSee the import audit on the Summary tab. Assign locations and verify records before submitting.`
+          `Imported ${newDefects.length} element record(s) across ${elementsFound} elements.${taggedNote}\n${nbiFilledCount} of ${nbiTotalCount} condition-rating field(s) pre-filled.${ucNote}${chNote}${emptySummary}${unmatchedSummary}${warningNote}\n\n${idLine}\n\nSee the import audit on the Summary tab. Assign locations and verify records before submitting.`
         );
       } catch (err: unknown) {
         console.warn("[PDF import]", err);
@@ -3806,7 +3940,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         setParsingActive(false);
       }
     },
-    [clearInspection, setSavedDefectsState, setNbiRatingsState, setUnderclearanceDataState, setChannelDataState, setStructureNumber, setNomenclature, setInspectionType, nbiRatings, setImportSummary, bumpLastModified]
+    [clearInspection, setSavedDefectsState, setNbiRatingsState, setUnderclearanceDataState, setChannelDataState, setStructureNumber, setAssetId, setTeamLeader, setTeamMembers, setInspectionDate, setWeather, setEquipmentUsed, setNomenclature, setInspectionType, nbiRatings, setImportSummary, bumpLastModified]
   );
 
   // Retained fallback hook. The UI always triggers a real PDF import via
@@ -3963,6 +4097,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     reviewImportedSubComponent,
     structureNumber,
     setStructureNumber,
+    assetId,
+    setAssetId,
     teamLeader,
     setTeamLeader,
     teamMembers,

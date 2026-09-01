@@ -1,0 +1,835 @@
+{
+ "structureNumber": "180610008113133",
+ "elements": [
+  {
+   "elementId": "12",
+   "elementName": "Reinforced Concrete Deck",
+   "isDefect": false,
+   "environment": "3",
+   "totalQty": 15182,
+   "unit": "sq. ft",
+   "cs1": 15022,
+   "cs2": 160,
+   "cs3": 0,
+   "cs4": 0
+  },
+  {
+   "elementId": "12",
+   "elementName": "Delamination/Spall/Patched Area",
+   "isDefect": true,
+   "defectCode": "1080",
+   "environment": "3",
+   "totalQty": 10,
+   "unit": "sq. ft",
+   "cs1": 0,
+   "cs2": 10,
+   "cs3": 0,
+   "cs4": 0
+  },
+  {
+   "elementId": "12",
+   "elementName": "Efflorescence/Rust Staining",
+   "isDefect": true,
+   "defectCode": "1120",
+   "environment": "3",
+   "totalQty": 150,
+   "unit": "sq. ft",
+   "cs1": 0,
+   "cs2": 150,
+   "cs3": 0,
+   "cs4": 0
+  },
+  {
+   "elementId": "109",
+   "elementName": "Prestressed Concrete Open Girder/Beam",
+   "isDefect": false,
+   "environment": "3",
+   "totalQty": 2175,
+   "unit": "ft",
+   "cs1": 2152,
+   "cs2": 23,
+   "cs3": 0,
+   "cs4": 0
+  },
+  {
+   "elementId": "109",
+   "elementName": "Delamination/Spall/Patched Area",
+   "isDefect": true,
+   "defectCode": "1080",
+   "environment": "3",
+   "totalQty": 20,
+   "unit": "ft",
+   "cs1": 0,
+   "cs2": 20,
+   "cs3": 0,
+   "cs4": 0
+  },
+  {
+   "elementId": "109",
+   "elementName": "Exposed Rebar",
+   "isDefect": true,
+   "defectCode": "1090",
+   "environment": "3",
+   "totalQty": 3,
+   "unit": "ft",
+   "cs1": 0,
+   "cs2": 3,
+   "cs3": 0,
+   "cs4": 0
+  },
+  {
+   "elementId": "205",
+   "elementName": "Reinforced Concrete Column",
+   "isDefect": false,
+   "environment": "3",
+   "totalQty": 22,
+   "unit": "each",
+   "cs1": 11,
+   "cs2": 9,
+   "cs3": 2,
+   "cs4": 0
+  },
+  {
+   "elementId": "205",
+   "elementName": "Delamination/Spall/Patched Area",
+   "isDefect": true,
+   "defectCode": "1080",
+   "environment": "3",
+   "totalQty": 1,
+   "unit": "each",
+   "cs1": 0,
+   "cs2": 0,
+   "cs3": 1,
+   "cs4": 0
+  },
+  {
+   "elementId": "205",
+   "elementName": "Exposed Rebar",
+   "isDefect": true,
+   "defectCode": "1090",
+   "environment": "3",
+   "totalQty": 1,
+   "unit": "each",
+   "cs1": 0,
+   "cs2": 0,
+   "cs3": 1,
+   "cs4": 0
+  },
+  {
+   "elementId": "205",
+   "elementName": "Cracking (RC and Other)",
+   "isDefect": true,
+   "defectCode": "1130",
+   "environment": "3",
+   "totalQty": 9,
+   "unit": "each",
+   "cs1": 0,
+   "cs2": 9,
+   "cs3": 0,
+   "cs4": 0
+  },
+  {
+   "elementId": "215",
+   "elementName": "Reinforced Concrete Abutment",
+   "isDefect": false,
+   "environment": "3",
+   "totalQty": 125,
+   "unit": "ft",
+   "cs1": 98,
+   "cs2": 25,
+   "cs3": 2,
+   "cs4": 0
+  },
+  {
+   "elementId": "215",
+   "elementName": "Delamination/Spall/Patched Area",
+   "isDefect": true,
+   "defectCode": "1080",
+   "environment": "3",
+   "totalQty": 7,
+   "unit": "ft",
+   "cs1": 0,
+   "cs2": 5,
+   "cs3": 2,
+   "cs4": 0
+  },
+  {
+   "elementId": "215",
+   "elementName": "Efflorescence/Rust Staining",
+   "isDefect": true,
+   "defectCode": "1120",
+   "environment": "3",
+   "totalQty": 20,
+   "unit": "ft",
+   "cs1": 0,
+   "cs2": 20,
+   "cs3": 0,
+   "cs4": 0
+  },
+  {
+   "elementId": "234",
+   "elementName": "Reinforced Concrete Pier Cap",
+   "isDefect": false,
+   "environment": "3",
+   "totalQty": 338,
+   "unit": "ft",
+   "cs1": 324,
+   "cs2": 14,
+   "cs3": 0,
+   "cs4": 0
+  },
+  {
+   "elementId": "234",
+   "elementName": "Delamination/Spall/Patched Area",
+   "isDefect": true,
+   "defectCode": "1080",
+   "environment": "3",
+   "totalQty": 10,
+   "unit": "ft",
+   "cs1": 0,
+   "cs2": 10,
+   "cs3": 0,
+   "cs4": 0
+  },
+  {
+   "elementId": "234",
+   "elementName": "Exposed Rebar",
+   "isDefect": true,
+   "defectCode": "1090",
+   "environment": "3",
+   "totalQty": 4,
+   "unit": "ft",
+   "cs1": 0,
+   "cs2": 4,
+   "cs3": 0,
+   "cs4": 0
+  },
+  {
+   "elementId": "310",
+   "elementName": "Elastomeric Bearing",
+   "isDefect": false,
+   "environment": "3",
+   "totalQty": 70,
+   "unit": "each",
+   "cs1": 70,
+   "cs2": 0,
+   "cs3": 0,
+   "cs4": 0
+  },
+  {
+   "elementId": "331",
+   "elementName": "Reinforced Concrete Bridge Railing",
+   "isDefect": false,
+   "environment": "3",
+   "totalQty": 870,
+   "unit": "ft",
+   "cs1": 820,
+   "cs2": 50,
+   "cs3": 0,
+   "cs4": 0
+  },
+  {
+   "elementId": "331",
+   "elementName": "Cracking (RC and Other)",
+   "isDefect": true,
+   "defectCode": "1130",
+   "environment": "3",
+   "totalQty": 50,
+   "unit": "ft",
+   "cs1": 0,
+   "cs2": 50,
+   "cs3": 0,
+   "cs4": 0
+  }
+ ],
+ "nbi": [
+  {
+   "item": "58",
+   "componentName": "Deck - Component Rating",
+   "desc": "",
+   "min": "1",
+   "rating": "7",
+   "comment": "The deck underside exhibits isolated insignificant transverse cracks with isolated light efflorescence and isolated minor honeycombing. Deck overhang soffits exhibit minor spalls at bents and at the southwest bridge corner. Spans have shifted laterally up to 1/2\" along joints."
+  },
+  {
+   "item": "58",
+   "componentName": "Wearing Surface",
+   "desc": "~2\" Asphalt",
+   "min": "6",
+   "rating": "7",
+   "comment": "Asphalt wearing surface has minor to moderate wear. The asphalt wearing surface exhibits up to 1/8\" wide transverse cracks and isolated up to 6\" wide by full depth potholes over the full width of the bridge at deck joints."
+  },
+  {
+   "item": "58",
+   "componentName": "Surfacing Thickness:",
+   "desc": "",
+   "min": "",
+   "rating": "2",
+   "comment": "inches Fill Height:  inches"
+  },
+  {
+   "item": "58",
+   "componentName": "Joints, Expansion, Open",
+   "desc": "",
+   "min": "6",
+   "rating": "N",
+   "comment": "Deck joints are paved over. Visible portions of the deck joints have missing"
+  },
+  {
+   "item": "58",
+   "componentName": "Joints, Expansion, Sealed",
+   "desc": "",
+   "min": "6",
+   "rating": "7",
+   "comment": "seals."
+  },
+  {
+   "item": "58",
+   "componentName": "Joints, Other",
+   "desc": "",
+   "min": "6",
+   "rating": "N",
+   "comment": ""
+  },
+  {
+   "item": "58",
+   "componentName": "Drainage System",
+   "desc": "",
+   "min": "6",
+   "rating": "8",
+   "comment": ""
+  },
+  {
+   "item": "58",
+   "componentName": "Curbs, Sidewalk & Parapets",
+   "desc": "",
+   "min": "6",
+   "rating": "N",
+   "comment": ""
+  },
+  {
+   "item": "58",
+   "componentName": "Median Barrier",
+   "desc": "",
+   "min": "6",
+   "rating": "N",
+   "comment": "Concrete bridge railings have medium (<1/32\" wide) transverse cracks."
+  },
+  {
+   "item": "58",
+   "componentName": "Railings",
+   "desc": "",
+   "min": "6",
+   "rating": "7",
+   "comment": "Railing Type:  SSTR"
+  },
+  {
+   "item": "58",
+   "componentName": "Railing Protective Coating",
+   "desc": "",
+   "min": "7",
+   "rating": "N",
+   "comment": ""
+  },
+  {
+   "item": "58",
+   "componentName": "Delineation",
+   "desc": "",
+   "min": "7",
+   "rating": "N",
+   "comment": ""
+  },
+  {
+   "item": "58",
+   "componentName": "Other",
+   "desc": "",
+   "min": "-",
+   "rating": "N",
+   "comment": ""
+  },
+  {
+   "item": "59",
+   "componentName": "Main Members - Steel",
+   "desc": "",
+   "min": "0",
+   "rating": "N",
+   "comment": ""
+  },
+  {
+   "item": "59",
+   "componentName": "Main Members - Concrete",
+   "desc": "",
+   "min": "0",
+   "rating": "7",
+   "comment": "Beam ends exhibit isolated minor spalls, some with exposed reinforcement."
+  },
+  {
+   "item": "59",
+   "componentName": "Main Members - Timber",
+   "desc": "",
+   "min": "0",
+   "rating": "N",
+   "comment": ""
+  },
+  {
+   "item": "59",
+   "componentName": "Main Members - Connections",
+   "desc": "",
+   "min": "0",
+   "rating": "N",
+   "comment": ""
+  },
+  {
+   "item": "59",
+   "componentName": "Floor System Members",
+   "desc": "",
+   "min": "1",
+   "rating": "N",
+   "comment": ""
+  },
+  {
+   "item": "59",
+   "componentName": "Floor System Connections",
+   "desc": "",
+   "min": "1",
+   "rating": "N",
+   "comment": ""
+  },
+  {
+   "item": "59",
+   "componentName": "Secondary Members",
+   "desc": "",
+   "min": "5",
+   "rating": "8",
+   "comment": ""
+  },
+  {
+   "item": "59",
+   "componentName": "Secondary Mem. Connections",
+   "desc": "",
+   "min": "5",
+   "rating": "7",
+   "comment": "Nuts are missing at multiple diaphragm connections."
+  },
+  {
+   "item": "59",
+   "componentName": "Expansion Bearings",
+   "desc": "",
+   "min": "6",
+   "rating": "8",
+   "comment": ""
+  },
+  {
+   "item": "59",
+   "componentName": "Fixed Bearings",
+   "desc": "",
+   "min": "6",
+   "rating": "8",
+   "comment": ""
+  },
+  {
+   "item": "59",
+   "componentName": "Steel Protective Coating",
+   "desc": "",
+   "min": "6",
+   "rating": "N",
+   "comment": ""
+  },
+  {
+   "item": "59",
+   "componentName": "Overall Component Rating",
+   "desc": "",
+   "min": "",
+   "rating": "7",
+   "comment": ""
+  },
+  {
+   "item": "60",
+   "componentName": "Abutment Caps",
+   "desc": "",
+   "min": "0",
+   "rating": "7",
+   "comment": "Abutment caps exhibit isolated insignificant vertical cracks and minor delaminations. There is a full width by 18\" high by 6\" deep spall in the west end of the Abutment 8 cap, and a similar, but less significant, spall is present in the west end of the Abutment 1 cap."
+  },
+  {
+   "item": "60",
+   "componentName": "Above Ground",
+   "desc": "",
+   "min": "0",
+   "rating": "N",
+   "comment": ""
+  },
+  {
+   "item": "60",
+   "componentName": "Below Ground or Foundation",
+   "desc": "",
+   "min": "0",
+   "rating": "8",
+   "comment": ""
+  },
+  {
+   "item": "60",
+   "componentName": "Backwalls & Wingwalls",
+   "desc": "",
+   "min": "0",
+   "rating": "6",
+   "comment": "Backwalls exhibit insignificant to medium (<1/32\" wide) vertical and diagonal cracks, some with light efflorescence. The backwalls also have several up to 1/8\" wide vertical and diagonal cracks with light to moderate efflorescence and light rust staining, and minor to moderate delaminations at the wingwall connections. The wingwalls exhibit insignificant diagonal cracks with light efflorescence. Intermediate Supports:"
+  },
+  {
+   "item": "60",
+   "componentName": "Caps - Concrete",
+   "desc": "",
+   "min": "-",
+   "rating": "7",
+   "comment": "Bent caps exhibit isolated insignificant flexural cracks near midspan between columns and isolated minor delaminations and spalls with exposed reinforcement."
+  },
+  {
+   "item": "60",
+   "componentName": "Caps - Steel",
+   "desc": "",
+   "min": "-",
+   "rating": "N",
+   "comment": ""
+  },
+  {
+   "item": "60",
+   "componentName": "Caps - Timber",
+   "desc": "",
+   "min": "-",
+   "rating": "N",
+   "comment": ""
+  },
+  {
+   "item": "60",
+   "componentName": "Above Ground - Concrete",
+   "desc": "",
+   "min": "-",
+   "rating": "7",
+   "comment": "Columns at Bents 2, 3, 4, and 7 exhibit isolated insignificant to medium (<1/32\" wide) horizontal cracks. Column 4 at Bent 5 exhibits minor honeycombing and a moderate (15\" wide by 12\" high by 1 1/2\" deep) honeycomb/spall with exposed and corroded reinforcement near the base. Column 2 at Bent 6 exhibits a 30\" wide by 6\" high by 1\" deep spall with exposed reinforcement at the top."
+  },
+  {
+   "item": "60",
+   "componentName": "Above Ground - Steel",
+   "desc": "",
+   "min": "-",
+   "rating": "N",
+   "comment": ""
+  },
+  {
+   "item": "60",
+   "componentName": "Above Ground - Timber",
+   "desc": "",
+   "min": "-",
+   "rating": "N",
+   "comment": ""
+  },
+  {
+   "item": "60",
+   "componentName": "Above Ground - Masonry",
+   "desc": "",
+   "min": "-",
+   "rating": "N",
+   "comment": ""
+  },
+  {
+   "item": "60",
+   "componentName": "Collision Protection System",
+   "desc": "",
+   "min": "5",
+   "rating": "N",
+   "comment": ""
+  },
+  {
+   "item": "60",
+   "componentName": "Steel Protective Coating",
+   "desc": "",
+   "min": "6",
+   "rating": "N",
+   "comment": ""
+  },
+  {
+   "item": "60",
+   "componentName": "Overall Component Rating",
+   "desc": "",
+   "min": "",
+   "rating": "6",
+   "comment": ""
+  },
+  {
+   "item": "61",
+   "componentName": "Channel Banks",
+   "desc": "",
+   "min": "0",
+   "rating": "N",
+   "comment": ""
+  },
+  {
+   "item": "61",
+   "componentName": "Channel Bed",
+   "desc": "",
+   "min": "0",
+   "rating": "N",
+   "comment": ""
+  },
+  {
+   "item": "61",
+   "componentName": "Rip Rap, Toe Walls & Apron",
+   "desc": "",
+   "min": "5",
+   "rating": "N",
+   "comment": ""
+  },
+  {
+   "item": "61",
+   "componentName": "Dikes",
+   "desc": "",
+   "min": "5",
+   "rating": "N",
+   "comment": ""
+  },
+  {
+   "item": "61",
+   "componentName": "Jetties",
+   "desc": "",
+   "min": "5",
+   "rating": "N",
+   "comment": ""
+  },
+  {
+   "item": "61",
+   "componentName": "Overall Component Rating",
+   "desc": "",
+   "min": "",
+   "rating": "N",
+   "comment": ""
+  },
+  {
+   "item": "61",
+   "componentName": "Top Slabs",
+   "desc": "",
+   "min": "0",
+   "rating": "N",
+   "comment": ""
+  },
+  {
+   "item": "61",
+   "componentName": "Bottom Slab or Footing",
+   "desc": "",
+   "min": "0",
+   "rating": "N",
+   "comment": ""
+  },
+  {
+   "item": "61",
+   "componentName": "Abutments, Intermed. Supports",
+   "desc": "",
+   "min": "0",
+   "rating": "N",
+   "comment": ""
+  },
+  {
+   "item": "61",
+   "componentName": "Headwalls & WingWalls",
+   "desc": "",
+   "min": "5",
+   "rating": "N",
+   "comment": ""
+  },
+  {
+   "item": "65",
+   "componentName": "Embankments",
+   "desc": "",
+   "min": "0",
+   "rating": "7",
+   "comment": "The edges of the concrete rip rap are exposed up to 6\" high and the rip rap have settled up to 6\" along the wingwalls."
+  },
+  {
+   "item": "65",
+   "componentName": "Embankment Retaining Walls",
+   "desc": "",
+   "min": "4",
+   "rating": "N",
+   "comment": ""
+  },
+  {
+   "item": "65",
+   "componentName": "Slope Protection",
+   "desc": "",
+   "min": "5",
+   "rating": "7",
+   "comment": "See Embankments comment. The rip rap slopes exhibit up to 1/16\" wide random cracks, minor spalls, and minor settlement along joints. There are several up to 3' long fractured portions of the rip rap curbs."
+  },
+  {
+   "item": "65",
+   "componentName": "Roadway",
+   "desc": "",
+   "min": "5",
+   "rating": "7",
+   "comment": "Asphalt approach roadways have minor to moderate wear. Up to 1/8\" wide by full width transverse cracks are present in the asphalt approach roadways at the relief joints."
+  },
+  {
+   "item": "65",
+   "componentName": "Relief Joints",
+   "desc": "",
+   "min": "6",
+   "rating": "8",
+   "comment": ""
+  },
+  {
+   "item": "65",
+   "componentName": "Drainage",
+   "desc": "",
+   "min": "6",
+   "rating": "8",
+   "comment": ""
+  },
+  {
+   "item": "65",
+   "componentName": "Guardfence",
+   "desc": "",
+   "min": "6",
+   "rating": "7",
+   "comment": "The northeast corner approach guardfence has minor impact damage at the transition."
+  },
+  {
+   "item": "65",
+   "componentName": "Delineation",
+   "desc": "",
+   "min": "7",
+   "rating": "8",
+   "comment": ""
+  },
+  {
+   "item": "65",
+   "componentName": "Sight Distance",
+   "desc": "",
+   "min": "7",
+   "rating": "8",
+   "comment": ""
+  },
+  {
+   "item": "65",
+   "componentName": "Overall Component Rating",
+   "desc": "",
+   "min": "",
+   "rating": "7",
+   "comment": ""
+  },
+  {
+   "item": "65",
+   "componentName": "Signs",
+   "desc": "",
+   "min": "N",
+   "rating": "N",
+   "comment": ""
+  },
+  {
+   "item": "65",
+   "componentName": "Illumination",
+   "desc": "",
+   "min": "N",
+   "rating": "N",
+   "comment": ""
+  },
+  {
+   "item": "65",
+   "componentName": "Warning Devices",
+   "desc": "",
+   "min": "N",
+   "rating": "N",
+   "comment": ""
+  },
+  {
+   "item": "65",
+   "componentName": "Utility Lines",
+   "desc": "",
+   "min": "7",
+   "rating": "N",
+   "comment": ""
+  },
+  {
+   "item": "36",
+   "componentName": "Bridge Rails",
+   "desc": "",
+   "min": "",
+   "rating": "1",
+   "comment": "SSTR"
+  },
+  {
+   "item": "36",
+   "componentName": "Transitions",
+   "desc": "",
+   "min": "",
+   "rating": "1",
+   "comment": "Thrie Beam"
+  },
+  {
+   "item": "71",
+   "componentName": "Appr. Rails:",
+   "desc": "",
+   "min": "",
+   "rating": "1",
+   "comment": "MBGF"
+  },
+  {
+   "item": "71",
+   "componentName": "Appr. Rail Ends:",
+   "desc": "",
+   "min": "",
+   "rating": "1",
+   "comment": "Continuous"
+  },
+  {
+   "item": "72",
+   "componentName": "84.446",
+   "desc": "",
+   "min": "",
+   "rating": "1",
+   "comment": "- On System  -97.16439765 Milepoint  System  Longitude General Description: 7 simple span prestressed concrete I-beam bridge on concrete supports (variable skew) 435  34.9 Bridge Length (ft.)  Deck Width (ft.) 99  32.5 Skew Angle (degrees)  Clear Width Between (ft.) Left Forward Right / Left Forward  Measurement Feature  Rails"
+  },
+  {
+   "item": "72",
+   "componentName": "Type Prestressed Concrete Beams  Size Type C",
+   "desc": "",
+   "min": "",
+   "rating": "N",
+   "comment": "umber 5 Spacing See Plans  Controlling Span Length (C-C bearings)  75.8 Spans 4 Superstructure: Major Approach:"
+  },
+  {
+   "item": "72",
+   "componentName": "Type  Size",
+   "desc": "",
+   "min": "",
+   "rating": "N",
+   "comment": "umber Spacing  Controlling Span Length (C-C bearings) Estimated Deck Overtopping Frequency  Comments: Estimated Approach Overtopping Frequency Horizontal / Vertical Alignment  Good  / Good Regulatory / Advisory Speeds  70 mph / 70 mph Year Built 1970  Year(s) Widened"
+  },
+  {
+   "item": "72",
+   "componentName": "Posted Load Restriction",
+   "desc": "",
+   "min": "",
+   "rating": "N",
+   "comment": "NN  No Restriction"
+  },
+  {
+   "item": "72",
+   "componentName": "Design Load",
+   "desc": "",
+   "min": "",
+   "rating": "5",
+   "comment": "- HS 20 (Also used for plans with MS 18 and H 20-S16) Design Method LFD"
+  }
+ ],
+ "isSnbi": false,
+ "agency": "TXDOT",
+ "underclearance": {
+  "district": "",
+  "county": "",
+  "controlSection": "",
+  "structureNumber": "",
+  "route": "",
+  "featureCrossed": "",
+  "inspectionDate": "",
+  "entries": []
+ }
+}

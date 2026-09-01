@@ -375,10 +375,18 @@ export default function SummaryScreen() {
                 />
                 <Text style={[styles.auditLineText, { color: c.foreground }]}>
                   {importSummary.structureNumberFound
-                    ? `Structure ${importSummary.structureNumber}`
+                    ? `Structure ${importSummary.structureNumber}${importSummary.assetId ? ` · Asset ID ${importSummary.assetId}` : ""}`
                     : "Structure number not found — enter manually"}
                 </Text>
               </View>
+              {(importSummary.taggedDefectRecords ?? 0) > 0 && (
+                <View style={[styles.auditLine, { borderColor: c.border }]}>
+                  <Feather name="check-circle" size={14} color="#059669" />
+                  <Text style={[styles.auditLineText, { color: c.foreground }]}>
+                    {importSummary.taggedDefectRecords} record(s) itemised from element notes with location and size
+                  </Text>
+                </View>
+              )}
 
               {/* NBI section breakdown */}
               <Text style={[styles.auditSectionTitle, { color: c.mutedForeground }]}>
@@ -441,6 +449,23 @@ export default function SummaryScreen() {
                   {importSummary.unmatchedComponents.map((name, idx) => (
                     <Text key={idx} style={[styles.calloutItem, { color: "#92400e" }]}>
                       {name}
+                    </Text>
+                  ))}
+                </View>
+              )}
+
+              {/* Parser notes: roll-up mismatches, ambiguous values, unattributed captions */}
+              {(importSummary.warnings?.length ?? 0) > 0 && (
+                <View style={styles.calloutNeutral}>
+                  <View style={styles.calloutHeader}>
+                    <Feather name="info" size={13} color="#92400e" />
+                    <Text style={[styles.calloutTitle, { color: "#92400e" }]}>
+                      {importSummary.warnings!.length} parser note(s) — check against the source report
+                    </Text>
+                  </View>
+                  {importSummary.warnings!.map((note, idx) => (
+                    <Text key={idx} style={[styles.calloutItem, { color: "#92400e" }]}>
+                      {note}
                     </Text>
                   ))}
                 </View>

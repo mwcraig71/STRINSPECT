@@ -1,5 +1,12 @@
 import { Platform } from "react-native";
 import { extractPdfTextNative } from "../components/pdfExtractorBridge";
+import {
+  isScdotReport,
+  parseScdotReport,
+  splitCodedValue,
+  type ParsedScdotReport,
+  type ScdotElementRow,
+} from "./scdotParser";
 
 // PDF text extraction runs in a real browser, never in Hermes.
 //   - Web (Expo web): pdf.js runs directly in the browser (loadPdfTextWeb).
@@ -52,6 +59,8 @@ export interface ParsedNbiEntry {
 
 export interface ParsedReport {
   structureNumber: string;
+  /** Agency asset identifier when it differs from the NBI structure number (SCDOT "Asset ID"). */
+  assetId?: string;
   elements: ParsedElementRow[];
   nbi: ParsedNbiEntry[];
   isSnbi: boolean;
@@ -59,6 +68,10 @@ export interface ParsedReport {
   inspectionType?: "Underwater";
   underclearance?: ParsedUnderclearance;
   channelCrossSection?: ParsedChannelCrossSection;
+  /** Full SCDOT (BrM) report breakdown; present only for SCDOT reports. */
+  scdot?: ParsedScdotReport;
+  /** Parser notes worth showing in the import audit (roll-up mismatches, ambiguous values, …). */
+  warnings: string[];
 }
 
 // ─── Shared form header (District, County, Control-Section, Structure #, Route, Feature Crossed, Date) ─────
@@ -1384,11 +1397,186 @@ export function parseChannelMeasurementReport(
   };
 }
 
+// ─── SCDOT (BrM) adapter ─────────────────────────────────────────────────────
+// Maps the SCDOT-specific breakdown onto the agency-neutral ParsedReport shape
+// consumed by importFromPdf. Details that have no neutral home stay on
+// ParsedReport.scdot.
+
+/** Element rows in the shape importFromPdf expects: defect rows point at their parent element. */
+export function scdotElementsToRows(elements: ScdotElementRow[]): ParsedElementRow[] {
+  const rows: ParsedElementRow[] = [];
+  let parentId = "";
+  for (const e of elements) {
+    if (!e.isDefect) parentId = e.elementId;
+    rows.push({
+      elementId: e.isDefect ? parentId : e.elementId,
+      elementName: e.name,
+      isDefect: e.isDefect,
+      defectCode: e.isDefect ? e.elementId : undefined,
+      environment: e.environment,
+      totalQty: e.totalQty,
+      unit: e.unit,
+      cs1: e.cs[0],
+      cs2: e.cs[1],
+      cs3: e.cs[2],
+      cs4: e.cs[3],
+    });
+  }
+  return rows;
+}
+
+// SCDOT condition fields → universal SNBI (B.C.01–B.C.11) sub-components.
+// The app keeps one "Overall Component Rating" row per B.C. item plus a few
+// named sub-components; only fields with an unambiguous home are mapped.
+const SCDOT_CONDITION_FIELDS: { item: string; component: string; field: string }[] = [
+  { item: "BC01", component: "Overall Component Rating", field: "058" },
+  { item: "BC02", component: "Overall Component Rating", field: "059" },
+  { item: "BC03", component: "Overall Component Rating", field: "060" },
+  { item: "BC04", component: "Overall Component Rating", field: "062" },
+  { item: "BC05", component: "Overall Component Rating", field: "602" },
+  { item: "BC06", component: "Overall Component Rating", field: "603" },
+  { item: "BC07", component: "Overall Component Rating", field: "604" },
+  { item: "BC08", component: "Overall Component Rating", field: "605" },
+  { item: "BC09", component: "Overall Component Rating", field: "061" },
+  { item: "BC09", component: "Rip Rap, Toe Walls & Apron", field: "601" }, // (601) Channel Protection Condition
+  { item: "BC10", component: "Scour Vulnerability Assessment", field: "113" }, // (113) Scour Condition
+  { item: "BC10", component: "Underwater Inspection", field: "600" }, // (600) UW Substructure Condition
+  { item: "BC10", component: "Overall Component Rating", field: "631" }, // (631) Scour Condition Rating
+  { item: "BC11", component: "Bridge Railing", field: "36A" },
+  { item: "BC06", component: "Transition Railings", field: "36B" },
+  { item: "BC11", component: "End Treatments", field: "36D" },
+];
+
+// Section 4 headings → sub-component whose previousComments should carry the text.
+function scdotSectionTargets(hasCulvert: boolean): { heading: string; item: string; component: string }[] {
+  return [
+    { heading: "Traffic Signs", item: "BC01", component: "Delineation" },
+    { heading: "Drainage System", item: "BC01", component: "Drainage System" },
+    { heading: "Curbs and Sidewalks", item: hasCulvert ? "BC04" : "BC01", component: hasCulvert ? "Headwalls & WingWalls" : "Curbs & Sidewalks" },
+    { heading: "Wingwalls", item: hasCulvert ? "BC04" : "BC03", component: hasCulvert ? "Headwalls & WingWalls" : "Backwalls & WingWalls" },
+    { heading: "Median and Other Barriers", item: "BC05", component: "Median Barrier" },
+    { heading: "Diaphragms", item: "BC02", component: "Secondary Members" },
+    { heading: "Fender System", item: "BC03", component: "Collision Protection System" },
+    { heading: "Waterway and Channel", item: "BC09", component: "Overall Component Rating" },
+  ];
+}
+
+/** Condition ratings + Section 4 notes as ParsedNbiEntry rows for the universal SNBI form. */
+export function scdotConditionEntries(report: ParsedScdotReport): ParsedNbiEntry[] {
+  const entries = new Map<string, ParsedNbiEntry>();
+  const key = (item: string, component: string) => `${item}|${component}`;
+  const get = (item: string, component: string) => {
+    const k = key(item, component);
+    if (!entries.has(k)) entries.set(k, { item, componentName: component, desc: "", min: "", rating: "", comment: "" });
+    return entries.get(k)!;
+  };
+
+  for (const m of SCDOT_CONDITION_FIELDS) {
+    const value = report.fields[m.field]?.value ?? "";
+    if (!value) continue;
+    const { code, text } = splitCodedValue(value);
+    const e = get(m.item, m.component);
+    e.rating = code;
+    e.desc = text;
+  }
+
+  const hasCulvert = report.elements.some((e) => !e.isDefect && /^24[0-5]$/.test(e.elementId));
+  for (const t of scdotSectionTargets(hasCulvert)) {
+    const lines = (report.sectionNotes[t.heading] || []).filter((l) => l.trim() && l.trim() !== "N/A");
+    if (lines.length === 0) continue;
+    const e = get(t.item, t.component);
+    e.comment = e.comment ? `${e.comment} ${lines.join(" ")}` : lines.join(" ");
+  }
+  // The "Scour:" sub-block of Waterway and Channel is the scour narrative.
+  const waterway = report.sectionNotes["Waterway and Channel"] || [];
+  const scourIdx = waterway.findIndex((l) => /^Scour:?$/i.test(l.trim()));
+  if (scourIdx >= 0) {
+    const scourLines = waterway.slice(scourIdx + 1).filter((l) => /^-\s/.test(l) || !/:$/.test(l));
+    const stop = scourLines.findIndex((l) => /:$/.test(l));
+    const text = (stop >= 0 ? scourLines.slice(0, stop) : scourLines).join(" ").trim();
+    if (text) {
+      const e = get("BC10", "Scour Vulnerability Assessment");
+      e.comment = e.comment ? `${e.comment} ${text}` : text;
+    }
+  }
+
+  return Array.from(entries.values()).filter((e) => e.rating || e.desc || e.comment);
+}
+
+/** Streambed cross sections → ChannelData shape (inlet = upstream, outlet = downstream). */
+export function scdotStreambedToChannel(report: ParsedScdotReport): ParsedChannelCrossSection | undefined {
+  const sections = report.streambed.filter((s) => s.rows.length > 0);
+  if (sections.length === 0) return undefined;
+  const isOutlet = (s: (typeof sections)[number]) => /outlet|down|right/i.test(`${s.offsetRemark} ${s.orientation}`);
+  const upstreamSec = sections.find((s) => !isOutlet(s)) ?? sections[0];
+  const downstreamSec = sections.find((s) => isOutlet(s) && s !== upstreamSec);
+  const toRows = (s: (typeof sections)[number]) =>
+    s.rows.map((r) => ({
+      topRef: s.bmLocation || "",
+      botRef: "",
+      // "1 + 5.0" → offset along the section in feet; the leading number is the section index.
+      totalHoriz: r.station.replace(/^\d+\s*\+\s*/, ""),
+      distFromLastBent: "",
+      vertDist: r.elevation,
+      notes: r.remark,
+    }));
+  const describe = (s: (typeof sections)[number]) =>
+    [
+      s.offsetRemark && `${s.offsetRemark}`,
+      s.waterSurface && `Water Surface ${s.waterSurface}`,
+      s.offset && `Offset ${s.offset}`,
+      s.elevBasis && `Elev Basis ${s.elevBasis}`,
+      s.soundingDate && `Sounded ${s.soundingDate}`,
+    ]
+      .filter(Boolean)
+      .join(", ");
+  return {
+    district: report.header.district,
+    county: report.header.county,
+    controlSection: "",
+    structureNumber: report.header.structureNumber,
+    route: report.header.facilityCarried,
+    featureCrossed: report.header.featureIntersected,
+    inspectionDate: report.header.inspectionDate,
+    upstream: toRows(upstreamSec),
+    downstream: downstreamSec ? toRows(downstreamSec) : [],
+    comments: [describe(upstreamSec), downstreamSec && describe(downstreamSec)].filter(Boolean).join(" | ") || undefined,
+  };
+}
+
+function parseScdotPages(pages: string[][]): ParsedReport {
+  const scdot = parseScdotReport(pages);
+  const inspectionType = /\bUnderwater\b/i.test(scdot.header.inspectionTypes) ? "Underwater" : undefined;
+  return {
+    structureNumber: scdot.header.structureNumber || parseStructureNumber(pages),
+    assetId: scdot.header.assetId || undefined,
+    elements: scdotElementsToRows(scdot.elements),
+    nbi: scdotConditionEntries(scdot),
+    isSnbi: true,
+    agency: "SCDOT",
+    inspectionType,
+    underclearance: undefined,
+    channelCrossSection: scdotStreambedToChannel(scdot),
+    scdot,
+    warnings: scdot.warnings,
+  };
+}
+
 // ─── Top-level report parser ──────────────────────────────────────────────────
 
 export async function parseReport(source: PdfSource): Promise<ParsedReport> {
   const pages = await loadPdfText(source);
-  const reportText = pages.join("\n");
+  return parsePages(pages);
+}
+
+// Pure entry point: turn already-extracted page lines into a ParsedReport.
+// Exported so the parsers can be unit-tested against fixture text without
+// pdf.js or a WebView.
+export function parsePages(pages: string[][]): ParsedReport {
+  if (isScdotReport(pages)) return parseScdotPages(pages);
+  // Join lines, not pages: joining the page arrays directly would stringify each
+  // page with commas and let the line-anchored regexes below span a whole page.
+  const reportText = pages.flat().join("\n");
   const agency =
     /\bSCDOT\b|SOUTH\s+CAROLINA\s+DEPARTMENT\s+OF\s+TRANSPORTATION/i.test(reportText)
       ? "SCDOT"
@@ -1408,5 +1596,5 @@ export async function parseReport(source: PdfSource): Promise<ParsedReport> {
     parseChannelCrossSection(pages) ??
     parseChannelMeasurementReport(pages) ??
     undefined;
-  return { structureNumber, elements, nbi, isSnbi, agency, inspectionType, underclearance, channelCrossSection };
+  return { structureNumber, elements, nbi, isSnbi, agency, inspectionType, underclearance, channelCrossSection, warnings: [] };
 }
