@@ -5,7 +5,7 @@ import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import { SymbolView } from "expo-symbols";
 import { Feather } from "@expo/vector-icons";
 import React from "react";
-import { Platform, StyleSheet, Text, View, useColorScheme } from "react-native";
+import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
 import { InspectionProvider, useInspection } from "@/context/InspectionContext";
@@ -29,16 +29,7 @@ function NativeTabLayout({ missingPhotoCount }: { missingPhotoCount: number }) {
         <Label>Ratings</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="photos">
-        <View style={nativeBadgeStyles.iconWrap}>
-          <Icon sf={{ default: "camera", selected: "camera.fill" }} />
-          {missingPhotoCount > 0 && (
-            <View style={nativeBadgeStyles.badge}>
-              <Text style={nativeBadgeStyles.badgeText}>
-                {missingPhotoCount > 99 ? "99+" : missingPhotoCount}
-              </Text>
-            </View>
-          )}
-        </View>
+        <Icon sf={{ default: "photo", selected: "photo.fill" }} />
         <Label>Photos</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="summary">
@@ -48,24 +39,6 @@ function NativeTabLayout({ missingPhotoCount }: { missingPhotoCount: number }) {
     </NativeTabs>
   );
 }
-
-const nativeBadgeStyles = StyleSheet.create({
-  iconWrap: { position: "relative", alignItems: "center", justifyContent: "center" },
-  badge: {
-    position: "absolute",
-    top: -4,
-    right: -8,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: "#f59e0b",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 3,
-  },
-  badgeText: { color: "#fff", fontSize: 9, fontWeight: "700", lineHeight: 13 },
-});
-
 
 function ClassicTabLayoutWithSync({ pendingCount, missingPhotoCount }: { pendingCount: number; missingPhotoCount: number }) {
   const colors = useColors();
@@ -144,9 +117,9 @@ function ClassicTabLayoutWithSync({ pendingCount, missingPhotoCount }: { pending
           tabBarBadgeStyle: { backgroundColor: "#f59e0b", fontSize: 10 },
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="camera" tintColor={color} size={22} />
+              <SymbolView name="photo" tintColor={color} size={22} />
             ) : (
-              <Feather name="camera" size={21} color={color} />
+              <Feather name="image" size={21} color={color} />
             ),
         }}
       />
