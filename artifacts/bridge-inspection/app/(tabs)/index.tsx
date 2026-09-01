@@ -315,11 +315,13 @@ export default function InspectionScreen() {
   }, [elementSearch, elementZoneFilter]);
   const displayedElements = editingShortlist ? shortlistElements : filteredElements;
 
-  const applyConditionStateToLoggedDefects = (state: ConditionState) => {
+  const applyConditionQuantitiesToLoggedDefects = () => {
     if (!element) return;
-    const value = conditionQuantities[state]?.trim();
-    if (!value || (parseFloat(value) || 0) <= 0) {
-      Alert.alert("Enter a Quantity", `Enter a ${state} quantity before applying it.`);
+    const values = (["CS1", "CS2", "CS3", "CS4"] as ConditionState[])
+      .map((state) => ({ state, value: conditionQuantities[state]?.trim() || "" }))
+      .filter(({ value }) => value && (parseFloat(value) || 0) > 0);
+    if (values.length === 0) {
+      Alert.alert("Enter a Quantity", "Enter at least one condition quantity before applying it.");
       return;
     }
     const matches = savedDefects.filter(
@@ -332,7 +334,8 @@ export default function InspectionScreen() {
     const apply = () => {
       setSavedDefects(savedDefects.map((record) => {
         if (record.location !== currentLocation || record.elementId !== element.id) return record;
-        const nextQuantities = { ...getConditionQuantities(record), [state]: value };
+        const nextQuantities = { ...getConditionQuantities(record) };
+        for (const { state, value } of values) nextQuantities[state] = value;
         const total = (["CS1", "CS2", "CS3", "CS4"] as ConditionState[])
           .reduce((sum, key) => sum + (parseFloat(nextQuantities[key] || "") || 0), 0);
         const previousTotal = getTotalConditionQuantity(record);
@@ -353,11 +356,12 @@ export default function InspectionScreen() {
         };
       }));
     };
-    const message = `Apply ${state} = ${value} to ${matches.length} logged defect${matches.length === 1 ? "" : "s"} for this element at ${currentLocation}?`;
+    const appliedValues = values.map(({ state, value }) => `${state} = ${value}`).join(", ");
+    const message = `Apply ${appliedValues} to ${matches.length} logged defect${matches.length === 1 ? "" : "s"} for this element at ${currentLocation}?`;
     if (Platform.OS === "web") {
       if (typeof window !== "undefined" && window.confirm(message)) apply();
     } else {
-      Alert.alert("Bulk Apply Condition State", message, [
+      Alert.alert("Apply Quantities to Matching Defects", message, [
         { text: "Cancel", style: "cancel" },
         { text: "Apply", onPress: apply },
       ]);
@@ -993,14 +997,6 @@ export default function InspectionScreen() {
                     placeholderTextColor={c.mutedForeground}
                     accessibilityLabel={`${cs} quantity`}
                   />
-                  <TouchableOpacity
-                    style={[styles.bulkApplyBtn, { borderColor: CS_COLORS[cs] }]}
-                    onPress={() => applyConditionStateToLoggedDefects(cs)}
-                    accessibilityLabel={`Apply ${cs} quantity to logged defects for this element and location`}
-                  >
-                    <Feather name="copy" size={10} color={CS_COLORS[cs]} />
-                    <Text style={[styles.bulkApplyText, { color: CS_COLORS[cs] }]}>Apply</Text>
-                  </TouchableOpacity>
                 </View>
               ))}
             </View>
@@ -1015,22 +1011,25 @@ export default function InspectionScreen() {
                   placeholderTextColor={c.mutedForeground}
                   accessibilityLabel="CS1 quantity"
                 />
-                <TouchableOpacity
-                  style={[styles.bulkApplyBtn, { borderColor: CS_COLORS.CS1, paddingHorizontal: 8 }]}
-                  onPress={() => applyConditionStateToLoggedDefects("CS1")}
-                  accessibilityLabel="Apply CS1 quantity to logged defects for this element and location"
-                >
-                  <Feather name="copy" size={10} color={CS_COLORS.CS1} />
-                  <Text style={[styles.bulkApplyText, { color: CS_COLORS.CS1 }]}>Apply</Text>
-                </TouchableOpacity>
               </View>
           </View>
+          <TouchableOpacity
+            style={[styles.bulkApplyAllBtn, { backgroundColor: c.secondary, borderColor: c.border }]}
+            onPress={applyConditionQuantitiesToLoggedDefects}
+            accessibilityRole="button"
+            accessibilityLabel="Apply quantities to matching logged defects"
+          >
+            <Feather name="copy" size={14} color={c.primary} />
+            <Text style={[styles.bulkApplyAllText, { color: c.primary }]}>
+              Apply quantities to matching logged defects
+            </Text>
+          </TouchableOpacity>
 
           {/* Maintenance Qty */}
           <View style={styles.twoCol}>
             <View style={styles.colLeft}>
               <Text style={[styles.matrixHint, { color: c.mutedForeground }]}>
-                Enter one or more states. Apply copies a column to existing defects on this element at this location.
+                Enter quantities for this defect. Save Defect records them here; the secondary action above is only for bulk-editing matching logged defects.
               </Text>
             </View>
             <View style={styles.colRight}>
@@ -1593,8 +1592,8 @@ const styles = StyleSheet.create({
   csMatrixHeader: { borderRadius: 6, paddingVertical: 4, alignItems: "center" },
   csMatrixHeaderText: { color: "#fff", fontSize: 11, fontWeight: "900" },
   csMatrixInput: { borderWidth: 1.5, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 6, textAlign: "center", fontSize: 14, fontWeight: "800" },
-  bulkApplyBtn: { borderWidth: 1, borderRadius: 6, paddingVertical: 4, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 3 },
-  bulkApplyText: { fontSize: 9, fontWeight: "800", textTransform: "uppercase" },
+  bulkApplyAllBtn: { borderWidth: 1, borderRadius: 8, paddingVertical: 9, paddingHorizontal: 10, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 7 },
+  bulkApplyAllText: { fontSize: 11, fontWeight: "800" },
   legacyCs1Row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, paddingTop: 4 },
   legacyCs1Input: { width: 90, borderWidth: 1, borderRadius: 8, padding: 7, textAlign: "center", fontWeight: "800" },
   matrixHint: { fontSize: 10, lineHeight: 14 },
