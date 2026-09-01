@@ -376,12 +376,14 @@ describe("parseScdotReport — corpus", () => {
       expect(e.unit, `${e.elementId}/${e.environment} unit`).not.toBe("");
       expect(e.cs).toHaveLength(4);
     }
-    expect(Object.keys(r.sectionNotes)).toHaveLength(13);
+    // 12 fixed headings; the (623) maintenance summary was added after template v11
+    expect(Object.keys(r.sectionNotes).length).toBeGreaterThanOrEqual(12);
     expect(r.photos.length).toBeGreaterThan(0);
     // photo numbers are contiguous
     expect(r.photos.map((p) => p.number)).toEqual(r.photos.map((_, i) => i + 1));
     expect(r.signoff.inspectedBy).not.toBe("");
-    expect(r.procedures.length).toBeGreaterThan(0);
+    // Unscheduled reports carry no procedures table
+    if (!/Unscheduled/.test(r.header.inspectionTypes)) expect(r.procedures.length).toBeGreaterThan(0);
   });
 
   it.each(SCDOT_FIXTURES)("%s: every tagged note carries a condition state and quantity", (file) => {
@@ -493,6 +495,70 @@ describe("parseScdotReport — corpus", () => {
       ]);
       expect(r.streambed[0].rows[38]).toEqual({ station: "12 + 75.5", elevation: "10.3", remark: "End Bent 14" });
       expect(r.equipment).toEqual([{ name: "A13 Unmanned Aircraft System (UAS)", hours: "1.00", cost: "0" }]);
+    });
+  });
+
+  describe("asset 02754 routine + special (culvert, template v21, quoted underwater findings)", () => {
+    const r = parseScdotReport(loadPages("scdot-2754-Misc-2025-09-09-001.pages.json"));
+
+    it("reads combined inspection types, three frequency rows and schedule notes", () => {
+      expect(r.templateVersion).toBe("v21, 08/01/2025");
+      expect(r.header.inspectionTypes).toBe("Routine, Special");
+      expect(r.frequencies.map((f) => `${f.inspectionType}:${f.frequencyMonths}`)).toEqual(["Routine:24", "Underwater (B):24", "Special (C):12"]);
+      expect(r.header.scheduleNotes).toBe("(12mo) Special inspection to monitor for additional settlement. 5/2/2025");
+      expect(r.signoff).toMatchObject({ qaReviewedBy: "James Andrews", qaCompleted: "10/13/2025" });
+    });
+
+    it("keeps a tagged note's trailing commentary paragraph with the note", () => {
+      const culvert = r.elements.find((e) => e.elementId === "241")!;
+      const settlement = culvert.defects.find((d) => d.defectCode === "4000" && d.qty === 6)!;
+      expect(settlement.context).toBe("10/17/2024 Underwater Inspection Findings");
+      expect(settlement.text).toMatch(/^All barrels, inlet widened section, apparent settlement resulting from scour \(up to 10\.9in high\)\. Barrels slope downward/);
+      expect(settlement.text).toMatch(/repair type could not be determined\.$/);
+      expect(settlement.text).not.toMatch(/\.\s*\./);
+      expect(culvert.defects.filter((d) => d.defectCode === "6000").map((d) => d.qty)).toEqual([9, 9, 9]);
+      expect(r.elements.find((e) => e.elementId === "6000")).toMatchObject({ name: "Scour", cs: [0, 0, 0, 27] });
+    });
+
+    it("reports the settlement roll-up mismatch present in the source report", () => {
+      expect(r.warnings).toEqual(["Element 241: tagged quantities for 4000 (Settlement) are CS 0/0/7/0 but the row says 0/0/1/0"]);
+    });
+  });
+
+  describe("asset 05708 unscheduled (template v11: no SNBI refs, no tags, one photo)", () => {
+    const r = parseScdotReport(loadPages("scdot-5708-Unscheduled-2024-03-12-002.pages.json"));
+
+    it("reads the older template's header and fields", () => {
+      expect(r.templateVersion).toBe("v11, 04/22/2024");
+      expect(r.header).toMatchObject({ assetId: "05708", inspectionTypes: "Unscheduled", weather: "", temperatureF: "", teamMembers: [] });
+      expect(r.header.scheduleNotes).toMatch(/^Traffic Status updated to "A" based on 5708-LR_Posting-2020-10-29-001 .* removing signs that were installed\.$/);
+      const v = (k: string) => r.fields[k]?.value;
+      expect(v("058")).toBe("5 Fair");
+      expect(r.fields["058"].snbi).toBeUndefined();
+      expect(v("113")).toBe("U - Unknown");
+      expect(splitCodedValue(v("113")!)).toEqual({ code: "U", text: "Unknown" });
+      expect(v("070")).toBe("3 - 10.0 - 19.9% Below");
+      expect(v("031")).toBe("1 M 9 (H 10)");
+      expect(v("602")).toBe("");
+      expect(v("600")).toBe("");
+    });
+
+    it("parses element rows with untagged bullet notes and no defect rows", () => {
+      expect(r.elements.map((e) => e.elementId)).toEqual(["38", "215", "216", "228", "234"]);
+      expect(r.elements.every((e) => e.defects.length === 0)).toBe(true);
+      const slab = r.elements[0];
+      expect(slab).toMatchObject({ cs: [1640, 0, 10, 0], unit: "sq ft" });
+      expect(slab.notes[0]).toMatch(/^\(4\) Spans \(15ft each\)/);
+      expect(slab.notes).toContain("-Span 1, along median line, pothole (up to 7ft long x 2.5in wide x 2in deep) (Photo 6).");
+      expect(r.photos).toEqual([{ number: 1, caption: "Screenshot of Posting Rescission Form" }]);
+      expect(r.procedures).toEqual([]);
+      expect(r.streambed.every((s) => s.rows.length === 0)).toBe(true);
+    });
+
+    it("ignores chart ticks and frequency rows as stray values", () => {
+      expect(r.warnings).toEqual([
+        'Stray value "0" attached to "Bridge with Complex Feature" (ambiguous near "Border Bridge Structure Number")',
+      ]);
     });
   });
 });

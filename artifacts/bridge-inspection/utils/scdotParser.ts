@@ -52,6 +52,8 @@ export interface ScdotHeader {
   location: string;
   weather: string;
   temperatureF: string;
+  /** Free text under "Schedule Notes:", which can run over several lines beside the frequency table. */
+  scheduleNotes: string;
 }
 
 export interface ScdotFrequency {
@@ -260,7 +262,27 @@ export function parseScdotHeader(pages: string[][], fields: Record<string, Scdot
     location: f("009"),
     weather: f("weather_during_inspection"),
     temperatureF: f("temperature_during_inspection_f"),
+    scheduleNotes: parseScheduleNotes(all),
   };
+}
+
+// "Schedule Notes:" text is laid out beside the frequency table, so its lines are
+// interleaved with the table's type names and rows; strip those out.
+function parseScheduleNotes(all: string[]): string {
+  const start = all.findIndex((l) => /^Schedule Notes:/.test(l));
+  if (start < 0) return "";
+  const parts: string[] = [];
+  const inline = all[start].replace(/^Schedule Notes:\s*/, "").trim();
+  if (inline && !INSPECTION_TYPES.includes(inline)) parts.push(inline);
+  for (let i = start + 1; i < all.length && i < start + 15; i++) {
+    const line = all[i];
+    if (isSectionHeading(line) || CHROME_RE.some((re) => re.test(line))) break;
+    if (FREQUENCY_ROW_RE.test(line) || INSPECTION_TYPES.includes(line.trim())) continue;
+    // A type name can be glued to the end of a notes line ("… installed.  Load Rating").
+    const cleaned = INSPECTION_TYPES.reduce((acc, t) => acc.replace(new RegExp(`\\s{2,}${t.replace(/[()]/g, "\\$&")}$`), ""), line).trim();
+    if (cleaned) parts.push(cleaned);
+  }
+  return parts.join(" ").replace(/\s{2,}/g, " ");
 }
 
 // ─── "(NNN) Label [B.X.NN]: value" fields ────────────────────────────────────
@@ -387,6 +409,12 @@ export function parseFields(body: string[]): { fields: Record<string, ScdotField
     }
     const labels = findLabels(line);
     if (labels.length === 0) {
+      // Rows of the inspection-frequency table ("60  10/1/2021  10/1/2026") and
+      // its type names sit beside the INSPECTION fields; they are never values.
+      if (FREQUENCY_ROW_RE.test(line) || INSPECTION_TYPES.includes(line.trim())) {
+        lines.push({ kind: "heading" });
+        continue;
+      }
       lines.push({ kind: "orphans", cells: splitCells(line) });
       continue;
     }
@@ -427,7 +455,7 @@ export function parseFields(body: string[]): { fields: Record<string, ScdotField
       const pick = pool.filter((c) => valueFitsLabel(c.label.label, v));
       if (pick.length === 0) {
         // Most likely a sub-heading or chart tick, not a value; only flag things that look like data.
-        if (/\d/.test(v) && v.length <= 40 && !/posting|values$/i.test(v)) {
+        if (/\d/.test(v) && v.length > 1 && v.length <= 40 && !/posting|values$/i.test(v)) {
           warnings.push(`Stray value "${v}" near "${where}" could not be attached to a field`);
         }
         continue;
@@ -505,13 +533,14 @@ export function parseFields(body: string[]): { fields: Record<string, ScdotField
 
 /** "7 Minor Deterioration" → { code: "7", text: "Minor Deterioration" }; "N N/A (NBI)" → { code: "N", … } */
 export function splitCodedValue(value: string): { code: string; text: string } {
-  const m = value.match(/^([0-9]|N)(?:\s+(?:-\s*)?(.*)|$)/);
+  const m = value.match(/^([0-9]|N|U)(?:\s+(?:-\s*)?(.*)|$)/);
   if (!m) return { code: "", text: value };
   return { code: m[1], text: (m[2] || "").trim() };
 }
 
 // ─── Inspection frequency table ──────────────────────────────────────────────
 
+const FREQUENCY_ROW_RE = /^\d+\s{2,}[\d/]+\s{2,}[\d/]+$/;
 const INSPECTION_TYPES = [
   "Routine",
   "NSTM (A)",
@@ -625,7 +654,8 @@ export function parseElementNotes(body: string[]): { elements: ScdotElementRow[]
   let current: ScdotElementRow | null = null;
   let contextStack: string[] = [];
   let pendingText: string[] = []; // untagged sentence fragments awaiting a tag or a full stop
-  let absorbInto: ScdotDefectNote[] | null = null; // tag line ended with ":" → following lines are its location list
+  let absorbInto: ScdotDefectNote[] | null = null; // following lines continue the last tagged note
+  let absorbMode: "list" | "paragraph" = "list";
 
   const flushPending = () => {
     if (pendingText.length && parent) parent.notes.push(pendingText.join(" "));
@@ -675,8 +705,13 @@ export function parseElementNotes(body: string[]): { elements: ScdotElementRow[]
     if (tags.length === 0) {
       // Location lists after "… at the following locations [tag]:" are short
       // items ("BM1-5 at BT 2"); a long line is the next paragraph starting.
-      if (absorbInto && line.length <= 60 && !/\.$/.test(line) && !/:$/.test(line)) {
+      if (absorbInto && absorbMode === "list" && line.length <= 60 && !/\.$/.test(line) && !/:$/.test(line)) {
         for (const d of absorbInto) d.text = `${d.text} ${line.trim()}`;
+        continue;
+      }
+      if (absorbInto && absorbMode === "paragraph") {
+        for (const d of absorbInto) d.text = `${d.text} ${line.trim()}`;
+        if (/\.$/.test(line)) absorbInto = null;
         continue;
       }
       absorbInto = null;
@@ -711,7 +746,7 @@ export function parseElementNotes(body: string[]): { elements: ScdotElementRow[]
       pendingText.length > 0 &&
       (/^[a-z0-9(\[]/.test(line.trim()) || /[,;:\-]$|\b(and|or|the following|following|with|at|of|in|to|x)$/i.test(lastPending));
     if (!continues) flushPending();
-    const text = [...pendingText, line.replace(TAG_RE, "").replace(/\s{2,}/g, " ").replace(/\s+([.:])/g, "$1").trim()]
+    const text = [...pendingText, line.replace(TAG_RE, "").replace(/\s{2,}/g, " ").replace(/\s+([.:])/g, "$1").replace(/\.\s*\./g, ".").trim()]
       .join(" ")
       .trim();
     pendingText = [];
@@ -738,7 +773,18 @@ export function parseElementNotes(body: string[]): { elements: ScdotElementRow[]
         created.push(note);
       }
     }
-    absorbInto = /:\s*$/.test(line) || /\]\s*:$/.test(line) ? created : null;
+    // "… [tag]:" → a location list follows; "… [tag]. Commentary …" → the
+    // commentary paragraph continues on the next lines until a full stop.
+    const trailing = line.slice(line.lastIndexOf("]") + 1).trim();
+    if (/^:?$/.test(trailing)) {
+      absorbInto = created;
+      absorbMode = "list";
+    } else if (trailing.length > 3 && !/\.$/.test(trailing)) {
+      absorbInto = created;
+      absorbMode = "paragraph";
+    } else {
+      absorbInto = null;
+    }
   }
   flushPending();
 
