@@ -95,7 +95,7 @@ export default function BridgesScreen() {
         Alert.alert("Error", "Could not load sample report from device storage.");
         return;
       }
-      await importFromPdf({ uri: asset.localUri, name: "18-061-0081-13-133_RTInsp_2025-02.pdf" });
+      await importFromPdf({ uri: asset.localUri, name: "237-InspectReport_Routine-2025-09-03-001.pdf" });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Could not load sample report.";
       Alert.alert("Error", message);
@@ -511,7 +511,7 @@ export default function BridgesScreen() {
                     onPress={handleLoadSampleReport}
                   >
                     <Feather name="download" size={13} color="#94a3b8" />
-                    <Text style={[styles.newBtnText, { color: "#94a3b8" }]}>Load Sample Report</Text>
+                    <Text style={[styles.newBtnText, { color: "#94a3b8" }]}>Load SC DOT Sample Report</Text>
                   </TouchableOpacity>
                 )}
               </View>
