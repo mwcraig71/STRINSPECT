@@ -222,7 +222,7 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
   const handleClearInspection = () => {
     Alert.alert(
       "Clear Inspection",
-      "This permanently discards all imported and recorded inspection data — element records, NBI ratings, and the structure number. This cannot be undone.",
+      "This permanently discards all imported and recorded inspection data — element records, condition ratings, and the structure number. This cannot be undone.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -268,7 +268,7 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
               <Text style={[styles.cardTitle, { color: c.foreground }]}>Inspection Team & Field Notes</Text>
             </View>
             <Text style={[styles.cardDesc, { color: c.mutedForeground }]}>
-              Optional supplemental information for identifying the field team and conditions. These notes are not mapped to SNBI or NBI rating fields.
+              Optional supplemental information for identifying the field team and conditions. These notes are not mapped to SNBI condition-rating fields.
             </Text>
 
             <Text style={[styles.matLabel, { color: c.mutedForeground }]}>Team leader</Text>
@@ -846,7 +846,7 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
               <Text style={[styles.cardTitle, { color: c.foreground }]}>AI Transcription</Text>
             </View>
             <Text style={[styles.cardDesc, { color: c.mutedForeground }]}>
-              Dictate inspection notes using the mic button on the Elements and NBI tabs. Whisper transcribes your speech; optionally GPT-4o-mini reformats it into a professional narrative.
+              Dictate inspection notes using the mic button on the Elements and Condition Ratings tabs. Whisper transcribes your speech; optionally GPT-4o-mini reformats it into a professional narrative.
             </Text>
 
             {/* API key input */}
@@ -1177,7 +1177,7 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
               )}
             </View>
             <Text style={[styles.cardDesc, { color: c.mutedForeground }]}>
-              Uploads defect records, NBI ratings, redlined PDF, and photos. When offline, data is queued and uploads automatically when connectivity returns.
+              Uploads defect records, condition ratings, redlined PDF, and photos. When offline, data is queued and uploads automatically when connectivity returns.
             </Text>
             {pendingSyncCount > 0 && syncStatus !== "syncing" && (
               <View style={[styles.syncErrorBox, { backgroundColor: "#1c1917", borderColor: "#78350f" }]}>

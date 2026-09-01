@@ -142,9 +142,10 @@ export default function InspectionProgress({ sessionData, setSessionData }: Prop
   });
   const elementCoverage = Object.entries(elementMap).sort((a, b) => b[1].count - a[1].count);
 
-  const isSnbiData = nbiRatings.some((n) => /^BC\d{2}$/.test(n.item));
-  const nbiTotal = nbiRatings.reduce((s, n) => s + n.subComponents.length, 0);
-  const nbiFilled = nbiRatings.reduce((s, n) => s + n.subComponents.filter((sc) => sc.rating).length, 0);
+  const universalRatings = nbiRatings.filter((n) => /^BC\d{2}$/.test(n.item));
+  const historicalRatings = nbiRatings.filter((n) => !/^BC\d{2}$/.test(n.item));
+  const nbiTotal = universalRatings.reduce((s, n) => s + n.subComponents.length, 0);
+  const nbiFilled = universalRatings.reduce((s, n) => s + n.subComponents.filter((sc) => sc.rating).length, 0);
   const nbiPct = nbiTotal > 0 ? Math.round((nbiFilled / nbiTotal) * 100) : 0;
 
   const critCount = defects.filter((d) => d.isCritical).length;
@@ -380,7 +381,7 @@ export default function InspectionProgress({ sessionData, setSessionData }: Prop
             <div className="flex items-center gap-2 mb-3">
               <Cloud className="h-4 w-4 text-primary" />
               <h2 className="text-sm font-semibold text-foreground">Supplemental Field Notes</h2>
-              <span className="text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded px-1.5 py-0.5">Non-SNBI</span>
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded px-1.5 py-0.5">Supplemental</span>
             </div>
             <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
               {[
@@ -562,9 +563,9 @@ export default function InspectionProgress({ sessionData, setSessionData }: Prop
               </div>
             </div>
 
-            {/* NBI Completion */}
+            {/* Condition-rating completion */}
             <div className="bg-card border border-border rounded-lg p-4">
-              <h2 className="text-sm font-semibold text-foreground mb-3">{isSnbiData ? "SNBI Rating Completion" : "NBI Rating Completion"}</h2>
+              <h2 className="text-sm font-semibold text-foreground mb-3">SNBI Condition Rating Completion</h2>
               {nbiTotal > 0 ? (
                 <>
                   <div className="flex items-end gap-2 mb-3">
@@ -583,7 +584,7 @@ export default function InspectionProgress({ sessionData, setSessionData }: Prop
                     />
                   </div>
                   <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
-                    {nbiRatings.map((n) => {
+                    {universalRatings.map((n) => {
                       const filled = n.subComponents.filter((sc) => sc.rating).length;
                       const pct = n.subComponents.length
                         ? Math.round((filled / n.subComponents.length) * 100)
@@ -591,7 +592,7 @@ export default function InspectionProgress({ sessionData, setSessionData }: Prop
                       return (
                         <div key={n.item} className="flex items-center gap-2">
                           <span className="text-xs text-muted-foreground flex-1 truncate">
-                            {isSnbiData ? `B.C.${n.item.replace("BC", "")}` : `Item ${n.item}`} — {n.description}
+                            {`B.C.${n.item.replace("BC", "")}`} — {n.description}
                           </span>
                           <span
                             className={`text-xs font-semibold flex-shrink-0 ${
@@ -606,7 +607,29 @@ export default function InspectionProgress({ sessionData, setSessionData }: Prop
                   </div>
                 </>
               ) : (
-                <p className="text-sm text-muted-foreground">{isSnbiData ? "No SNBI ratings found in session data." : "No NBI ratings found in session data."}</p>
+                <p className="text-sm text-muted-foreground">No active SNBI condition ratings found in this session.</p>
+              )}
+              {historicalRatings.length > 0 && (
+                <div className="mt-4 pt-3 border-t border-border">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                    Historical NBI Import Review
+                  </p>
+                  <div className="space-y-1.5">
+                    {historicalRatings.map((rating) => {
+                      const pending = rating.subComponents.filter((component) => component.isImported).length;
+                      return (
+                        <div key={rating.item} className="flex items-center justify-between gap-2 text-xs">
+                          <span className="text-muted-foreground">
+                            Historical NBI Item {rating.item} — {rating.description}
+                          </span>
+                          <span className={pending > 0 ? "text-amber-400 font-semibold" : "text-green-400"}>
+                            {pending > 0 ? `${pending} pending review` : "Reviewed"}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               )}
             </div>
           </div>

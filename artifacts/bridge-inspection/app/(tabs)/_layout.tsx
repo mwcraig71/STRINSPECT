@@ -26,7 +26,7 @@ function NativeTabLayout({ missingPhotoCount }: { missingPhotoCount: number }) {
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="nbi">
         <Icon sf={{ default: "chart.bar", selected: "chart.bar.fill" }} />
-        <Label>NBI</Label>
+        <Label>Ratings</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="photos">
         <View style={nativeBadgeStyles.iconWrap}>
@@ -127,7 +127,7 @@ function ClassicTabLayoutWithSync({ pendingCount, missingPhotoCount }: { pending
       <Tabs.Screen
         name="nbi"
         options={{
-          title: "NBI",
+          title: "Ratings",
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="chart.bar" tintColor={color} size={22} />

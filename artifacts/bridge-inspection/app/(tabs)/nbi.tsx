@@ -44,7 +44,7 @@ export default function NBIScreen() {
     () => new Set((importSummary?.emptySections ?? []).map((s) => s.item)),
     [importSummary]
   );
-  const [activeItem, setActiveItem] = useState("58");
+  const [activeItem, setActiveItem] = useState("BC01");
 
   const { focus, focusTs } = useLocalSearchParams<{ focus?: string; focusTs?: string }>();
   const handledFocusRef = React.useRef<string | undefined>(undefined);
@@ -58,6 +58,11 @@ export default function NBIScreen() {
       handledFocusRef.current = nonce;
     }
   }, [focus, focusTs, nbiRatings]);
+  React.useEffect(() => {
+    if (!nbiRatings.some((item) => item.item === activeItem) && nbiRatings[0]) {
+      setActiveItem(nbiRatings[0].item);
+    }
+  }, [activeItem, nbiRatings]);
 
   const [expandedComp, setExpandedComp] = useState<number | null>(null);
   const [ratingPickerOpen, setRatingPickerOpen] = useState<number | null>(null);
@@ -78,7 +83,7 @@ export default function NBIScreen() {
         <View style={styles.headerRow}>
           <View style={styles.headerTitle}>
             <Feather name="bar-chart-2" size={16} color="#38bdf8" />
-            <Text style={styles.headerTitleText}>{isSnbiFormat ? "SNBI Ratings" : "NBI Ratings"}</Text>
+            <Text style={styles.headerTitleText}>Condition Ratings</Text>
           </View>
           <TouchableOpacity style={[styles.gearBtn, { backgroundColor: "#1e293b" }]} onPress={() => setSettingsOpen(true)}>
             <Feather name="settings" size={16} color="#94a3b8" />
@@ -114,7 +119,7 @@ export default function NBIScreen() {
                   </View>
                 )}
                 <Text style={[styles.tabText, { color: activeItem === item.item ? "#fff" : c.mutedForeground }]}>
-                  {isSnbiFormat ? `B.C.${item.item.replace("BC", "")}` : `Item ${item.item}`}
+                  {/^BC\d{2}$/.test(item.item) ? `B.C.${item.item.replace("BC", "")}` : `Historical Item ${item.item}`}
                 </Text>
                 <Text style={[styles.tabSub, { color: activeItem === item.item ? "rgba(255,255,255,0.8)" : c.mutedForeground }]}>
                   {item.description}
@@ -130,7 +135,7 @@ export default function NBIScreen() {
           <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
             <View style={[styles.cardHeader, { backgroundColor: c.headerBg }]}>
               <Text style={styles.cardHeaderTitle}>{activeNbi.description} Assessment</Text>
-              <Text style={styles.cardHeaderItem}>{isSnbiFormat ? `B.C.${activeNbi.item.replace("BC", "")}` : `Item ${activeNbi.item}`}</Text>
+              <Text style={styles.cardHeaderItem}>{/^BC\d{2}$/.test(activeNbi.item) ? `B.C.${activeNbi.item.replace("BC", "")}` : `Historical NBI Item ${activeNbi.item}`}</Text>
             </View>
 
             {activeNbi.subComponents.map((comp, compIdx) => {
@@ -225,7 +230,7 @@ export default function NBIScreen() {
                       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
                         <Text style={[styles.ratingPickerTitle, { color: c.mutedForeground }]}>Select Rating</Text>
                         {comp.isImported && (
-                          <Text style={[styles.ratingPickerTitle, { color: "#f97316" }]}>⚠ Pre-filled from 2025 Report</Text>
+                            <Text style={[styles.ratingPickerTitle, { color: "#f97316" }]}>Pre-filled from historical report</Text>
                         )}
                       </View>
                       <View style={styles.ratingGrid}>

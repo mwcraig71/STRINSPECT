@@ -362,7 +362,7 @@ export default function SummaryScreen() {
                   <Text style={[styles.statNum, { color: c.foreground }]}>
                     {importSummary.nbiFilledCount}/{importSummary.nbiTotalCount}
                   </Text>
-                  <Text style={[styles.statLabel, { color: c.mutedForeground }]}>{isSnbiFormat ? "Rating Fields Filled" : "NBI Fields Filled"}</Text>
+                  <Text style={[styles.statLabel, { color: c.mutedForeground }]}>Condition Rating Fields Filled</Text>
                 </View>
               </View>
 
@@ -381,7 +381,11 @@ export default function SummaryScreen() {
               </View>
 
               {/* NBI section breakdown */}
-              <Text style={[styles.auditSectionTitle, { color: c.mutedForeground }]}>{isSnbiFormat ? "SNBI Sections" : "NBI Sections"}</Text>
+              <Text style={[styles.auditSectionTitle, { color: c.mutedForeground }]}>
+                {importSummary.sections.some((section) => /^BC\d{2}$/.test(section.item))
+                  ? "SNBI Condition Rating Sections"
+                  : "Historical NBI Import Sections"}
+              </Text>
               <View style={styles.chipWrap}>
                 {importSummary.sections.map((s) => {
                   const blank = !s.hasData;
@@ -419,7 +423,7 @@ export default function SummaryScreen() {
                   </View>
                   {importSummary.emptySections.map((s) => (
                     <Text key={s.item} style={styles.calloutItem}>
-                      {isSnbiFormat ? `B.C.${s.item.replace("BC", "")}` : `Item ${s.item}`} — {s.description}: no data extracted
+                      {/^BC\d{2}$/.test(s.item) ? `B.C.${s.item.replace("BC", "")}` : `Historical Item ${s.item}`} — {s.description}: no data extracted
                     </Text>
                   ))}
                 </View>

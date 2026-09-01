@@ -26,3 +26,4 @@
 - [Android tab icons](android-tab-icons.md) — use classic Feather tabs on Android; NativeTabs configured only with SF Symbols renders missing glyphs.
 - [Tablet orientation](tablet-orientation.md) — support both orientations; detect tablets from the shortest screen edge, not width alone.
 - [WebView toolbar icons](webview-toolbar-icons.md) — embedded PDF controls use inline SVG, not emoji or icon-font glyphs that can render as boxes.
+- [Universal SNBI ratings](universal-snbi-ratings.md) — B.C.01–B.C.11 is always the active model; preserve Item-based imports only as explicit historical review records.

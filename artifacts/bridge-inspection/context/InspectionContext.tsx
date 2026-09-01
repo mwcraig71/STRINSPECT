@@ -1862,7 +1862,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const [criticalFindingsAcknowledged, setCriticalFindingsAcknowledgedState] = useState(false);
   const [ucChannelOverrideAcknowledged, setUcChannelOverrideAcknowledgedState] = useState(false);
   const [savedDefects, setSavedDefectsState] = useState<DefectRecord[]>([]);
-  const [nbiRatings, setNbiRatingsState] = useState<NbiRating[]>(INITIAL_NBI_RATINGS);
+  const [nbiRatings, setNbiRatingsState] = useState<NbiRating[]>(INITIAL_SNBI_RATINGS);
   const [structureNumber, setStructureNumberState] = useState("");
   const [teamLeader, setTeamLeaderState] = useState("");
   const [teamMembers, setTeamMembersState] = useState<string[]>([]);
@@ -1925,7 +1925,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const [standardPhotos, setStandardPhotosState] = useState<StandardPhotoSlot[]>(TXDOT_REQUIRED_SLOTS);
   const [extraPhotos, setExtraPhotosState] = useState<StandardPhotoSlot[]>([]);
-  const [isSnbiFormat, setIsSnbiFormatState] = useState(false);
+  const [isSnbiFormat, setIsSnbiFormatState] = useState(true);
 
   // ── AsyncStorage load on mount ──
   useEffect(() => {
@@ -2019,7 +2019,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         if (importAuditAckStr === "1") setImportAuditAcknowledgedState(true);
         if (criticalAckStr === "1") setCriticalFindingsAcknowledgedState(true);
         if (ucChannelOverrideStr === "1") setUcChannelOverrideAcknowledgedState(true);
-        if (isSnbiFormatStr === "1") setIsSnbiFormatState(true);
+        setIsSnbiFormatState(true);
         if (openAiKeyStr) setOpenAiKeyState(openAiKeyStr);
         if (aiRephraseStr !== null) setAiRephraseState(aiRephraseStr !== "0");
         if (teamLeaderStr) setTeamLeaderState(teamLeaderStr);
@@ -2060,7 +2060,17 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           } catch {}
         }
         if (defects) setSavedDefectsState((JSON.parse(defects) as DefectRecord[]).map(normalizeDefectRecord));
-        if (nbi) setNbiRatingsState(JSON.parse(nbi));
+        if (nbi) {
+          const storedRatings = JSON.parse(nbi) as NbiRating[];
+          const hasUniversalRatings = storedRatings.some((item) => /^BC\d{2}$/.test(item.item));
+          const migratedRatings = hasUniversalRatings
+            ? storedRatings
+            : [...INITIAL_SNBI_RATINGS, ...storedRatings];
+          setNbiRatingsState(migratedRatings);
+          if (!hasUniversalRatings) {
+            AsyncStorage.setItem(STORAGE_KEYS.NBI_RATINGS, JSON.stringify(migratedRatings)).catch(() => {});
+          }
+        }
         if (impSummary) {
           try {
             setImportSummaryState(JSON.parse(impSummary) as ImportSummary);
@@ -2504,10 +2514,10 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const clearInspection = useCallback(() => {
     setSavedDefectsState([]);
     AsyncStorage.setItem(STORAGE_KEYS.SAVED_DEFECTS, JSON.stringify([])).catch(() => {});
-    setNbiRatingsState(INITIAL_NBI_RATINGS);
-    AsyncStorage.setItem(STORAGE_KEYS.NBI_RATINGS, JSON.stringify(INITIAL_NBI_RATINGS)).catch(() => {});
-    setIsSnbiFormatState(false);
-    AsyncStorage.removeItem(STORAGE_KEYS.IS_SNBI_FORMAT).catch(() => {});
+    setNbiRatingsState(INITIAL_SNBI_RATINGS);
+    AsyncStorage.setItem(STORAGE_KEYS.NBI_RATINGS, JSON.stringify(INITIAL_SNBI_RATINGS)).catch(() => {});
+    setIsSnbiFormatState(true);
+    AsyncStorage.setItem(STORAGE_KEYS.IS_SNBI_FORMAT, "1").catch(() => {});
     setStructureNumber("");
     setTeamLeaderState("");
     AsyncStorage.removeItem(STORAGE_KEYS.TEAM_LEADER).catch(() => {});
@@ -2899,15 +2909,16 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
       target: { screen: "inspection", focusId: unverified[0]?.id },
     });
 
-    // 3. Every NBI sub-component rated + no imported-but-unreviewed leftover
+    // 3. Every universal SNBI sub-component rated + no imported legacy value left unreviewed.
     let nbiUnrated = 0;
     let nbiImported = 0;
     let firstNbiItem: string | undefined;
     nbiRatings.forEach((r) => {
+      const isUniversal = /^BC\d{2}$/.test(r.item);
       r.subComponents.forEach((sc) => {
         const blank =
           !sc.rating || sc.rating.trim() === "" || sc.rating === "—" || sc.rating === "-";
-        if (blank) {
+        if (isUniversal && blank) {
           nbiUnrated++;
           if (!firstNbiItem) firstNbiItem = r.item;
         }
@@ -2920,7 +2931,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     const nbiPass = nbiUnrated === 0 && nbiImported === 0;
     checks.push({
       id: "nbiRatings",
-      label: "NBI ratings complete & reviewed",
+      label: "Condition ratings complete & reviewed",
       passed: nbiPass,
       reason: nbiPass
         ? ""
@@ -3261,8 +3272,15 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
             : {}),
         };
       } else {
+        const defaults = (/^BC\d{2}$/.test(nextItem.item) ? INITIAL_SNBI_RATINGS : INITIAL_NBI_RATINGS)
+          .find((item) => item.item === nextItem.item)
+          ?.subComponents.find((sub) => sub.name === cur.name);
         nextSub[compIndex] = {
           ...cur,
+          rating: defaults?.rating ?? "",
+          desc: defaults?.desc ?? "",
+          min: defaults?.min ?? "",
+          comments: defaults?.comments ?? "",
           previousRating: undefined,
           previousDesc: undefined,
           previousMin: undefined,
@@ -3311,13 +3329,14 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           });
         }
 
-        setIsSnbiFormatState(isSnbiParsed);
-        AsyncStorage.setItem(STORAGE_KEYS.IS_SNBI_FORMAT, isSnbiParsed ? "1" : "0").catch(() => {});
-        const baseRatings = isSnbiParsed ? INITIAL_SNBI_RATINGS : INITIAL_NBI_RATINGS;
-        if (isSnbiParsed) {
-          setNbiRatingsState(INITIAL_SNBI_RATINGS);
-          AsyncStorage.setItem(STORAGE_KEYS.NBI_RATINGS, JSON.stringify(INITIAL_SNBI_RATINGS)).catch(() => {});
-        }
+        setIsSnbiFormatState(true);
+        AsyncStorage.setItem(STORAGE_KEYS.IS_SNBI_FORMAT, "1").catch(() => {});
+        const sourceRatings = isSnbiParsed ? INITIAL_SNBI_RATINGS : INITIAL_NBI_RATINGS;
+        const baseRatings = isSnbiParsed
+          ? INITIAL_SNBI_RATINGS
+          : [...INITIAL_SNBI_RATINGS, ...INITIAL_NBI_RATINGS];
+        setNbiRatingsState(baseRatings);
+        AsyncStorage.setItem(STORAGE_KEYS.NBI_RATINGS, JSON.stringify(baseRatings)).catch(() => {});
 
         if (parsedNum) {
           setStructureNumber(parsedNum);
@@ -3455,7 +3474,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         let nbiFilledCount = 0;
         let nbiTotalCount = 0;
         const sectionAudits: ImportSectionAudit[] = [];
-        for (const item of baseRatings) {
+        for (const item of sourceRatings) {
           let filled = 0;
           for (const sub of item.subComponents) {
             nbiTotalCount++;
@@ -3690,13 +3709,13 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
 
         const emptySummary =
           emptySections.length > 0
-            ? `\n\n${emptySections.length} NBI section(s) with no data extracted — review manually:\n${emptySections
+            ? `\n\n${emptySections.length} condition-rating section(s) with no data extracted — review manually:\n${emptySections
                 .map((s) => `Item ${s.item}: ${s.description}`)
                 .join("\n")}`
             : "";
         const unmatchedSummary =
           unmatchedNames.length > 0
-            ? `\n\n${unmatchedNames.length} NBI component(s) not matched:\n${unmatchedNames.join("\n")}`
+            ? `\n\n${unmatchedNames.length} historical rating component(s) not matched:\n${unmatchedNames.join("\n")}`
             : "";
 
         const ucNote = parsedUnderclearance
@@ -3708,7 +3727,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         const { Alert } = require("react-native");
         Alert.alert(
           "Import Complete",
-          `Imported ${newDefects.length} element record(s) across ${elementsFound} elements.\n${nbiFilledCount} of ${nbiTotalCount} NBI field(s) pre-filled.${ucNote}${chNote}${emptySummary}${unmatchedSummary}\n\n${
+          `Imported ${newDefects.length} element record(s) across ${elementsFound} elements.\n${nbiFilledCount} of ${nbiTotalCount} condition-rating field(s) pre-filled.${ucNote}${chNote}${emptySummary}${unmatchedSummary}\n\n${
             parsedNum ? `Structure: ${parsedNum}` : "Structure number not found."
           }\n\nSee the import audit on the Summary tab. Assign locations and verify records before submitting.`
         );

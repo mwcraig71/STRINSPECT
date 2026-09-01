@@ -82,6 +82,12 @@ function conditionBreakdown(defect: DefectRecord) {
     .map((state) => `${state}: ${quantities[state]}`)
     .join(" · ");
 }
+
+function ratingItemLabel(item: string) {
+  return /^BC\d{2}$/.test(item)
+    ? `B.C.${item.replace("BC", "")}`
+    : `Historical NBI Item ${item}`;
+}
 const CS_BG: Record<string, string> = {
   CS1: "rgba(34,197,94,0.12)", CS2: "rgba(234,179,8,0.12)",
   CS3: "rgba(249,115,22,0.12)", CS4: "rgba(239,68,68,0.12)",
@@ -152,6 +158,9 @@ const REPORT_STYLES = `
 function buildReportContentHtml(data: SessionData, header: ReportHeader = EMPTY_HEADER, extraPhotos: ExtraPhotoEntry[] = []): string {
   const defects = data.defects ?? [];
   const nbiRatings = data.nbiRatings ?? [];
+  const universalRatings = nbiRatings.filter((rating) => /^BC\d{2}$/.test(rating.item));
+  const historicalRatings = nbiRatings.filter((rating) => !/^BC\d{2}$/.test(rating.item));
+  const hasHistoricalRatings = historicalRatings.length > 0;
   const importSummary = data.importSummary;
   const structNum = data.structureNumber ?? "Unknown";
   const now = new Date().toLocaleString();
@@ -273,21 +282,24 @@ function buildReportContentHtml(data: SessionData, header: ReportHeader = EMPTY_
 
   // ── 3. LOAD POSTING INFORMATION ─────────────────────────────────────────────
   const LOAD_CODES = ["58", "59", "60", "62"];
-  const loadRatings = nbiRatings.filter((n) => LOAD_CODES.some((c) => n.item.includes(c)));
+  const loadRatings = historicalRatings.filter((n) =>
+    LOAD_CODES.includes(n.item)
+    && !!n.subComponents[0]?.rating
+    && !n.subComponents[0]?.isImported
+  );
   const loadRows = loadRatings.map((n) => {
     const sub = n.subComponents[0];
     return `<tr>
-      <td style="padding:5px 8px">${esc(n.item)}</td>
+      <td style="padding:5px 8px">${esc(ratingItemLabel(n.item))}</td>
       <td style="padding:5px 8px">${esc(n.description)}</td>
       <td style="padding:5px 8px;text-align:center;font-weight:700">${esc(sub?.rating ?? "—")}</td>
       <td style="padding:5px 8px">${esc(sub?.comments ?? "")}</td>
     </tr>`;
   }).join("");
 
-  const loadSection = `
-    <h2>Load Posting Information</h2>
-    ${loadRatings.length > 0
-      ? `<table style="border-collapse:collapse;width:100%">
+  const loadSection = loadRatings.length > 0 ? `
+    <h2>Historical NBI Load Posting (Reviewed)</h2>
+    <table style="border-collapse:collapse;width:100%">
            <thead><tr style="background:#f9fafb">
              <th style="padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;color:#6b7280">Item</th>
              <th style="padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;color:#6b7280">Description</th>
@@ -295,33 +307,58 @@ function buildReportContentHtml(data: SessionData, header: ReportHeader = EMPTY_
              <th style="padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;color:#6b7280">Comments</th>
            </tr></thead>
            <tbody>${loadRows}</tbody>
-         </table>`
-      : `<p style="color:#6b7280;font-style:italic;font-size:11px">N/A &mdash; No deck, superstructure, substructure, or culvert ratings recorded.</p>`
-    }`;
+         </table>` : "";
 
-  // ── 4. BRIDGE INSPECTION RECORD (NBI / SNBI) ────────────────────────────────
-  const isSnbiData = nbiRatings.some((n) => /^BC\d{2}$/.test(n.item));
-  const nbiRows = nbiRatings.map((n) => {
-    const sub = n.subComponents[0];
-    return `<tr>
-      <td style="padding:5px 8px">${esc(n.item)}</td>
-      <td style="padding:5px 8px">${esc(n.description)}</td>
-      <td style="padding:5px 8px;text-align:center;font-weight:700">${esc(sub?.rating ?? "—")}</td>
-      <td style="padding:5px 8px">${esc(sub?.comments ?? "")}</td>
-    </tr>`;
-  }).join("");
+  // ── 4. UNIVERSAL CONDITION RATINGS + EXPLICIT HISTORICAL IMPORTS ─────────────
+  const nbiRows = universalRatings.flatMap((n) =>
+    n.subComponents.map((sub) => `<tr>
+      <td style="padding:5px 8px">${esc(ratingItemLabel(n.item))}</td>
+      <td style="padding:5px 8px">${esc(n.description)} — ${esc(sub.name)}</td>
+      <td style="padding:5px 8px;text-align:center;font-weight:700">${esc(sub.rating || "—")}</td>
+      <td style="padding:5px 8px">${esc(sub.comments || "")}</td>
+    </tr>`)
+  ).join("");
 
-  const nbiSection = nbiRatings.length === 0 ? "" : `
-    <h2>${isSnbiData ? "SNBI Component Ratings" : "Bridge Inspection Record"}</h2>
+  const nbiSection = universalRatings.length === 0 ? "" : `
+    <h2>${hasHistoricalRatings ? "Condition Ratings (SNBI and Historical Imports)" : "Condition Ratings (SNBI)"}</h2>
     <table style="border-collapse:collapse;width:100%">
       <thead><tr style="background:#f9fafb">
-        <th style="padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;color:#6b7280">Item</th>
+        <th style="padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;color:#6b7280">SNBI / Historical Item</th>
         <th style="padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;color:#6b7280">Description</th>
         <th style="padding:6px 8px;text-align:center;font-size:10px;text-transform:uppercase;color:#6b7280">Rating</th>
         <th style="padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;color:#6b7280">Comments</th>
       </tr></thead>
       <tbody>${nbiRows}</tbody>
     </table>`;
+
+  const historicalRows = historicalRatings.flatMap((rating) =>
+    rating.subComponents
+      .filter((component) =>
+        component.isImported || component.rating || component.desc || component.comments
+      )
+      .map((component) => `<tr>
+        <td style="padding:5px 8px">${esc(ratingItemLabel(rating.item))}</td>
+        <td style="padding:5px 8px">${esc(rating.description)} — ${esc(component.name)}</td>
+        <td style="padding:5px 8px;text-align:center;font-weight:700">${esc(component.rating || "—")}</td>
+        <td style="padding:5px 8px;color:${component.isImported ? "#b45309" : "#047857"};font-weight:700">
+          ${component.isImported ? "Pending review — not accepted" : "Reviewed"}
+        </td>
+        <td style="padding:5px 8px">${esc(component.comments || "")}</td>
+      </tr>`)
+  ).join("");
+  const historicalSection = historicalRows ? `
+    <h2>Historical NBI Import Review</h2>
+    <p style="font-size:11px;color:#6b7280;margin-bottom:8px">Historical values are not active SNBI ratings. Pending values require inspector review.</p>
+    <table style="border-collapse:collapse;width:100%">
+      <thead><tr style="background:#fff7ed">
+        <th style="padding:6px 8px;text-align:left">Historical Item</th>
+        <th style="padding:6px 8px;text-align:left">Component</th>
+        <th style="padding:6px 8px;text-align:center">Imported Rating</th>
+        <th style="padding:6px 8px;text-align:left">Review Status</th>
+        <th style="padding:6px 8px;text-align:left">Comments</th>
+      </tr></thead>
+      <tbody>${historicalRows}</tbody>
+    </table>` : "";
 
   // ── 5. DEFECT RECORDS BY LOCATION ───────────────────────────────────────────
   const locations = sortedLocations(defects);
@@ -490,6 +527,7 @@ function buildReportContentHtml(data: SessionData, header: ReportHeader = EMPTY_
     ${fuaSection}
     ${loadSection}
     ${nbiSection}
+    ${historicalSection}
     <h2>Defect Records by Location</h2>
     ${defects.length === 0 ? `<p style="color:#6b7280;font-style:italic">No defect records in this session.</p>` : defectSections}
     ${photosSection}
@@ -690,7 +728,9 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
 
   const defects = sessionData?.defects ?? [];
   const nbiRatings = sessionData?.nbiRatings ?? [];
-  const isSnbiData = nbiRatings.some((n) => /^BC\d{2}$/.test(n.item));
+  const universalRatings = nbiRatings.filter((rating) => /^BC\d{2}$/.test(rating.item));
+  const historicalRatings = nbiRatings.filter((rating) => !/^BC\d{2}$/.test(rating.item));
+  const hasHistoricalRatings = historicalRatings.length > 0;
 
   const hasRedlinePdf = pdfAnnotations.some((a) => a.type !== "_meta");
   const pdfAvailable = !!sessionData?.structureNumber;
@@ -751,15 +791,42 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers, ...rows]), "All Defects");
 
       if (nbiRatings.length > 0) {
-        const nbiRows = nbiRatings.map((n) => {
-          const sub = n.subComponents[0];
-          return [n.item, n.description, sub?.rating ?? "", sub?.comments ?? ""];
-        });
+        const nbiRows = universalRatings.flatMap((n) =>
+          n.subComponents.map((sub) => [
+            ratingItemLabel(n.item),
+            `${n.description} — ${sub.name}`,
+            sub.rating || "",
+            sub.comments || "",
+          ])
+        );
         XLSX.utils.book_append_sheet(
           wb,
           XLSX.utils.aoa_to_sheet([["Item", "Description", "Rating", "Comments"], ...nbiRows]),
-          isSnbiData ? "SNBI Ratings" : "NBI Ratings",
+          "Condition Ratings",
         );
+        const historicalRows = historicalRatings.flatMap((rating) =>
+          rating.subComponents
+            .filter((component) =>
+              component.isImported || component.rating || component.desc || component.comments
+            )
+            .map((component) => [
+              ratingItemLabel(rating.item),
+              `${rating.description} — ${component.name}`,
+              component.rating || "",
+              component.isImported ? "Pending review — not accepted" : "Reviewed",
+              component.comments || "",
+            ])
+        );
+        if (historicalRows.length > 0) {
+          XLSX.utils.book_append_sheet(
+            wb,
+            XLSX.utils.aoa_to_sheet([
+              ["Historical Item", "Component", "Imported Rating", "Review Status", "Comments"],
+              ...historicalRows,
+            ]),
+            "Historical Review",
+          );
+        }
       }
 
       sortedLocations(defects).slice(0, 20).forEach((loc) => {
@@ -957,11 +1024,15 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
         children.push(new Paragraph({ text: "" }));
       }
 
-      // ── 3. LOAD POSTING INFORMATION ────────────────────────────────────────
-      children.push(new Paragraph({ text: "Load Posting Information", heading: HeadingLevel.HEADING_2 }));
+      // ── 3. REVIEWED HISTORICAL NBI LOAD POSTING ────────────────────────────
       const LOAD_CODES = ["58", "59", "60", "62"];
-      const loadRatings = nbiRatings.filter((n) => LOAD_CODES.some((c) => n.item.includes(c)));
+      const loadRatings = historicalRatings.filter((n) =>
+        LOAD_CODES.includes(n.item)
+        && !!n.subComponents[0]?.rating
+        && !n.subComponents[0]?.isImported
+      );
       if (loadRatings.length > 0) {
+        children.push(new Paragraph({ text: "Historical NBI Load Posting (Reviewed)", heading: HeadingLevel.HEADING_2 }));
         children.push(new Table({
           width: { size: 100, type: WidthType.PERCENTAGE },
           rows: [
@@ -980,16 +1051,17 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
             }),
           ],
         }));
-      } else {
-        children.push(new Paragraph({
-          children: [new TextRun({ text: "N/A \u2014 No deck, superstructure, substructure, or culvert ratings recorded.", italics: true })],
-        }));
+        children.push(new Paragraph({ text: "" }));
       }
-      children.push(new Paragraph({ text: "" }));
 
-      // ── 4. BRIDGE INSPECTION RECORD (NBI / SNBI) ────────────────────────────
-      if (nbiRatings.length > 0) {
-        children.push(new Paragraph({ text: isSnbiData ? "SNBI Component Ratings" : "Bridge Inspection Record", heading: HeadingLevel.HEADING_2 }));
+      // ── 4. CONDITION RATINGS ────────────────────────────────────────────────
+      if (universalRatings.length > 0) {
+        children.push(new Paragraph({
+          text: hasHistoricalRatings
+            ? "Condition Ratings (SNBI and Historical Imports)"
+            : "Condition Ratings (SNBI)",
+          heading: HeadingLevel.HEADING_2,
+        }));
         children.push(new Table({
           width: { size: 100, type: WidthType.PERCENTAGE },
           rows: [
@@ -998,14 +1070,49 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
                 (h) => new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: h, bold: true })] })] }),
               ),
             }),
-            ...nbiRatings.map((n) => {
-              const sub = n.subComponents[0];
+            ...universalRatings.flatMap((n) => n.subComponents.map((sub) => {
               return new TableRow({
-                children: [n.item, n.description, sub?.rating ?? "\u2014", sub?.comments ?? ""].map(
+                children: [ratingItemLabel(n.item), `${n.description} — ${sub.name}`, sub.rating || "\u2014", sub.comments || ""].map(
                   (v) => new TableCell({ children: [new Paragraph(v)] }),
                 ),
               });
+            })),
+          ],
+        }));
+        children.push(new Paragraph({ text: "" }));
+      }
+      const historicalRows = historicalRatings.flatMap((rating) =>
+        rating.subComponents
+          .filter((component) =>
+            component.isImported || component.rating || component.desc || component.comments
+          )
+          .map((component) => new TableRow({
+            children: [
+              ratingItemLabel(rating.item),
+              `${rating.description} — ${component.name}`,
+              component.rating || "\u2014",
+              component.isImported ? "Pending review — not accepted" : "Reviewed",
+              component.comments || "",
+            ].map((value) => new TableCell({ children: [new Paragraph(value)] })),
+          }))
+      );
+      if (historicalRows.length > 0) {
+        children.push(new Paragraph({ text: "Historical NBI Import Review", heading: HeadingLevel.HEADING_2 }));
+        children.push(new Paragraph({
+          children: [new TextRun({
+            text: "Historical values are not active SNBI ratings. Pending values require inspector review.",
+            italics: true,
+          })],
+        }));
+        children.push(new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          rows: [
+            new TableRow({
+              children: ["Historical Item", "Component", "Imported Rating", "Review Status", "Comments"].map(
+                (heading) => new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: heading, bold: true })] })] }),
+              ),
             }),
+            ...historicalRows,
           ],
         }));
         children.push(new Paragraph({ text: "" }));
@@ -1535,7 +1642,7 @@ export default function ReviewExport({ sessionData, setSessionData }: Props) {
               { label: "Defects", value: defects.length, color: "text-foreground" },
               { label: "CS4", value: defects.filter((d) => d.cs === "CS4").length, color: "text-red-400" },
               { label: "Critical", value: defects.filter((d) => d.isCritical).length, color: "text-orange-400" },
-              { label: "NBI Ratings", value: nbiRatings.length, color: "text-blue-400" },
+              { label: "Condition Ratings", value: universalRatings.length, color: "text-blue-400" },
               { label: "Annotations", value: pdfAnnotations.filter((a) => a.type !== "_meta").length, color: "text-violet-400" },
             ].map(({ label, value, color }) => (
               <div key={label}>

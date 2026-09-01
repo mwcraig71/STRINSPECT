@@ -34,6 +34,11 @@ export interface SubComponent {
   min: string;
   rating: string;
   comments: string;
+  previousRating?: string;
+  previousDesc?: string;
+  previousMin?: string;
+  previousComments?: string;
+  isImported?: boolean;
 }
 
 export interface NbiRating {

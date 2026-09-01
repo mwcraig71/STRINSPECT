@@ -624,8 +624,8 @@ export default function InspectionScreen() {
                     <Feather name="clipboard" size={15} color="#fff" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.menuItemTitle, { color: c.foreground }]}>SNBI</Text>
-                    <Text style={[styles.menuItemSub, { color: c.mutedForeground }]}>Field Collection</Text>
+                    <Text style={[styles.menuItemTitle, { color: c.foreground }]}>Condition Ratings</Text>
+                    <Text style={[styles.menuItemSub, { color: c.mutedForeground }]}>SNBI Field Collection</Text>
                   </View>
                   <Feather name="chevron-right" size={16} color={c.mutedForeground} />
                 </TouchableOpacity>
