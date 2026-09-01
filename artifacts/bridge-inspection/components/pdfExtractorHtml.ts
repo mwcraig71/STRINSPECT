@@ -59,10 +59,13 @@ if (!pdfjsLib) {
 var extractStarted = false;
 var jobId = null;
 
-async function extract(base64Uri) {
+async function extract(pdfUri) {
   if (!pdfjsLib) { postRN({ type: 'extract-error', id: jobId, message: 'PDF.js not available.' }); return; }
   try {
-    var resp = await fetch(base64Uri);
+    var resp = await fetch(pdfUri);
+    if (!resp.ok && typeof resp.status !== 'undefined' && resp.status !== 0) {
+      throw new Error('Could not open PDF file (' + resp.status + ').');
+    }
     var buf = await resp.arrayBuffer();
     var pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
     var allPages = [];
@@ -121,7 +124,7 @@ function onMsg(e) {
     if (extractStarted) return;
     extractStarted = true;
     jobId = (typeof data.id !== 'undefined') ? data.id : null;
-    extract(data.pdfBase64);
+    extract(data.pdfUri);
   }
 }
 window.addEventListener('message', onMsg);

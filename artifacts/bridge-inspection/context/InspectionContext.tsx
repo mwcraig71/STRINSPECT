@@ -1483,7 +1483,7 @@ interface InspectionContextType {
     compIndex: number,
     action: "approve" | "disapprove" | "modify"
   ) => void;
-  importFromPdf: (source: File | { uri: string; name?: string }) => Promise<void>;
+  importFromPdf: (source: File | { uri: string; name?: string; nativeDirectUri?: boolean }) => Promise<void>;
   simulateLegacyImport: () => void;
   parsingActive: boolean;
   importSummary: ImportSummary | null;
@@ -3363,7 +3363,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   );
 
   const importFromPdf = useCallback(
-    async (source: File | { uri: string; name?: string }) => {
+    async (source: File | { uri: string; name?: string; nativeDirectUri?: boolean }) => {
       // Wipe previous session immediately so the screen is blank while parsing
       clearInspection();
       setParsingActive(true);
@@ -3798,6 +3798,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           }\n\nSee the import audit on the Summary tab. Assign locations and verify records before submitting.`
         );
       } catch (err: unknown) {
+        console.warn("[PDF import]", err);
         const { Alert } = require("react-native");
         const message = err instanceof Error ? err.message : "Could not parse the PDF. Ensure the file is a valid supported agency inspection report.";
         Alert.alert("Import Failed", message);

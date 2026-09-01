@@ -2,14 +2,14 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Platform, View } from "react-native";
 import { WebView } from "react-native-webview";
 import { getPdfExtractorHtml } from "./pdfExtractorHtml";
-import { registerPdfExtractor } from "./pdfExtractorBridge";
+import { registerPdfExtractor, type PdfExtractorSource } from "./pdfExtractorBridge";
 
 const HTML = getPdfExtractorHtml();
-const EXTRACT_TIMEOUT_MS = 60_000;
+const EXTRACT_TIMEOUT_MS = 180_000;
 
 interface Job {
   id: number;
-  base64: string;
+  source: PdfExtractorSource;
 }
 
 interface Pending {
@@ -38,7 +38,7 @@ export default function PdfTextExtractorHost() {
     if (Platform.OS === "web") return;
 
     registerPdfExtractor(
-      (base64: string) =>
+      (source: PdfExtractorSource) =>
         new Promise<string[][]>((resolve, reject) => {
           if (pendingRef.current) {
             reject(new Error("Another PDF is already being read. Please wait."));
@@ -49,7 +49,7 @@ export default function PdfTextExtractorHost() {
             reject(new Error("Reading the PDF timed out. Please try again."));
           }, EXTRACT_TIMEOUT_MS);
           pendingRef.current = { resolve, reject, timer };
-          const next: Job = { id: Date.now(), base64 };
+          const next: Job = { id: Date.now(), source };
           jobRef.current = next;
           setJob(next);
         }),
@@ -75,7 +75,10 @@ export default function PdfTextExtractorHost() {
     const msg = JSON.stringify({
       type: "extract",
       id: current.id,
-      pdfBase64: "data:application/pdf;base64," + current.base64,
+      pdfUri:
+        "uri" in current.source
+          ? current.source.uri
+          : "data:application/pdf;base64," + current.source.base64,
     });
     webViewRef.current?.postMessage(msg);
   }, []);
@@ -138,6 +141,8 @@ export default function PdfTextExtractorHost() {
         javaScriptEnabled
         originWhitelist={["*"]}
         allowFileAccess
+        allowFileAccessFromFileURLs
+        allowUniversalAccessFromFileURLs
         onLoad={onLoad}
         onMessage={onMessage}
         onError={onError}

@@ -127,7 +127,7 @@ export interface ParsedChannelCrossSection {
   comments?: string;
 }
 
-type PdfSource = File | { uri: string };
+type PdfSource = File | { uri: string; nativeDirectUri?: boolean };
 
 // Read the raw PDF bytes from a source. WEB ONLY — on web, fetch() reads
 // file/blob/http URLs correctly and File exposes arrayBuffer(). Native never
@@ -170,8 +170,16 @@ async function loadPdfText(source: PdfSource): Promise<string[][]> {
 // SAME per-page line/column reconstruction as loadPdfTextWeb below (see
 // components/pdfExtractorHtml.ts), so downstream parsers match identically.
 async function loadPdfTextNative(source: PdfSource): Promise<string[][]> {
+  if (
+    typeof source === "object" &&
+    "uri" in source &&
+    source.nativeDirectUri &&
+    !source.uri.startsWith("data:")
+  ) {
+    return extractPdfTextNative({ uri: source.uri });
+  }
   const base64 = await readPdfBase64(source);
-  return extractPdfTextNative(base64);
+  return extractPdfTextNative({ base64 });
 }
 
 // Web: run pdf.js directly in the browser.

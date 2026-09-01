@@ -29,7 +29,9 @@ Same pattern is used in `PDFAnnotatorModal.tsx` (read→data: URI) and
 and `atob`-decode directly — no platform branch needed.
 
 **Why:** RN's `fetch`/Blob has no dependable local-file support; expo-file-system
-is the supported way to get bytes. **How to apply:** any time you need raw bytes
-of a picked/bundled file on native (parsing, uploading, hashing), use the FS read,
-not fetch. The sample report lives at `assets/docs/sample-inspection-report.pdf`
-(real 14-page TxDOT report) and is a valid end-to-end test via "Load Sample Report".
+is the supported way to get bytes. **How to apply:** when React Native itself
+needs raw bytes for parsing, uploading, or hashing, use the FS read, not fetch.
+Exception: do not load very large bundled PDFs into RN memory as base64. The
+headless extraction WebView can receive a direct local file URI with local-file
+access enabled, avoiding several in-memory copies while still letting pdf.js read
+the file in a browser runtime.

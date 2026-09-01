@@ -95,7 +95,11 @@ export default function BridgesScreen() {
         Alert.alert("Error", "Could not load sample report from device storage.");
         return;
       }
-      await importFromPdf({ uri: asset.localUri, name: "237-InspectReport_Routine-2025-09-03-001.pdf" });
+      await importFromPdf({
+        uri: asset.localUri,
+        name: "237-InspectReport_Routine-2025-09-03-001.pdf",
+        nativeDirectUri: true,
+      });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Could not load sample report.";
       Alert.alert("Error", message);
@@ -103,11 +107,20 @@ export default function BridgesScreen() {
   };
 
   const handleLoadSampleReport = () => {
+    const message = hasActiveSession
+      ? "This will replace the current inspection with the bundled SCDOT sample report."
+      : "This will open the bundled SCDOT sample report as a new inspection.";
+
+    if (Platform.OS === "web") {
+      if (typeof window !== "undefined" && window.confirm(message)) {
+        void loadSampleReport();
+      }
+      return;
+    }
+
     Alert.alert(
       "Load South Carolina DOT Sample?",
-      hasActiveSession
-        ? "This will replace the current inspection with the bundled SCDOT sample report."
-        : "This will open the bundled SCDOT sample report as a new inspection.",
+      message,
       [
         { text: "Cancel", style: "cancel" },
         { text: "Load Sample", style: "destructive", onPress: () => { void loadSampleReport(); } },

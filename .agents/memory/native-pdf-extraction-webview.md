@@ -12,16 +12,18 @@ split by platform in `utils/pdfParser.ts` (`loadPdfText`):
 - **Web** (`loadPdfTextWeb`): pdf.js runs directly in the browser. pdf.js is
   **lazy-loaded** (`getWebPdfjs`) so the heavy browser-only bundle never enters
   the native Metro graph.
-- **Native** (`loadPdfTextNative`): reads the PDF as base64, then drives a headless
-  WebView through an imperative bridge.
+- **Native** (`loadPdfTextNative`): drives a headless WebView through an imperative
+  bridge. Normal picked files use an expo-file-system base64 read; large bundled
+  PDFs pass their local file URI directly to the WebView to avoid duplicating
+  hundreds of megabytes in React Native memory.
 
 ## Moving parts
 - `components/pdfExtractorHtml.ts` — self-contained HTML that reuses the annotator's
   bundled pdf.js (`pdfAnnotatorPdfjsBundled.ts`) and extracts text.
 - `components/pdfExtractorBridge.ts` — module singleton; the host registers its impl,
-  the (non-component) parser calls `extractPdfTextNative(base64)`.
+  the (non-component) parser passes either a base64 payload or local file URI.
 - `components/PdfTextExtractorHost.tsx` — always mounted (in `app/_layout.tsx`),
-  invisible; owns one on-demand WebView. Single-flight, 60s timeout, teardown reject.
+  invisible; owns one on-demand WebView. Single-flight, 180s timeout, teardown reject.
 
 ## Hard constraint: web/native extraction parity
 The per-page line/column reconstruction is **duplicated** (TS in `loadPdfTextWeb`,
@@ -35,5 +37,9 @@ downstream pure parsers stop matching. The shared recipe: bucket rows by
 - Send the PDF to the WebView via `webViewRef.postMessage(...)`, NOT by eval'ing a
   multi-MB JS string through `injectJavaScript` — the latter is fragile for large
   payloads.
+- Do not base64-encode very large bundled PDFs. Base64 adds roughly one-third in
+  size and JSON/state transfer creates additional copies, which can exhaust a
+  phone's memory before pdf.js starts. Mark that source for direct URI transport
+  and allow local-file access on the extraction WebView.
 - Correlate request/response with a **job id**; a late result from a torn-down job
   must be ignored or it can resolve a newer pending job with stale pages.
