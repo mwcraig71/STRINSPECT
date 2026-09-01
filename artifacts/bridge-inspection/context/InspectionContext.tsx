@@ -415,7 +415,14 @@ const SNBI_CODE_TO_DEFECT_ID: Record<string, string> = {
   "7000": "damage",
 };
 
-export type SnbiElement = (typeof SNBI_ELEMENTS)[number];
+export type SnbiElement = {
+  readonly id: string;
+  readonly name: string;
+  readonly category: string;
+  readonly material: string;
+  readonly unit: string;
+  readonly core: boolean;
+};
 export type DefectType = { id: string; name: string; unit: string };
 export type ConditionState = "CS1" | "CS2" | "CS3" | "CS4";
 
@@ -2439,6 +2446,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const resetElementFilters = useCallback(() => {
     setElementZoneFilterState("All");
     setActiveElementIdsState([]);
+    setElementSearch("");
     AsyncStorage.multiRemove([
       STORAGE_KEYS.ELEMENT_ZONE_FILTER,
       STORAGE_KEYS.ACTIVE_ELEMENT_IDS,
@@ -3071,15 +3079,26 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
       const matchedEl = SNBI_ELEMENTS.find(
         (e) => String(e.id) === String(record.elementId)
       );
-      if (matchedEl) {
-        setElement(matchedEl);
-        const available = DEFECTS_BY_ELEMENT[matchedEl.id] || [];
-        setDefect(
-          available.find((d) => String(d.id) === String(record.defectId)) ||
-            available[0] ||
-            null
-        );
-      }
+      const inferredUnit = record.quantityValue
+        ? record.quantity.replace(record.quantityValue, "").trim() || "ea"
+        : "ea";
+      const editableElement: SnbiElement = matchedEl ?? {
+        id: String(record.elementId || "imported"),
+        name: record.element,
+        category: "Imported",
+        material: "Other",
+        unit: inferredUnit,
+        core: false,
+      };
+      setElement(editableElement);
+      const available = DEFECTS_BY_ELEMENT[editableElement.id] || [];
+      setDefect(
+        available.find((d) => String(d.id) === String(record.defectId)) ?? {
+          id: String(record.defectId || "imported"),
+          name: record.defect,
+          unit: inferredUnit,
+        }
+      );
       setEnvironment(record.environment);
       setConditionState(record.cs);
       setQuantity(record.quantityValue);
