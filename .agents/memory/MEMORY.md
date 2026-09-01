@@ -2,7 +2,7 @@
 - [Metro react dedup for Expo web](metro-react-dedup-web.md) — react/react-dom must be aliased in metro.config.js for Expo apps in this pnpm monorepo.
 - [New Expo packages + Metro pnpm symlinks](metro-new-package-resolution.md) — any new Expo package installed via pnpm may need an extraNodeModules entry in metro.config.js to resolve; pnpm symlinks alone are insufficient for Metro in this monorepo.
 - [Opening bundled PDFs in Expo](expo-bundled-pdf-open.md) — bundle + open a static PDF across web/native; web popup-blocker gotcha.
-- [Native PDF text extraction via WebView](native-pdf-extraction-webview.md) — native extraction runs in a WebView; large bundled PDFs use direct file URIs to avoid base64 memory spikes.
+- [Native PDF text extraction via WebView](native-pdf-extraction-webview.md) — native extraction runs in a WebView; direct file:// fetch can fail, so moderate PDFs use base64 transport.
 - [Reading local file bytes in RN](rn-read-local-file-bytes.md) — use expo-file-system base64 for normal picked files; large bundled PDFs must bypass RN byte loading.
 - [pdf.js worker in WebView](pdfjs-webview-worker.md) — workerSrc='' throws on real devices; use Blob URL from embedded worker JSON. Eval fallback for old engines.
 - [structure-number sync](structure-number-sync.md) — how the bridge structure number stays consistent across CIF, Underclearance, and the global header.

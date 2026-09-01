@@ -98,7 +98,6 @@ export default function BridgesScreen() {
       await importFromPdf({
         uri: asset.localUri,
         name: "261-InspectReport_Routine-2024-11-06-001.pdf",
-        nativeDirectUri: true,
       });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Could not load sample report.";
