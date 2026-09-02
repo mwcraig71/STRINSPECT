@@ -1,8 +1,21 @@
 uploads = []
-outputs = []
 
 [[generated]]
 id = "cIWt439IcybPUsLhf9nJ8"
 uri = "file://artifacts/bridge-inspection/assets/images/icon.png"
 type = "image"
 title = "bridge inspection app icon"
+
+[[outputs]]
+id = "euJWVy3BgFswD1uY9Zspa"
+uri = "file://underwater-element-filter-proposal.md"
+type = "text"
+title = "Underwater Element Filtering Proposal"
+description = "Proposal for Claude covering SCDOT underwater element filtering, All, Shortlist, and Done behavior."
+logical_id = "844d5892-c2ec-4858-afd8-414e462eacd5"
+content_hash = "sha256:744793e5ee63ea2c3560d8fd8609f9938eedaad55f389024389567cf50d6d47d"
+size = 8694
+mtime_ms = 1788353553276
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:176b01c2-b254-47bc-b4f0-9ba935fc8dc1/844d5892-c2ec-4858-afd8-414e462eacd5/6971e5a5-69af-4cc7-b290-463f6fdc6f13"
+storage_version_token = "1788353674403329"
+content_type = "text/markdown"
