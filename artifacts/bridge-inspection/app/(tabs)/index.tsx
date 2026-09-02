@@ -390,9 +390,9 @@ export default function InspectionScreen() {
                 <Feather name="menu" size={18} color="#e2e8f0" />
               </TouchableOpacity>
             <Feather name="activity" size={16} color="#38bdf8" />
-            <View>
-              <Text style={styles.headerTitleText}>Bridge Elements</Text>
-              <Text style={{ color: "#94a3b8", fontSize: 11, marginTop: 1 }}>
+            <View style={styles.headerTitleContent}>
+              <Text style={styles.headerTitleText} numberOfLines={1}>Bridge Elements</Text>
+              <Text style={{ color: "#94a3b8", fontSize: 11, marginTop: 1 }} numberOfLines={1}>
                 {structureNumber ? structureNumber : "No bridge selected — go to Bridges tab"}
               </Text>
             </View>
@@ -1391,9 +1391,10 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingTop: 8,
   },
-  headerTitle: { flexDirection: "row", alignItems: "center", gap: 7 },
-  headerTitleText: { fontSize: 14, fontWeight: "900", color: "#f8fafc", letterSpacing: -0.3, textTransform: "uppercase" },
-  headerActions: { flexDirection: "row", alignItems: "center", gap: 8 },
+  headerTitle: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 7 },
+  headerTitleContent: { flex: 1, minWidth: 0 },
+  headerTitleText: { flexShrink: 1, fontSize: 14, fontWeight: "900", color: "#f8fafc", letterSpacing: -0.3, textTransform: "uppercase" },
+  headerActions: { flexShrink: 0, flexDirection: "row", alignItems: "center", gap: 8 },
   moduleToggleHeaderBtn: {
     flexDirection: "row",
     alignItems: "center",
