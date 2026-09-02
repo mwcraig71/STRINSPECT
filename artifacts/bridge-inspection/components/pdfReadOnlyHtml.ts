@@ -13,7 +13,7 @@ export function getPdfReadOnlyHtml(): string {
 body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;overflow:hidden;height:100vh}
 #topbar{position:fixed;top:0;left:0;right:0;z-index:200;height:40px;background:#0f172a;border-bottom:1px solid #334155;display:flex;align-items:center;padding:0 12px;gap:8px}
 #page-info{color:#94a3b8;font-size:11px;font-weight:700;flex:1;white-space:nowrap;overflow:hidden}
-#scroll-area{position:absolute;top:40px;bottom:140px;left:0;right:0;overflow-y:auto;overflow-x:auto;-webkit-overflow-scrolling:auto;background:#1e293b}
+#scroll-area{position:absolute;top:40px;bottom:140px;left:0;right:0;overflow-y:auto;overflow-x:auto;-webkit-overflow-scrolling:auto;touch-action:pan-x pan-y;background:#1e293b}
 #scroll-area.drawing{overflow:hidden}
 .page-wrap{position:relative;margin:8px auto;display:block;box-shadow:0 2px 12px rgba(0,0,0,.6)}
 .pdf-canvas{display:block;width:100%}
@@ -501,6 +501,62 @@ function zoomOut() {
     if (ZOOM_STEPS[i] < zoomLevel - 0.01) { var p = zoomLevel; zoomLevel = ZOOM_STEPS[i]; applyZoom(p); return; }
   }
 }
+
+function applyZoomAt(nextZoom, clientX, clientY) {
+  var area = document.getElementById('scroll-area');
+  var rect = area.getBoundingClientRect();
+  var pz = zoomLevel || 1;
+  var cx = (area.scrollLeft + clientX - rect.left) / pz;
+  var cy = (area.scrollTop + clientY - rect.top) / pz;
+  zoomLevel = nextZoom;
+  document.getElementById('zoom-wrap').style.zoom = zoomLevel;
+  document.getElementById('zoom-label').textContent = Math.round(zoomLevel * 100) + '%';
+  area.scrollLeft = cx * zoomLevel - (clientX - rect.left);
+  area.scrollTop = cy * zoomLevel - (clientY - rect.top);
+}
+
+/* ── Tablet pinch zoom ── */
+var pinchStartDistance = 0;
+var pinchStartZoom = 1;
+var pinchActive = false;
+function touchDistance(t1, t2) {
+  var dx = t1.clientX - t2.clientX;
+  var dy = t1.clientY - t2.clientY;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+function touchMidpoint(t1, t2) {
+  return { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
+}
+function applyPinchZoom(e) {
+  if (!pinchActive || !e.touches || e.touches.length < 2) return;
+  e.preventDefault();
+  var distance = touchDistance(e.touches[0], e.touches[1]);
+  if (!pinchStartDistance) return;
+  var nextZoom = Math.max(0.5, Math.min(3.0, pinchStartZoom * distance / pinchStartDistance));
+  var mid = touchMidpoint(e.touches[0], e.touches[1]);
+  applyZoomAt(nextZoom, mid.x, mid.y);
+}
+function beginPinch(e) {
+  if (!e.touches || e.touches.length !== 2) return;
+  e.preventDefault();
+  pinchActive = true;
+  pinchStartDistance = touchDistance(e.touches[0], e.touches[1]);
+  pinchStartZoom = zoomLevel;
+  isDrawing = false;
+  currentStroke = null;
+  activeCv = null;
+}
+function endPinch(e) {
+  if (!e.touches || e.touches.length < 2) {
+    pinchActive = false;
+    pinchStartDistance = 0;
+  }
+}
+var zoomTouchArea = document.getElementById('scroll-area');
+zoomTouchArea.addEventListener('touchstart', beginPinch, { passive: false });
+zoomTouchArea.addEventListener('touchmove', applyPinchZoom, { passive: false });
+zoomTouchArea.addEventListener('touchend', endPinch, { passive: false });
+zoomTouchArea.addEventListener('touchcancel', endPinch, { passive: false });
 
 function undoLast() {
   if (annotations.length === 0) return;
