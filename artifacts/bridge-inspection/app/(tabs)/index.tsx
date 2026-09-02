@@ -102,7 +102,6 @@ export default function InspectionScreen() {
     includeUndersideUnderwater,
     setIncludeUndersideUnderwater,
     zoneOptions,
-    resetElementFilters,
     sessionManifest,
     legacyManifest,
     savedDefects,
@@ -683,14 +682,16 @@ export default function InspectionScreen() {
       >
         {/* ── Location ── */}
         <View style={[styles.section, { backgroundColor: c.card, borderTopColor: c.headerBg }]}>
-          <Text style={[styles.sectionLabel, { color: c.mutedForeground }]}>Location</Text>
-          <TouchableOpacity
-            style={[styles.picker, { backgroundColor: c.background, borderColor: c.border }]}
-            onPress={() => setLocationPickerOpen(!locationPickerOpen)}
-          >
-            <Text style={[styles.pickerValue, { color: c.foreground }]}>{currentLocation || "Select location..."}</Text>
-            <Feather name={locationPickerOpen ? "chevron-up" : "chevron-down"} size={18} color={c.mutedForeground} />
-          </TouchableOpacity>
+          <View style={styles.inlinePickerRow}>
+            <Text style={[styles.fieldLabel, styles.inlinePickerLabel, { color: c.mutedForeground }]}>Location</Text>
+            <TouchableOpacity
+              style={[styles.picker, styles.inlinePicker, { backgroundColor: c.background, borderColor: c.border }]}
+              onPress={() => setLocationPickerOpen(!locationPickerOpen)}
+            >
+              <Text style={[styles.pickerValue, { color: c.foreground }]}>{currentLocation || "Select location..."}</Text>
+              <Feather name={locationPickerOpen ? "chevron-up" : "chevron-down"} size={18} color={c.mutedForeground} />
+            </TouchableOpacity>
+          </View>
           {locationPickerOpen && (
             <ScrollView style={[styles.dropdownList, { borderColor: c.border }]} nestedScrollEnabled>
               {locationSequence.map((loc) => (
@@ -732,17 +733,6 @@ export default function InspectionScreen() {
              <Text style={[styles.sectionLabel, { color: c.mutedForeground }]}>Elements</Text>
           </View>
 
-          {/* Element */}
-           <View style={styles.elementFilterHeader}>
-             <Text style={[styles.fieldLabel, { color: c.mutedForeground }]}>Element</Text>
-             <TouchableOpacity
-               onPress={resetElementFilters}
-               accessibilityRole="button"
-                accessibilityLabel="Reset element filters"
-             >
-               <Text style={[styles.resetFilterText, { color: c.primary }]}>Reset</Text>
-             </TouchableOpacity>
-           </View>
            {underwaterZoneActive && (
              <TouchableOpacity
                accessibilityRole="switch"
@@ -919,10 +909,11 @@ export default function InspectionScreen() {
                 </View>
               ))}
             </View>
-            <View style={styles.legacyCs1Row}>
-                <Text style={[styles.fieldLabel, { color: CS_COLORS.CS1 }]}>CS1 Quantity</Text>
+             <View style={styles.quantityFooterRow}>
+               <View style={styles.quantityFooterField}>
+                 <Text style={[styles.fieldLabel, { color: CS_COLORS.CS1 }]}>CS1 Quantity</Text>
                 <TextInput
-                  style={[styles.legacyCs1Input, { borderColor: CS_COLORS.CS1, color: c.foreground, backgroundColor: c.card }]}
+                   style={[styles.quantityFooterInput, { borderColor: CS_COLORS.CS1, color: c.foreground, backgroundColor: c.card }]}
                   value={conditionQuantities.CS1 || ""}
                   onChangeText={(value) => setConditionQuantities({ ...conditionQuantities, CS1: value })}
                   keyboardType="decimal-pad"
@@ -931,7 +922,20 @@ export default function InspectionScreen() {
                   accessibilityLabel="CS1 quantity"
                 />
               </View>
+               <View style={styles.quantityFooterField}>
+                 <Text style={[styles.fieldLabel, { color: c.mutedForeground }]}>Maintenance Qty (Optional)</Text>
+                 <TextInput
+                   style={[styles.quantityFooterInput, { backgroundColor: "#eff6ff", borderColor: "#bfdbfe", color: "#1d4ed8" }]}
+                   value={maintenanceQuantity}
+                   onChangeText={setMaintenanceQuantity}
+                   keyboardType="numeric"
+                   placeholder={String(Object.values(conditionQuantities).reduce((sum, value) => sum + (parseFloat(value || "") || 0), 0)) || "Override..."}
+                   placeholderTextColor="#93c5fd"
+                   accessibilityLabel="Maintenance quantity"
+                 />
+               </View>
           </View>
+           </View>
           <TouchableOpacity
             style={[styles.bulkApplyAllBtn, { backgroundColor: c.secondary, borderColor: c.border }]}
             onPress={applyConditionQuantitiesToLoggedDefects}
@@ -943,26 +947,6 @@ export default function InspectionScreen() {
               Apply quantities to matching logged defects
             </Text>
           </TouchableOpacity>
-
-          {/* Maintenance Qty */}
-          <View style={styles.twoCol}>
-            <View style={styles.colLeft}>
-              <Text style={[styles.matrixHint, { color: c.mutedForeground }]}>
-                Enter quantities for this defect. Save Defect records them here; the secondary action above is only for bulk-editing matching logged defects.
-              </Text>
-            </View>
-            <View style={styles.colRight}>
-              <Text style={[styles.fieldLabel, { color: c.mutedForeground }]}>Maint Qty (Optional)</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: "#eff6ff", borderColor: "#bfdbfe", color: "#1d4ed8" }]}
-                value={maintenanceQuantity}
-                onChangeText={setMaintenanceQuantity}
-                keyboardType="numeric"
-                placeholder={String(Object.values(conditionQuantities).reduce((sum, value) => sum + (parseFloat(value || "") || 0), 0)) || "Override..."}
-                placeholderTextColor="#93c5fd"
-              />
-            </View>
-          </View>
 
           {/* Notes */}
           <View style={styles.notesLabelRow}>
@@ -1388,8 +1372,9 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
   sectionLabel: { fontSize: 10, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.5 },
   fieldLabel: { fontSize: 9, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.3 },
-  elementFilterHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  resetFilterText: { fontSize: 11, fontWeight: "800" },
+  inlinePickerRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  inlinePickerLabel: { width: 52 },
+  inlinePicker: { flex: 1 },
   zoneFilterText: { fontSize: 10, fontWeight: "800" },
   zoneToggle: {
     alignSelf: "flex-start",
@@ -1490,9 +1475,9 @@ const styles = StyleSheet.create({
   csMatrixInput: { borderWidth: 1.5, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 6, textAlign: "center", fontSize: 14, fontWeight: "800" },
   bulkApplyAllBtn: { borderWidth: 1, borderRadius: 8, paddingVertical: 9, paddingHorizontal: 10, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 7 },
   bulkApplyAllText: { fontSize: 11, fontWeight: "800" },
-  legacyCs1Row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, paddingTop: 4 },
-  legacyCs1Input: { width: 90, borderWidth: 1, borderRadius: 8, padding: 7, textAlign: "center", fontWeight: "800" },
-  matrixHint: { fontSize: 10, lineHeight: 14 },
+  quantityFooterRow: { flexDirection: "row", gap: 8, paddingTop: 4 },
+  quantityFooterField: { flex: 1, gap: 5 },
+  quantityFooterInput: { borderWidth: 1, borderRadius: 8, padding: 7, textAlign: "center", fontWeight: "800" },
   input: { borderWidth: 1, borderRadius: 10, padding: 8, fontSize: 14, fontWeight: "800" },
   textArea: {
     borderWidth: 1,
