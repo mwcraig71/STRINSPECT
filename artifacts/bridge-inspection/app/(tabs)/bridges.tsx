@@ -91,12 +91,15 @@ export default function BridgesScreen() {
       const module = require("@/assets/docs/sample-inspection-report.pdf");
       const asset = Asset.fromModule(module);
       await asset.downloadAsync();
-      if (!asset.localUri) {
+      // On web, localUri can resolve to a device-style cache URI that fetch()
+      // cannot load. asset.uri is the browser-served Metro asset URL.
+      const sampleUri = Platform.OS === "web" ? asset.uri : asset.localUri;
+      if (!sampleUri) {
         Alert.alert("Error", "Could not load sample report from device storage.");
         return;
       }
       await importFromPdf({
-        uri: asset.localUri,
+        uri: sampleUri,
         name: "261-InspectReport_Routine-2024-11-06-001.pdf",
       });
     } catch (err: unknown) {

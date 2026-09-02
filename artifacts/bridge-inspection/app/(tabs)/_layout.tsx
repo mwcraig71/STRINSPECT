@@ -13,13 +13,9 @@ import { SyncToast } from "@/components/SyncToast";
 import { useAutoSync } from "@/hooks/useAutoSync";
 import { TabletSplitLayout } from "@/components/TabletSplitLayout";
 
-function NativeTabLayout({ missingPhotoCount }: { missingPhotoCount: number }) {
+function NativeTabLayout() {
   return (
     <NativeTabs>
-      <NativeTabs.Trigger name="bridges">
-        <Icon sf={{ default: "square.stack", selected: "square.stack.fill" }} />
-        <Label>Bridges</Label>
-      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="index">
         <Icon sf={{ default: "doc.text", selected: "doc.text.fill" }} />
         <Label>Elements</Label>
@@ -40,7 +36,7 @@ function NativeTabLayout({ missingPhotoCount }: { missingPhotoCount: number }) {
   );
 }
 
-function ClassicTabLayoutWithSync({ pendingCount, missingPhotoCount }: { pendingCount: number; missingPhotoCount: number }) {
+function ClassicTabLayout({ missingPhotoCount }: { missingPhotoCount: number }) {
   const colors = useColors();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
@@ -74,15 +70,7 @@ function ClassicTabLayoutWithSync({ pendingCount, missingPhotoCount }: { pending
       <Tabs.Screen
         name="bridges"
         options={{
-          title: "Bridges",
-          tabBarBadge: pendingCount > 0 ? pendingCount : undefined,
-          tabBarBadgeStyle: { backgroundColor: "#f59e0b", fontSize: 10 },
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="square.stack" tintColor={color} size={22} />
-            ) : (
-              <Feather name="layers" size={21} color={color} />
-            ),
+          href: null,
         }}
       />
       <Tabs.Screen
@@ -140,13 +128,13 @@ function ClassicTabLayoutWithSync({ pendingCount, missingPhotoCount }: { pending
 }
 
 function TabContent() {
-  const { toastVisible, toastKey, pendingCount } = useAutoSync();
+  const { toastVisible, toastKey } = useAutoSync();
   const { standardPhotos } = useInspection();
   const missingPhotoCount = standardPhotos.filter((s) => !s.photoUri).length;
 
   const tabNav = Platform.OS === "ios" && isLiquidGlassAvailable()
-    ? <NativeTabLayout missingPhotoCount={missingPhotoCount} />
-    : <ClassicTabLayoutWithSync pendingCount={pendingCount} missingPhotoCount={missingPhotoCount} />;
+    ? <NativeTabLayout />
+    : <ClassicTabLayout missingPhotoCount={missingPhotoCount} />;
   return (
     <TabletSplitLayout>
       <View style={{ flex: 1 }}>

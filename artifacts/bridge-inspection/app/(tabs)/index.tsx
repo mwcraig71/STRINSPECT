@@ -4,7 +4,7 @@ import * as ImagePicker from "expo-image-picker";
 import { resizePhoto } from "@/lib/photoUtils";
 import * as Location from "expo-location";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
 import {
   Alert,
@@ -25,7 +25,7 @@ import { lookupCS } from "@/data/csDescriptions";
 import { useIsTablet } from "@/hooks/useIsTablet";
 
 import { useColors } from "@/hooks/useColors";
-import { effectiveZone, isInZone, sortForUnderwater, ZONE_FILTERS } from "@/utils/elementZones";
+import { effectiveZone, isInZone, sortForUnderwater } from "@/utils/elementZones";
 import {
   DEFECTS_BY_ELEMENT,
   INSPECTION_TYPES,
@@ -134,10 +134,8 @@ export default function InspectionScreen() {
     setShowSteelPipePileModal,
     imageSize,
     dateStampEnabled,
-    hasUnsyncedChanges,
     setLastPhotoSource,
   } = useInspection();
-  const router = useRouter();
 
   const scrollRef = React.useRef<ScrollView>(null);
 
@@ -179,35 +177,12 @@ export default function InspectionScreen() {
   const [showLegacyCS1, setShowLegacyCS1] = useState(false);
   const [showAllLegacySides, setShowAllLegacySides] = useState(false);
 
-  const leaveInspection = React.useCallback(() => {
-    const goToBridges = () => router.navigate("/bridges");
-    if (hasUnsyncedChanges) {
-      const message = "You have data that hasn't been submitted. Leaving this inspection will keep it as the active draft.";
-      if (Platform.OS === "web") {
-        if (typeof window !== "undefined" && window.confirm(message)) {
-          goToBridges();
-        }
-        return;
-      }
-      Alert.alert(
-        "Unsubmitted Changes",
-        message,
-        [
-          { text: "Stay Here", style: "cancel" },
-          { text: "Go to Bridges", onPress: goToBridges },
-        ],
-      );
-    } else {
-      goToBridges();
-    }
-  }, [hasUnsyncedChanges, router]);
+  React.useEffect(() => {
+    // Zone selection now comes exclusively from the inspection-mode control in
+    // the header. Clear any previously persisted chip override.
+    if (elementZoneFilter !== "All") setElementZoneFilter("All");
+  }, [elementZoneFilter, setElementZoneFilter]);
 
-  const startAnotherInspection = React.useCallback(() => {
-    router.navigate({
-      pathname: "/bridges",
-      params: { newInspection: Date.now().toString() },
-    });
-  }, [router]);
   const addPhoto = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -462,26 +437,6 @@ export default function InspectionScreen() {
               <Feather name="settings" size={18} color="#94a3b8" />
             </TouchableOpacity>
           </View>
-        </View>
-        <View style={styles.headerQuickActions}>
-          <TouchableOpacity
-            style={styles.headerQuickAction}
-            onPress={leaveInspection}
-            accessibilityRole="button"
-            accessibilityLabel="Back to Bridges"
-          >
-            <Feather name="arrow-left" size={14} color="#38bdf8" />
-            <Text style={styles.headerQuickActionText}>Bridges</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.headerQuickAction}
-            onPress={startAnotherInspection}
-            accessibilityRole="button"
-            accessibilityLabel="Start a new inspection"
-          >
-            <Feather name="plus" size={14} color="#38bdf8" />
-            <Text style={styles.headerQuickActionText}>New Inspection</Text>
-          </TouchableOpacity>
         </View>
       </View>
       <SettingsModal visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
@@ -793,7 +748,7 @@ export default function InspectionScreen() {
              </TouchableOpacity>
            </View>
            <View style={styles.zoneFilterRow}>
-             {ZONE_FILTERS.map((zone) => (
+             {(["All"] as const).map((zone) => (
                <TouchableOpacity
                  key={zone}
                  accessibilityRole="button"
@@ -804,7 +759,7 @@ export default function InspectionScreen() {
                      ? { backgroundColor: c.primary, borderColor: c.primary }
                      : { backgroundColor: c.secondary, borderColor: c.border },
                  ]}
-                 onPress={() => setElementZoneFilter(zone)}
+                 onPress={() => setElementZoneFilter("All")}
                >
                  <Text style={[styles.zoneFilterText, { color: elementZoneFilter === zone ? "#fff" : c.mutedForeground }]}>
                    {zone}
@@ -1419,30 +1374,6 @@ const styles = StyleSheet.create({
   headerTitle: { flexDirection: "row", alignItems: "center", gap: 7 },
   headerTitleText: { fontSize: 14, fontWeight: "900", color: "#f8fafc", letterSpacing: -0.3, textTransform: "uppercase" },
   headerActions: { flexDirection: "row", alignItems: "center", gap: 8 },
-  headerQuickActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 8,
-  },
-  headerQuickAction: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    backgroundColor: "#0c1a2e",
-    borderColor: "#0369a1",
-    borderWidth: 1,
-    borderRadius: 9,
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-  },
-  headerQuickActionText: {
-    color: "#bae6fd",
-    fontSize: 10,
-    fontWeight: "800",
-    textTransform: "uppercase",
-    letterSpacing: 0.3,
-  },
   moduleToggleHeaderBtn: {
     flexDirection: "row",
     alignItems: "center",
