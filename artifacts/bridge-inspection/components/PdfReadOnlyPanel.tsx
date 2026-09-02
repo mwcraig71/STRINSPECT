@@ -61,7 +61,7 @@ export function PdfReadOnlyPanel({ pdfPath, style, onImportPress, annotations, o
     return () => window.removeEventListener("message", handler);
   }, []);
 
-  // ── Native: read file via expo-file-system and inject as base64 ──
+  // ── Native: hand the local file URI to the WebView (no base64 copy in RN memory) ──
   const injectPdf = useCallback(async () => {
     if (injectedRef.current || !pdfPath) return;
     injectedRef.current = true;
@@ -72,10 +72,10 @@ export function PdfReadOnlyPanel({ pdfPath, style, onImportPress, annotations, o
         setLoadError("PDF file not found. Please re-import the report.");
         return;
       }
-      const b64 = await FileSystem.readAsStringAsync(pdfPath, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-      const base64Uri = "data:application/pdf;base64," + b64;
+      const source = /^file:/i.test(pdfPath)
+        ? pdfPath
+        : "data:application/pdf;base64," +
+          (await FileSystem.readAsStringAsync(pdfPath, { encoding: FileSystem.EncodingType.Base64 }));
       const existingAnns = (annotations ?? []).filter(
         (a) => (a as { type?: string } | null)?.type !== "_meta",
       );
@@ -84,7 +84,7 @@ export function PdfReadOnlyPanel({ pdfPath, style, onImportPress, annotations, o
       const customRaw = await AsyncStorage.getItem(CUSTOM_SHORTCUTS_KEY).catch(() => null);
       const overridesRaw = await AsyncStorage.getItem(SC_OVERRIDES_KEY).catch(() => null);
       const hiddenRaw = await AsyncStorage.getItem(SC_HIDDEN_KEY).catch(() => null);
-      const msg = JSON.stringify({ type: "init", pdfBase64: base64Uri, annotations: existingAnns, shortcuts: mergeShortcuts(customRaw, overridesRaw, hiddenRaw), scFavorites: favIds });
+      const msg = JSON.stringify({ type: "init", pdfUri: source, annotations: existingAnns, shortcuts: mergeShortcuts(customRaw, overridesRaw, hiddenRaw), scFavorites: favIds });
       const js = `(function(){var e=new MessageEvent('message',{data:${JSON.stringify(msg)}});window.dispatchEvent(e);document.dispatchEvent(e);})();true;`;
       webViewRef.current?.injectJavaScript(js);
     } catch (err) {
@@ -242,6 +242,8 @@ export function PdfReadOnlyPanel({ pdfPath, style, onImportPress, annotations, o
             javaScriptEnabled
             originWhitelist={["*"]}
             allowFileAccess
+            allowFileAccessFromFileURLs
+            allowUniversalAccessFromFileURLs
             scrollEnabled={false}
             onLoad={onWebViewLoad}
             onMessage={(event: { nativeEvent: { data: string } }) => {

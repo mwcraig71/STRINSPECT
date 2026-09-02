@@ -1,0 +1,67 @@
+{
+ "structureNumber": "",
+ "elements": [],
+ "nbi": [],
+ "isSnbi": false,
+ "underclearance": {
+  "district": "02",
+  "county": "220",
+  "controlSection": "0747-04",
+  "structureNumber": "046",
+  "route": "Center Pedestrian Bridge",
+  "featureCrossed": "FM-157",
+  "inspectionDate": "4/14/2024",
+  "entries": [
+   {
+    "psn": "",
+    "rightLateral": {
+     "data": "6.5'",
+     "refer": "L-M"
+    },
+    "leftLateral": {
+     "data": "0",
+     "refer": "-"
+    },
+    "totalHorizontal": {
+     "data": "78.9'",
+     "refer": "M-M"
+    },
+    "maxPracticalVert": {
+     "data": "Clr",
+     "refer": ""
+    },
+    "minMeasuredVert": {
+     "data": "Clr",
+     "refer": "19'2\""
+    },
+    "signedVertData": "17'10\"",
+    "signedVertTolerance": "1'4\""
+   },
+   {
+    "psn": "",
+    "rightLateral": {
+     "data": "",
+     "refer": ""
+    },
+    "leftLateral": {
+     "data": "",
+     "refer": ""
+    },
+    "totalHorizontal": {
+     "data": "",
+     "refer": ""
+    },
+    "maxPracticalVert": {
+     "data": "Clr",
+     "refer": ""
+    },
+    "minMeasuredVert": {
+     "data": "Clr",
+     "refer": ""
+    },
+    "signedVertData": "",
+    "signedVertTolerance": ""
+   }
+  ]
+ }
+}

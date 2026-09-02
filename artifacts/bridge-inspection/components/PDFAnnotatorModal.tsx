@@ -54,7 +54,10 @@ export default function PDFAnnotatorModal({ visible, pdfPath, annotations, onSav
     }
   }, [visible]);
 
-  const buildInitMsg = useCallback(async (base64Uri: string): Promise<string> => {
+  // `pdfSource` is either a data: URI (web) or a local file:// URI (native). The
+  // WebView fetches the file itself, so a 200 MB report is never copied
+  // through React Native memory as base64.
+  const buildInitMsg = useCallback(async (pdfSource: string): Promise<string> => {
     const existingAnnotations = (annotations ?? []).filter(
       (a) => (a as { type?: string } | null)?.type !== "_meta",
     );
@@ -65,7 +68,7 @@ export default function PDFAnnotatorModal({ visible, pdfPath, annotations, onSav
     const hiddenRaw = await AsyncStorage.getItem(SC_HIDDEN_KEY).catch(() => null);
     return JSON.stringify({
       type: "init",
-      pdfBase64: base64Uri,
+      pdfUri: pdfSource,
       annotations: existingAnnotations,
       shortcuts: mergeShortcuts(customRaw, overridesRaw, hiddenRaw),
       scFavorites: favIds,
@@ -103,9 +106,10 @@ export default function PDFAnnotatorModal({ visible, pdfPath, annotations, onSav
         return;
       }
 
-      const b64 = await FileSystem.readAsStringAsync(pdfPath, { encoding: FileSystem.EncodingType.Base64 });
-      const base64Uri = "data:application/pdf;base64," + b64;
-      const msg = await buildInitMsg(base64Uri);
+      const source = /^file:/i.test(pdfPath)
+        ? pdfPath
+        : "data:application/pdf;base64," + (await FileSystem.readAsStringAsync(pdfPath, { encoding: FileSystem.EncodingType.Base64 }));
+      const msg = await buildInitMsg(source);
       const msgJson = JSON.stringify(msg);
       const js = "(function(){var e=new MessageEvent('message',{data:" + msgJson + "});window.dispatchEvent(e);document.dispatchEvent(e);})();true;";
       webViewRef.current?.injectJavaScript(js);
@@ -350,6 +354,8 @@ export default function PDFAnnotatorModal({ visible, pdfPath, annotations, onSav
               javaScriptEnabled
               originWhitelist={["*"]}
               allowFileAccess
+              allowFileAccessFromFileURLs
+              allowUniversalAccessFromFileURLs
               onLoad={onWebViewLoad}
               onMessage={onMessage}
               onError={(e) => setLoadError(e.nativeEvent.description || "WebView error")}
