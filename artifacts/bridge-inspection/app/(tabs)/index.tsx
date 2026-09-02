@@ -271,6 +271,13 @@ export default function InspectionScreen() {
   const underwaterZoneActive = inspectionType === INSPECTION_TYPES.UNDERWATER;
   const displayedElements = filteredElements;
 
+  const openBridgeSelection = React.useCallback(() => {
+    setModuleMenuOpen(false);
+    // Let the native Modal finish dismissing before pushing a route. Navigating
+    // during the same press can be ignored when the destination is a hidden tab.
+    setTimeout(() => router.push("/bridges"), 0);
+  }, [router]);
+
   const applyConditionQuantitiesToLoggedDefects = () => {
     if (!element) return;
     const values = (["CS1", "CS2", "CS3", "CS4"] as ConditionState[])
@@ -498,10 +505,7 @@ export default function InspectionScreen() {
             <Text style={[styles.menuHeading, { color: c.mutedForeground }]}>General</Text>
             <TouchableOpacity
               style={styles.menuItem}
-              onPress={() => {
-                setModuleMenuOpen(false);
-                router.navigate("/bridges");
-              }}
+              onPress={openBridgeSelection}
               accessibilityRole="button"
               accessibilityLabel="Open bridge selection"
             >
