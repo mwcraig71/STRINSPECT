@@ -688,7 +688,13 @@ export default function InspectionScreen() {
               style={[styles.picker, styles.inlinePicker, { backgroundColor: c.background, borderColor: c.border }]}
               onPress={() => setLocationPickerOpen(!locationPickerOpen)}
             >
-              <Text style={[styles.pickerValue, { color: c.foreground }]}>{currentLocation || "Select location..."}</Text>
+              <Text
+                style={[styles.pickerValue, { color: c.foreground }]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {currentLocation || "Select location..."}
+              </Text>
               <Feather name={locationPickerOpen ? "chevron-up" : "chevron-down"} size={18} color={c.mutedForeground} />
             </TouchableOpacity>
           </View>
@@ -728,9 +734,20 @@ export default function InspectionScreen() {
               </TouchableOpacity>
             </View>
           )}
-          <View style={styles.sectionHeader}>
-            <Feather name="file-text" size={14} color={c.mutedForeground} />
-             <Text style={[styles.sectionLabel, { color: c.mutedForeground }]}>Elements</Text>
+          <View style={styles.inlinePickerRow}>
+            <View style={styles.inlinePickerTitle}>
+              <Feather name="file-text" size={14} color={c.mutedForeground} />
+              <Text style={[styles.fieldLabel, { color: c.mutedForeground }]}>Elements</Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.picker, styles.inlinePicker, { backgroundColor: c.background, borderColor: c.border }]}
+              onPress={() => setElementPickerOpen(!elementPickerOpen)}
+            >
+              <Text style={[styles.pickerValue, { color: c.primary, fontWeight: "800" }]} numberOfLines={1}>
+                {element ? `${element.id} - ${element.name}` : "Select element..."}
+              </Text>
+              <Feather name={elementPickerOpen ? "chevron-up" : "chevron-down"} size={18} color={c.mutedForeground} />
+            </TouchableOpacity>
           </View>
 
            {underwaterZoneActive && (
@@ -756,15 +773,6 @@ export default function InspectionScreen() {
                </Text>
              </TouchableOpacity>
            )}
-          <TouchableOpacity
-            style={[styles.picker, { backgroundColor: c.background, borderColor: c.border }]}
-            onPress={() => setElementPickerOpen(!elementPickerOpen)}
-          >
-            <Text style={[styles.pickerValue, { color: c.primary, fontWeight: "800" }]}>
-              {element ? `${element.id} - ${element.name}` : "Select element..."}
-            </Text>
-            <Feather name={elementPickerOpen ? "chevron-up" : "chevron-down"} size={18} color={c.mutedForeground} />
-          </TouchableOpacity>
           {elementPickerOpen && (
             <View style={[styles.dropdownPanel, { borderColor: c.border, backgroundColor: c.background }]}>
               <View style={[styles.elementSearchRow, { backgroundColor: c.background, borderBottomColor: c.border }]}>
@@ -836,10 +844,11 @@ export default function InspectionScreen() {
           )}
 
           {/* Defect */}
-          <View>
-              <Text style={[styles.fieldLabel, { color: c.mutedForeground }]}>Defect Type</Text>
+          <View style={styles.inlinePickerGroup}>
+              <View style={styles.inlinePickerRow}>
+                <Text style={[styles.fieldLabel, styles.inlinePickerTitleText, { color: c.mutedForeground }]}>Defect Type</Text>
               <TouchableOpacity
-                style={[styles.picker, { backgroundColor: c.secondary, borderColor: c.border }]}
+                style={[styles.picker, styles.inlinePicker, { backgroundColor: c.secondary, borderColor: c.border }]}
                 onPress={() => setDefectPickerOpen(!defectPickerOpen)}
               >
                 <Text style={[styles.pickerValue, { color: c.foreground, fontSize: 12 }]} numberOfLines={1}>
@@ -847,6 +856,7 @@ export default function InspectionScreen() {
                 </Text>
                 <Feather name={defectPickerOpen ? "chevron-up" : "chevron-down"} size={14} color={c.mutedForeground} />
               </TouchableOpacity>
+              </View>
               {defectPickerOpen && (
                 <ScrollView
                   style={[styles.dropdownList, { borderColor: c.border }]}
@@ -878,7 +888,7 @@ export default function InspectionScreen() {
           {/* Condition-state quantity matrix */}
           <View style={[styles.csMatrix, { borderColor: c.border, backgroundColor: c.background }]}>
             <View style={styles.csMatrixTitleRow}>
-              <Text style={[styles.fieldLabel, { color: c.mutedForeground }]}>
+              <Text style={[styles.fieldLabel, styles.csMatrixTitle, { color: c.mutedForeground }]}>
                 Condition Quantities ({defect?.unit || "ea"})
               </Text>
               <TouchableOpacity
@@ -948,14 +958,64 @@ export default function InspectionScreen() {
             </Text>
           </TouchableOpacity>
 
-          {/* Notes */}
-          <View style={styles.notesLabelRow}>
-            <Text style={[styles.fieldLabel, { color: c.mutedForeground }]}>Location and size</Text>
-            {Platform.OS !== "web" && (
-              <SpeechToTextButton
-                onResult={(text) => setLocationDesc(locationDesc ? `${locationDesc} ${text}` : text)}
-              />
-            )}
+          {/* Notes and severity */}
+          <View style={styles.notesAndSeverityRow}>
+            <View style={styles.notesInlineTitle}>
+              <Text style={[styles.fieldLabel, { color: c.mutedForeground }]}>Location and size</Text>
+              {Platform.OS !== "web" && (
+                <SpeechToTextButton
+                  onResult={(text) => setLocationDesc(locationDesc ? `${locationDesc} ${text}` : text)}
+                />
+              )}
+            </View>
+            <View style={styles.severityInline}>
+              <TouchableOpacity
+                style={[styles.picker, styles.severityPicker, { backgroundColor: c.secondary, borderColor: c.border }]}
+                onPress={() => setSeverityPickerOpen((value) => !value)}
+                accessibilityRole="button"
+                accessibilityLabel="Defect severity"
+                accessibilityState={{ expanded: severityPickerOpen }}
+              >
+                <Text style={[styles.pickerValue, { color: isCritical ? "#dc2626" : isMaintenance ? c.primary : c.foreground }]} numberOfLines={1}>
+                  {isCritical ? "Critical" : isMaintenance ? "Maintenance" : "Standard"}
+                </Text>
+                <Feather name={severityPickerOpen ? "chevron-up" : "chevron-down"} size={14} color={c.mutedForeground} />
+              </TouchableOpacity>
+              {severityPickerOpen && (
+                <View style={[styles.dropdownList, styles.severityDropdown, { borderColor: c.border }]}>
+                  {[
+                    { label: "Standard", critical: false, maintenance: false },
+                    { label: "Maintenance", critical: false, maintenance: true },
+                    { label: "Critical", critical: true, maintenance: false },
+                  ].map((option) => {
+                    const selected = option.critical === isCritical && option.maintenance === isMaintenance;
+                    return (
+                      <TouchableOpacity
+                        key={option.label}
+                        style={[
+                          styles.dropdownItem,
+                          selected && { backgroundColor: c.primary + "20" },
+                          { borderBottomColor: c.border },
+                        ]}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected }}
+                        onPress={() => {
+                          setIsCritical(option.critical);
+                          setIsMaintenance(option.maintenance);
+                          setSeverityPickerOpen(false);
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        }}
+                      >
+                        <Text style={[styles.dropdownItemText, { color: selected ? c.primary : c.foreground }]}>
+                          {option.label}
+                        </Text>
+                        {selected && <Feather name="check" size={14} color={c.primary} />}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
           </View>
           <TextInput
             style={[styles.textArea, { backgroundColor: c.background, borderColor: c.border, color: c.foreground }]}
@@ -969,11 +1029,12 @@ export default function InspectionScreen() {
 
           {/* Photos */}
           <View style={styles.photoSection}>
-            <View style={styles.photoSectionHeader}>
-              <Feather name="image" size={14} color={c.mutedForeground} />
-              <Text style={[styles.fieldLabel, { color: c.mutedForeground }]}>Photos</Text>
-            </View>
-            <View style={styles.photoBtns}>
+            <View style={styles.photoInlineRow}>
+              <View style={styles.photoSectionHeader}>
+                <Feather name="image" size={14} color={c.mutedForeground} />
+                <Text style={[styles.fieldLabel, { color: c.mutedForeground }]}>Photos</Text>
+              </View>
+              <View style={styles.photoBtns}>
               <TouchableOpacity
                 style={[styles.photoBtnLarge, { backgroundColor: c.secondary, borderColor: c.border }]}
                 onPress={addPhoto}
@@ -988,6 +1049,7 @@ export default function InspectionScreen() {
                 <Feather name="camera" size={18} color="#fff" />
                 <Text style={[styles.photoBtnLargeText, { color: "#fff" }]}>Capture</Text>
               </TouchableOpacity>
+              </View>
             </View>
             {photos.map((p, idx) => (
               <View key={idx} style={[styles.photoRow, { backgroundColor: c.secondary, borderColor: c.border }]}>
@@ -1016,55 +1078,6 @@ export default function InspectionScreen() {
               </View>
             ))}
           </View>
-
-          {/* Defect severity */}
-          <Text style={[styles.fieldLabel, { color: c.mutedForeground }]}>Defect Severity</Text>
-          <TouchableOpacity
-            style={[styles.picker, { backgroundColor: c.secondary, borderColor: c.border }]}
-            onPress={() => setSeverityPickerOpen((value) => !value)}
-            accessibilityRole="button"
-            accessibilityLabel="Defect severity"
-            accessibilityState={{ expanded: severityPickerOpen }}
-          >
-            <Text style={[styles.pickerValue, { color: isCritical ? "#dc2626" : isMaintenance ? c.primary : c.foreground }]}>
-              {isCritical ? "Critical" : isMaintenance ? "Maintenance" : "Standard"}
-            </Text>
-            <Feather name={severityPickerOpen ? "chevron-up" : "chevron-down"} size={16} color={c.mutedForeground} />
-          </TouchableOpacity>
-          {severityPickerOpen && (
-            <View style={[styles.dropdownList, { borderColor: c.border }]}>
-              {[
-                { label: "Standard", critical: false, maintenance: false },
-                { label: "Maintenance", critical: false, maintenance: true },
-                { label: "Critical", critical: true, maintenance: false },
-              ].map((option) => {
-                const selected = option.critical === isCritical && option.maintenance === isMaintenance;
-                return (
-                  <TouchableOpacity
-                    key={option.label}
-                    style={[
-                      styles.dropdownItem,
-                      selected && { backgroundColor: c.primary + "20" },
-                      { borderBottomColor: c.border },
-                    ]}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected }}
-                    onPress={() => {
-                      setIsCritical(option.critical);
-                      setIsMaintenance(option.maintenance);
-                      setSeverityPickerOpen(false);
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    }}
-                  >
-                    <Text style={[styles.dropdownItemText, { color: selected ? c.primary : c.foreground }]}>
-                      {option.label}
-                    </Text>
-                    {selected && <Feather name="check" size={14} color={c.primary} />}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          )}
 
           {/* ── Commit ── */}
           <TouchableOpacity
@@ -1372,9 +1385,12 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
   sectionLabel: { fontSize: 10, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.5 },
   fieldLabel: { fontSize: 9, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.3 },
-  inlinePickerRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  inlinePickerLabel: { width: 52 },
-  inlinePicker: { flex: 1 },
+  inlinePickerRow: { flexDirection: "row", alignItems: "center", flexWrap: "nowrap", gap: 8 },
+  inlinePickerLabel: { width: 52, flexShrink: 0 },
+  inlinePickerTitle: { width: 72, flexShrink: 0, flexDirection: "row", alignItems: "center", gap: 6 },
+  inlinePickerTitleText: { width: 72, flexShrink: 0 },
+  inlinePickerGroup: { gap: 10 },
+  inlinePicker: { flex: 1, minWidth: 0 },
   zoneFilterText: { fontSize: 10, fontWeight: "800" },
   zoneToggle: {
     alignSelf: "flex-start",
@@ -1388,6 +1404,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   notesLabelRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  notesAndSeverityRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  notesInlineTitle: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  severityInline: { width: 132, flexShrink: 0 },
+  severityPicker: { paddingVertical: 8, paddingHorizontal: 8 },
+  severityDropdown: { marginTop: 4 },
   picker: {
     flexDirection: "row",
     alignItems: "center",
@@ -1396,7 +1417,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 9,
   },
-  pickerValue: { fontSize: 13, fontWeight: "800", flex: 1 },
+  pickerValue: { fontSize: 13, fontWeight: "800", flex: 1, minWidth: 0 },
   dropdownList: {
     borderWidth: 1,
     borderRadius: 10,
@@ -1467,7 +1488,8 @@ const styles = StyleSheet.create({
   csBtn: { flex: 1, paddingVertical: 8, borderRadius: 8, borderWidth: 1, alignItems: "center" },
   csBtnText: { fontSize: 9, fontWeight: "900" },
   csMatrix: { borderWidth: 1, borderRadius: 12, padding: 10, gap: 8 },
-  csMatrixTitleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  csMatrixTitleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  csMatrixTitle: { flex: 1, minWidth: 0 },
   csMatrixRow: { flexDirection: "row", gap: 8 },
   csMatrixCol: { flex: 1, gap: 5 },
   csMatrixHeader: { borderRadius: 6, paddingVertical: 4, alignItems: "center" },
@@ -1489,8 +1511,9 @@ const styles = StyleSheet.create({
     textAlignVertical: "top",
   },
   photoSection: { gap: 8 },
-  photoSectionHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
-  photoBtns: { flexDirection: "row", gap: 8 },
+  photoInlineRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  photoSectionHeader: { width: 65, flexShrink: 0, flexDirection: "row", alignItems: "center", gap: 6 },
+  photoBtns: { flex: 1, flexDirection: "row", gap: 8 },
   photoBtnLarge: {
     flex: 1,
     flexDirection: "row",
