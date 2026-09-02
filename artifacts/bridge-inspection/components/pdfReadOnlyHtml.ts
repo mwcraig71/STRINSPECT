@@ -27,6 +27,9 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
 #opt-dynamic{display:contents}
 .tbtn{background:#1e293b;border:1.5px solid #334155;border-radius:10px;color:#94a3b8;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap;flex-shrink:0;-webkit-user-select:none;user-select:none}
 .tbtn.active{border-color:#38bdf8;color:#38bdf8;background:rgba(56,189,248,.1)}
+.auto-note-toggle{min-height:44px;display:flex;align-items:center;gap:5px;padding:0 8px;border:1.5px solid #334155;border-radius:8px;background:#1e293b;color:#94a3b8;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;-webkit-user-select:none;user-select:none}
+.auto-note-toggle:has(input:checked){border-color:#38bdf8;color:#38bdf8;background:rgba(56,189,248,.1)}
+.auto-note-toggle input{width:20px;height:20px;accent-color:#38bdf8;margin:0}
 .ui-icon{width:14px;height:14px;display:block;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .clr-dot{width:44px;height:44px;min-width:44px;border-radius:50%;cursor:pointer;border:2px solid transparent;padding:0;appearance:none;flex-shrink:0;transition:transform .1s}
 .clr-dot.active{border-color:#fff;transform:scale(1.25)}
@@ -91,6 +94,14 @@ if (/Android/i.test(navigator.userAgent)) {
     <button class="tbtn" id="btn-highlight"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 11-6 6v3h3l6-6"/><path d="m22 6-4-4L8 12l4 4L22 6z"/><path d="M2 22h20"/></svg>HL</button>
     <button class="tbtn" id="btn-text">T&nbsp;Text</button>
     <button class="tbtn" id="btn-undo"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 6 6v4"/></svg>Undo</button>
+    <label class="auto-note-toggle" title="Automatically open a note after a highlight">
+      <input type="checkbox" id="auto-note-highlight">
+      <span>HL Note</span>
+    </label>
+    <label class="auto-note-toggle" title="Automatically open a note after a pen stroke">
+      <input type="checkbox" id="auto-note-pen">
+      <span>Pen Note</span>
+    </label>
     <div id="opt-dynamic"></div>
     <div class="zoom-group">
       <button class="tbtn" id="btn-zoom-out" aria-label="Zoom out"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button>
@@ -166,6 +177,8 @@ var highlightSize = 16;
 var highlightColor = '#facc15';
 var annotations = [];
 var currentStroke = null;
+var autoNoteAfterHighlight = false;
+var autoNoteAfterPen = false;
 var pdfDoc = null;
 var pageCount = 0;
 var pageCanvases = {};
@@ -229,6 +242,8 @@ document.getElementById('btn-pen').onclick = function() { setTool('pen'); };
 document.getElementById('btn-highlight').onclick = function() { setTool('highlight'); };
 document.getElementById('btn-text').onclick = function() { setTool('text'); };
 document.getElementById('btn-undo').onclick = undoLast;
+document.getElementById('auto-note-highlight').onchange = function() { autoNoteAfterHighlight = this.checked; };
+document.getElementById('auto-note-pen').onchange = function() { autoNoteAfterPen = this.checked; };
 document.getElementById('btn-zoom-in').onclick = zoomIn;
 document.getElementById('btn-zoom-out').onclick = zoomOut;
 
@@ -386,13 +401,59 @@ function onUp(e, cv, pn) {
   if (!isDrawing || !currentStroke) { isDrawing = false; activeCv = null; return; }
   isDrawing = false;
   var targetPn = currentStroke.page;
+  var targetCv = activeCv || cv;
+  var completedStroke = Object.assign({}, currentStroke, { points: currentStroke.points.slice() });
   if (currentStroke.points.length > 0) {
-    annotations.push(Object.assign({}, currentStroke, { points: currentStroke.points.slice() }));
+    annotations.push(completedStroke);
     autoSave();
   }
   currentStroke = null;
   activeCv = null;
   redrawPage(targetPn);
+  if (
+    completedStroke.points.length > 0 &&
+    ((completedStroke.type === 'highlight' && autoNoteAfterHighlight) ||
+      (completedStroke.type === 'stroke' && autoNoteAfterPen))
+  ) {
+    showAutoNoteForStroke(completedStroke, targetCv);
+  }
+}
+
+function showAutoNoteForStroke(stroke, cv) {
+  var pts = stroke.points || [];
+  if (!cv || pts.length === 0) return;
+  var pd = pageDimensions[stroke.page] || { w: cv.clientWidth, h: cv.clientHeight };
+  var minX = pts[0][0], maxX = pts[0][0], minY = pts[0][1], maxY = pts[0][1];
+  for (var i = 1; i < pts.length; i++) {
+    minX = Math.min(minX, pts[i][0]);
+    maxX = Math.max(maxX, pts[i][0]);
+    minY = Math.min(minY, pts[i][1]);
+    maxY = Math.max(maxY, pts[i][1]);
+  }
+  var gap = 14;
+  var noteX = maxX + gap;
+  var noteY = minY + 18;
+  var rect = cv.getBoundingClientRect();
+  var sx = rect.width / pd.w;
+  var sy = rect.height / pd.h;
+  var screenX = rect.left + noteX * sx;
+  var screenY = rect.top + minY * sy;
+  var inputWidth = 250;
+  var inputHeight = 52;
+  if (screenX + inputWidth > window.innerWidth - 8) {
+    noteX = minX;
+    noteY = maxY + 24;
+    screenX = rect.left + noteX * sx;
+    screenY = rect.top + maxY * sy + gap;
+  }
+  noteX = Math.max(8, Math.min(noteX, pd.w - 120));
+  noteY = Math.max(18, Math.min(noteY, pd.h - 8));
+  screenX = Math.max(8, Math.min(screenX, window.innerWidth - inputWidth - 8));
+  screenY = Math.max(8, Math.min(screenY, window.innerHeight - inputHeight - 8));
+  textPendingPage = stroke.page;
+  textPendingX = noteX;
+  textPendingY = noteY;
+  showTextInput(screenX, screenY, stroke.page, '', -1);
 }
 
 function showTextInput(clientX, clientY, pn, preText, editIdx) {
