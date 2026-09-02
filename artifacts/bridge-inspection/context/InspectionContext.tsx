@@ -2875,7 +2875,10 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   );
 
   const filteredElements = useMemo(() => {
-    const zone = effectiveZone(elementZoneFilter, inspectionType);
+    // The header mode selector is the only zone control. Ignore any legacy
+    // persisted chip value so old All/Topside/Underside/Underwater state cannot
+    // override the current inspection mode.
+    const zone = effectiveZone("All", inspectionType);
     let list: readonly SnbiElement[];
 
     if (zone === "Underwater" && !elementSearch.trim()) {
@@ -2915,9 +2918,6 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         list = list.filter((item) => isInZone(item, zone, zoneOptions));
       }
     }
-    if (!elementSearch.trim() && activeElementIds.length > 0) {
-      list = list.filter((item) => activeElementIds.includes(item.id));
-    }
     if (editId && element && !list.some((item) => item.id === element.id)) {
       list = [element, ...list];
     }
@@ -2931,9 +2931,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
       substructureMaterials,
       elementSearch,
       inspectionType,
-      elementZoneFilter,
       zoneOptions,
-      activeElementIds,
       editId,
       element,
     ]

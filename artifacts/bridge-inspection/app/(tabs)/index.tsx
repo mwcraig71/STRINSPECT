@@ -25,7 +25,6 @@ import { lookupCS } from "@/data/csDescriptions";
 import { useIsTablet } from "@/hooks/useIsTablet";
 
 import { useColors } from "@/hooks/useColors";
-import { effectiveZone, isInZone, sortForUnderwater } from "@/utils/elementZones";
 import {
   DEFECTS_BY_ELEMENT,
   INSPECTION_TYPES,
@@ -100,13 +99,9 @@ export default function InspectionScreen() {
     filteredElements,
     elementSearch,
     setElementSearch,
-    elementZoneFilter,
-    setElementZoneFilter,
     includeUndersideUnderwater,
     setIncludeUndersideUnderwater,
     zoneOptions,
-    activeElementIds,
-    setActiveElementIds,
     resetElementFilters,
     sessionManifest,
     legacyManifest,
@@ -173,16 +168,9 @@ export default function InspectionScreen() {
   const [elementPickerOpen, setElementPickerOpen] = useState(false);
   const [defectPickerOpen, setDefectPickerOpen] = useState(false);
   const [severityPickerOpen, setSeverityPickerOpen] = useState(false);
-  const [editingShortlist, setEditingShortlist] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [showLegacyCS1, setShowLegacyCS1] = useState(false);
   const [showAllLegacySides, setShowAllLegacySides] = useState(false);
-
-  React.useEffect(() => {
-    // Zone selection now comes exclusively from the inspection-mode control in
-    // the header. Clear any previously persisted chip override.
-    if (elementZoneFilter !== "All") setElementZoneFilter("All");
-  }, [elementZoneFilter, setElementZoneFilter]);
 
   const addPhoto = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -281,20 +269,8 @@ export default function InspectionScreen() {
   };
 
   const availableDefects = element ? DEFECTS_BY_ELEMENT[element.id] || [] : [];
-  // Shortlist editing lists the whole catalog for the chosen zone (no
-  // location/structure-type narrowing) so any element can be starred.
-  const shortlistElements = React.useMemo(() => {
-    const query = elementSearch.trim().toLowerCase();
-    const zone = effectiveZone(elementZoneFilter, inspectionType);
-    const list = SNBI_ELEMENTS.filter((item) => {
-      const inZone = !!query || isInZone(item, zone, zoneOptions);
-      return inZone && (!query
-        || `${item.id} ${item.name} ${item.category} ${item.material}`.toLowerCase().includes(query));
-    });
-    return zone === "Underwater" && !query ? sortForUnderwater(list, zoneOptions) : list;
-  }, [elementSearch, elementZoneFilter, inspectionType, zoneOptions]);
-  const underwaterZoneActive = effectiveZone(elementZoneFilter, inspectionType) === "Underwater";
-  const displayedElements = editingShortlist ? shortlistElements : filteredElements;
+  const underwaterZoneActive = inspectionType === INSPECTION_TYPES.UNDERWATER;
+  const displayedElements = filteredElements;
 
   const applyConditionQuantitiesToLoggedDefects = () => {
     if (!element) return;
@@ -762,48 +738,9 @@ export default function InspectionScreen() {
              <TouchableOpacity
                onPress={resetElementFilters}
                accessibilityRole="button"
-               accessibilityLabel="Reset element filters and shortlist"
+                accessibilityLabel="Reset element filters"
              >
                <Text style={[styles.resetFilterText, { color: c.primary }]}>Reset</Text>
-             </TouchableOpacity>
-           </View>
-           <View style={styles.zoneFilterRow}>
-             {(["All"] as const).map((zone) => (
-               <TouchableOpacity
-                 key={zone}
-                 accessibilityRole="button"
-                 accessibilityState={{ selected: elementZoneFilter === zone }}
-                 style={[
-                   styles.zoneFilterBtn,
-                   elementZoneFilter === zone
-                     ? { backgroundColor: c.primary, borderColor: c.primary }
-                     : { backgroundColor: c.secondary, borderColor: c.border },
-                 ]}
-                 onPress={() => setElementZoneFilter("All")}
-               >
-                 <Text style={[styles.zoneFilterText, { color: elementZoneFilter === zone ? "#fff" : c.mutedForeground }]}>
-                   {zone}
-                 </Text>
-               </TouchableOpacity>
-             ))}
-             <TouchableOpacity
-               accessibilityRole="button"
-               accessibilityState={{ expanded: editingShortlist }}
-               style={[
-                 styles.zoneFilterBtn,
-                 editingShortlist
-                   ? { backgroundColor: "#f59e0b", borderColor: "#f59e0b" }
-                   : { backgroundColor: c.secondary, borderColor: c.border },
-               ]}
-               onPress={() => {
-                 setEditingShortlist((value) => !value);
-                 setElementPickerOpen(true);
-               }}
-             >
-               <Feather name="star" size={11} color={editingShortlist ? "#fff" : c.mutedForeground} />
-               <Text style={[styles.zoneFilterText, { color: editingShortlist ? "#fff" : c.mutedForeground }]}>
-                 {editingShortlist ? "Done" : `Shortlist${activeElementIds.length ? ` (${activeElementIds.length})` : ""}`}
-               </Text>
              </TouchableOpacity>
            </View>
            {underwaterZoneActive && (
@@ -860,11 +797,7 @@ export default function InspectionScreen() {
               <Text style={[styles.elementSearchHint, { color: c.mutedForeground, borderBottomColor: c.border }]}>
                 {elementSearch.trim().length > 0
                   ? `${displayedElements.length} match${displayedElements.length === 1 ? "" : "es"}`
-                  : editingShortlist
-                    ? "Tap stars to maintain this bridge's active elements"
-                    : activeElementIds.length > 0
-                      ? `${displayedElements.length} active element${displayedElements.length === 1 ? "" : "s"}`
-                      : `${displayedElements.length} common element${displayedElements.length === 1 ? "" : "s"} · search to find more`}
+                  : `${displayedElements.length} element${displayedElements.length === 1 ? "" : "s"} available for ${inspectionType}`}
               </Text>
               <ScrollView style={styles.dropdownScroll} nestedScrollEnabled keyboardShouldPersistTaps="handled">
                {displayedElements.length === 0 && (
@@ -881,33 +814,16 @@ export default function InspectionScreen() {
                     { borderBottomColor: c.border },
                   ]}
                    accessibilityRole="button"
-                   accessibilityLabel={editingShortlist
-                     ? `${activeElementIds.includes(el.id) ? "Remove" : "Add"} ${el.id} ${el.name} ${activeElementIds.includes(el.id) ? "from" : "to"} shortlist`
-                     : `Select element ${el.id} ${el.name}`}
+                    accessibilityLabel={`Select element ${el.id} ${el.name}`}
                    onPress={() => {
-                     if (editingShortlist) {
-                       setActiveElementIds(
-                         activeElementIds.includes(el.id)
-                           ? activeElementIds.filter((id) => id !== el.id)
-                           : [...activeElementIds, el.id]
-                       );
-                     } else {
-                       setElement(el);
-                       setElementPickerOpen(false);
-                     }
+                      setElement(el);
+                      setElementPickerOpen(false);
                    }}
                 >
                   <Text style={[styles.dropdownItemText, { color: element?.id === el.id ? c.primary : c.foreground }]}>
                     {el.id} - {el.name}
                   </Text>
                   <Text style={[styles.dropdownItemSub, { color: c.mutedForeground }]}>{el.category}</Text>
-                   {editingShortlist && (
-                     <Feather
-                       name="star"
-                       size={15}
-                       color={activeElementIds.includes(el.id) ? "#f59e0b" : c.mutedForeground}
-                     />
-                   )}
                 </TouchableOpacity>
               ))}
               </ScrollView>
@@ -1474,17 +1390,6 @@ const styles = StyleSheet.create({
   fieldLabel: { fontSize: 9, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.3 },
   elementFilterHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   resetFilterText: { fontSize: 11, fontWeight: "800" },
-  zoneFilterRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  zoneFilterBtn: {
-    minHeight: 32,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
-  },
   zoneFilterText: { fontSize: 10, fontWeight: "800" },
   zoneToggle: {
     alignSelf: "flex-start",
