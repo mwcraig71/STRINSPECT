@@ -44,7 +44,7 @@ Nothing on the critical path may wait on an upload or on server processing.
 3. **Web import.** `File.arrayBuffer()` loads the whole file into browser
    memory; pdf.js cannot range-read a local `File`. Desktop is fine; warn
    above ~150 MB and suggest the desktop app or a light copy.
-4. **Server storage (`bytea`).** `PUT /api/sessions/pdf/:sn` buffers the
+4. **Server storage (`bytea`).** Full proposal: `pr-proposal-pdf-object-storage.md`. `PUT /api/sessions/pdf/:sn` buffers the
    body and stores it in Postgres; `GET` sends it from memory; no size cap.
    Move originals to object storage (Supabase Storage / S3 / R2) keyed by
    structure number + inspection date, keep only object keys and sizes on
