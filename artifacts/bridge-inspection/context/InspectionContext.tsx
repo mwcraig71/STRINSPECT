@@ -2939,19 +2939,24 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   }, [locationSequence, editId]);
 
   useEffect(() => {
-    if (filteredElements.length > 0 && !editId) {
-      // On joint locations, default to the last joint type the inspector chose —
-      // bridges usually repeat the same joint across spans, saving a re-selection.
-      if (currentLocation.includes("Joint") && lastJointElementId) {
-        const remembered = filteredElements.find((e) => e.id === lastJointElementId);
-        if (remembered) {
-          setElement(remembered);
-          return;
-        }
+    if (editId || filteredElements.length === 0) return;
+
+    // Keep an explicit picker selection. The filtered list is recomputed when
+    // element changes, so blindly choosing the first item here would make
+    // every selection snap back to the first element (typically element 12).
+    if (element && filteredElements.some((item) => item.id === element.id)) return;
+
+    // On joint locations, default to the last joint type the inspector chose —
+    // bridges usually repeat the same joint across spans, saving a re-selection.
+    if (currentLocation.includes("Joint") && lastJointElementId) {
+      const remembered = filteredElements.find((e) => e.id === lastJointElementId);
+      if (remembered) {
+        setElement(remembered);
+        return;
       }
-      setElement(filteredElements[0]);
     }
-  }, [filteredElements, editId, currentLocation, lastJointElementId]);
+    setElement(filteredElements[0]);
+  }, [filteredElements, editId, currentLocation, lastJointElementId, element]);
 
   // Persist the chosen joint type so it carries to the next joint and next session.
   useEffect(() => {
