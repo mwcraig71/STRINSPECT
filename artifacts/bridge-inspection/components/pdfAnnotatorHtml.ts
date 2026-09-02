@@ -13,7 +13,7 @@ export function getPdfAnnotatorHtml(): string {
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-:root{--topbar-height:48px;--toolbar-height:140px}
+:root{--topbar-height:48px;--toolbar-height:140px;--android-bottom-offset:0px}
 body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;overflow:hidden;height:100vh}
 #topbar{position:fixed;top:0;left:0;right:0;z-index:200;height:calc(48px + env(safe-area-inset-top));background:#0f172a;border-bottom:1px solid #334155;display:flex;align-items:center;justify-content:space-between;padding:env(safe-area-inset-top) 12px 0;gap:8px}
 #page-info{color:#94a3b8;font-size:12px;font-weight:700;flex:1}
@@ -26,7 +26,7 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
 .pdf-canvas{display:block;width:100%}
 .ann-canvas{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
 .ann-canvas.draw-active{cursor:crosshair;touch-action:none;pointer-events:auto}
-#toolbar{position:fixed;bottom:0;left:0;right:0;z-index:200;background:#0f172a;border-top:1px solid #334155;padding:8px 10px calc(12px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:7px}
+#toolbar{position:fixed;bottom:var(--android-bottom-offset);left:0;right:0;z-index:200;background:#0f172a;border-top:1px solid #334155;padding:8px 10px calc(12px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:7px}
 #tool-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .zoom-group{display:flex;gap:6px;align-items:center;margin-left:auto;flex-shrink:0}
 #zoom-label{color:#94a3b8;font-size:12px;font-weight:700;padding:0 2px;min-width:38px;text-align:center;flex-shrink:0}
@@ -70,6 +70,11 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
 </style>
 </head>
 <body>
+<script>
+if (/Android/i.test(navigator.userAgent)) {
+  document.documentElement.style.setProperty('--android-bottom-offset', '48px');
+}
+</script>
 
 <div id="loading">
   <div class="spinner"></div>
