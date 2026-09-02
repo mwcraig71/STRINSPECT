@@ -10,6 +10,14 @@ import React, {
 import { nbiSubNameMatchScore, parseReport, ParsedUnderclearance, ParsedChannelCrossSection } from "../utils/pdfParser";
 import type { ScdotElementRow } from "../utils/scdotParser";
 import { scdotLocationLabel, scdotNoteDescription } from "../utils/scdotImport";
+import {
+  effectiveZone,
+  isInZone,
+  isZoneFilter,
+  sortForUnderwater,
+  type ZoneFilter,
+  type ZoneOptions,
+} from "../utils/elementZones";
 import { setBaseUrl, setAuthTokenGetter, upsertSession } from "@workspace/api-client-react";
 import { Platform } from "react-native";
 import * as Network from "expo-network";
@@ -337,11 +345,11 @@ const DEFECT_OVERRIDES: Record<string, { id: string; name: string; unit: string 
   "333": [{ id: "deterioration", name: "Deterioration", unit: "ea" }, { id: "impact", name: "Impact Damage", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }],
   "334": [{ id: "mortar", name: "Mortar Deterioration", unit: "ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "spall", name: "Spalling/Splitting", unit: "sq ft" }, { id: "impact", name: "Impact Damage", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }],
   // Substructure (material suite + settlement / movement)
-  "215": [{ id: "spall", name: "Delamination/Spall/Patched Area", unit: "sq ft" }, { id: "rebar", name: "Exposed/Corroded Reinforcing", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "corr_s", name: "Efflorescence/Rust Staining", unit: "sq ft" }, { id: "settle", name: "Settlement/Movement", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }],
-  "216": [{ id: "decay", name: "Decay/Section Loss", unit: "in" }, { id: "check", name: "Checks/Shakes", unit: "ft" }, { id: "crack", name: "Splits/Cracks", unit: "ft" }, { id: "settle", name: "Settlement/Movement", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }],
-  "217": [{ id: "mortar", name: "Mortar Deterioration", unit: "ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "spall", name: "Spalling/Splitting", unit: "sq ft" }, { id: "displace", name: "Masonry Displacement", unit: "ea" }, { id: "settle", name: "Settlement/Movement", unit: "ea" }],
-  "218": [{ id: "deterioration", name: "Deterioration", unit: "ea" }, { id: "settle", name: "Settlement/Movement", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }],
-  "220": [{ id: "spall", name: "Delamination/Spall/Patched Area", unit: "sq ft" }, { id: "rebar", name: "Exposed/Corroded Reinforcing", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "corr_s", name: "Efflorescence/Rust Staining", unit: "sq ft" }, { id: "settle", name: "Settlement/Movement", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }],
+  "215": [{ id: "spall", name: "Delamination/Spall/Patched Area", unit: "sq ft" }, { id: "rebar", name: "Exposed/Corroded Reinforcing", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "corr_s", name: "Efflorescence/Rust Staining", unit: "sq ft" }, { id: "settle", name: "Settlement/Movement", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }, { id: "scour", name: "Scour", unit: "ea" }],
+  "216": [{ id: "decay", name: "Decay/Section Loss", unit: "in" }, { id: "check", name: "Checks/Shakes", unit: "ft" }, { id: "crack", name: "Splits/Cracks", unit: "ft" }, { id: "settle", name: "Settlement/Movement", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }, { id: "scour", name: "Scour", unit: "ea" }],
+  "217": [{ id: "mortar", name: "Mortar Deterioration", unit: "ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "spall", name: "Spalling/Splitting", unit: "sq ft" }, { id: "displace", name: "Masonry Displacement", unit: "ea" }, { id: "settle", name: "Settlement/Movement", unit: "ea" }, { id: "scour", name: "Scour", unit: "ea" }],
+  "218": [{ id: "deterioration", name: "Deterioration", unit: "ea" }, { id: "settle", name: "Settlement/Movement", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }, { id: "scour", name: "Scour", unit: "ea" }],
+  "220": [{ id: "spall", name: "Delamination/Spall/Patched Area", unit: "sq ft" }, { id: "rebar", name: "Exposed/Corroded Reinforcing", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "corr_s", name: "Efflorescence/Rust Staining", unit: "sq ft" }, { id: "settle", name: "Settlement/Movement", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }, { id: "scour", name: "Scour", unit: "ea" }],
   // Protective systems / wearing surface
   "510": [{ id: "spall", name: "Delamination/Spall/Pothole", unit: "sq ft" }, { id: "crack_ws", name: "Cracking (Wearing Surface)", unit: "ft" }, { id: "deterioration", name: "Effectiveness/Deterioration", unit: "sq ft" }, { id: "damage", name: "Damage", unit: "ea" }],
   "515": [{ id: "coat_fail", name: "Peeling/Bubbling/Cracking", unit: "sq ft" }, { id: "deterioration", name: "Chalking/Oxide Film/Effectiveness", unit: "sq ft" }, { id: "corr", name: "Underlying Steel Corrosion", unit: "sq ft" }, { id: "damage", name: "Damage", unit: "ea" }],
@@ -1346,8 +1354,13 @@ interface InspectionContextType {
   setSubstructureMaterials: (v: string[]) => void;
   elementSearch: string;
   setElementSearch: (v: string) => void;
-  elementZoneFilter: "All" | "Topside" | "Underside";
-  setElementZoneFilter: (v: "All" | "Topside" | "Underside") => void;
+  elementZoneFilter: ZoneFilter;
+  setElementZoneFilter: (v: ZoneFilter) => void;
+  /** Underwater picker: also list the underside families (superstructure, bearings, coatings, deck undersides). */
+  includeUndersideUnderwater: boolean;
+  setIncludeUndersideUnderwater: (v: boolean) => void;
+  /** Options the zone classifier needs (culvert override, underside toggle) — shared by picker and shortlist editor. */
+  zoneOptions: ZoneOptions;
   activeElementIds: string[];
   setActiveElementIds: (v: string[]) => void;
   resetElementFilters: () => void;
@@ -1809,6 +1822,7 @@ const STORAGE_KEYS = {
   WEATHER: "@bridge_weather",
   EQUIPMENT_USED: "@bridge_equipment_used",
   ELEMENT_ZONE_FILTER: "@bridge_element_zone_filter",
+  INCLUDE_UNDERSIDE_UNDERWATER: "@bridge_include_underside_underwater",
   ACTIVE_ELEMENT_IDS: "@bridge_active_element_ids",
 };
 
@@ -1883,7 +1897,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const [superstructureMaterials, setSuperstructureMaterialsState] = useState<string[]>([]);
   const [substructureMaterials, setSubstructureMaterialsState] = useState<string[]>([]);
   const [elementSearch, setElementSearch] = useState("");
-  const [elementZoneFilter, setElementZoneFilterState] = useState<"All" | "Topside" | "Underside">("All");
+  const [elementZoneFilter, setElementZoneFilterState] = useState<ZoneFilter>("All");
+  const [includeUndersideUnderwater, setIncludeUndersideUnderwaterState] = useState(false);
   const [activeElementIds, setActiveElementIdsState] = useState<string[]>([]);
   const [lastSynced, setLastSynced] = useState<string | null>(null);
   const [lastModified, setLastModifiedState] = useState<string | null>(null);
@@ -1997,7 +2012,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
             "@bridge_demo_mode",
           ]);
         }
-        const [defects, nbi, nom, insType, superType, subType, superMat, subMat, structNum, uc, ch, sb, sn, spp, impSummary, lastJoint, lastSync, lastMod, pdfPath, pdfAnns, pdfUploadedStr, imgSz, aspectRatioStr, dateStampStr, finalizedAtStr, importAuditAckStr, criticalAckStr, stdPhotosStr, openAiKeyStr, aiRephraseStr, extraPhotosStr, ucChannelOverrideStr, isSnbiFormatStr, teamLeaderStr, teamMembersStr, inspectionDateStr, weatherStr, equipmentUsedStr, elementZoneStr, activeElementIdsStr, lastPhotoSourceStr, assetIdStr] = await Promise.all([
+        const [defects, nbi, nom, insType, superType, subType, superMat, subMat, structNum, uc, ch, sb, sn, spp, impSummary, lastJoint, lastSync, lastMod, pdfPath, pdfAnns, pdfUploadedStr, imgSz, aspectRatioStr, dateStampStr, finalizedAtStr, importAuditAckStr, criticalAckStr, stdPhotosStr, openAiKeyStr, aiRephraseStr, extraPhotosStr, ucChannelOverrideStr, isSnbiFormatStr, teamLeaderStr, teamMembersStr, inspectionDateStr, weatherStr, equipmentUsedStr, elementZoneStr, activeElementIdsStr, lastPhotoSourceStr, assetIdStr, includeUndersideStr] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.SAVED_DEFECTS),
           AsyncStorage.getItem(STORAGE_KEYS.NBI_RATINGS),
           AsyncStorage.getItem(STORAGE_KEYS.NOMENCLATURE),
@@ -2040,6 +2055,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           AsyncStorage.getItem(STORAGE_KEYS.ACTIVE_ELEMENT_IDS),
           AsyncStorage.getItem(STORAGE_KEYS.LAST_PHOTO_SOURCE),
           AsyncStorage.getItem(STORAGE_KEYS.ASSET_ID),
+          AsyncStorage.getItem(STORAGE_KEYS.INCLUDE_UNDERSIDE_UNDERWATER),
         ]);
         if (lastJoint) setLastJointElementIdState(lastJoint);
         if (lastSync) setLastSynced(lastSync);
@@ -2062,6 +2078,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         if (aiRephraseStr !== null) setAiRephraseState(aiRephraseStr !== "0");
         if (teamLeaderStr) setTeamLeaderState(teamLeaderStr);
         if (assetIdStr) setAssetIdState(assetIdStr);
+        if (includeUndersideStr === "1") setIncludeUndersideUnderwaterState(true);
         if (teamMembersStr) {
           try {
             const parsed = JSON.parse(teamMembersStr);
@@ -2071,7 +2088,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         if (inspectionDateStr) setInspectionDateState(inspectionDateStr);
         if (weatherStr) setWeatherState(weatherStr);
         if (equipmentUsedStr) setEquipmentUsedState(equipmentUsedStr);
-        if (elementZoneStr === "All" || elementZoneStr === "Topside" || elementZoneStr === "Underside") {
+        if (isZoneFilter(elementZoneStr)) {
           setElementZoneFilterState(elementZoneStr);
         }
         if (activeElementIdsStr) {
@@ -2569,9 +2586,14 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     });
   }, [bumpLastModified]);
 
-  const setElementZoneFilter = useCallback((v: "All" | "Topside" | "Underside") => {
+  const setElementZoneFilter = useCallback((v: ZoneFilter) => {
     setElementZoneFilterState(v);
     AsyncStorage.setItem(STORAGE_KEYS.ELEMENT_ZONE_FILTER, v).catch(() => {});
+  }, []);
+
+  const setIncludeUndersideUnderwater = useCallback((v: boolean) => {
+    setIncludeUndersideUnderwaterState(v);
+    AsyncStorage.setItem(STORAGE_KEYS.INCLUDE_UNDERSIDE_UNDERWATER, v ? "1" : "0").catch(() => {});
   }, []);
 
   const setActiveElementIds = useCallback((values: string[]) => {
@@ -2583,10 +2605,12 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
 
   const resetElementFilters = useCallback(() => {
     setElementZoneFilterState("All");
+    setIncludeUndersideUnderwaterState(false);
     setActiveElementIdsState([]);
     setElementSearch("");
     AsyncStorage.multiRemove([
       STORAGE_KEYS.ELEMENT_ZONE_FILTER,
+      STORAGE_KEYS.INCLUDE_UNDERSIDE_UNDERWATER,
       STORAGE_KEYS.ACTIVE_ELEMENT_IDS,
     ]).catch(() => {});
   }, []);
@@ -2826,25 +2850,63 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     [inspectionType, nomenclature]
   );
 
+  // A culvert structure has no other substructure elements: once a culvert
+  // element is in play (recorded, shortlisted, or set up), the Culvert family
+  // replaces the Substructure category in the Underside/Underwater zones.
+  const culvertStructure = useMemo(() => {
+    const isCulvert = (id: string) => /^24[0-5]$/.test(id);
+    return (
+      savedDefects.some((d) => isCulvert(d.elementId)) ||
+      activeElementIds.some(isCulvert) ||
+      (!!element && isCulvert(element.id))
+    );
+  }, [savedDefects, activeElementIds, element]);
+
+  const zoneOptions = useMemo<ZoneOptions>(
+    () => ({ includeUnderside: includeUndersideUnderwater, culvertStructure }),
+    [includeUndersideUnderwater, culvertStructure]
+  );
+
   const filteredElements = useMemo(() => {
-    let list = getFilteredElements(
+    const zone = effectiveZone(elementZoneFilter, inspectionType);
+    let list: readonly SnbiElement[];
+
+    if (zone === "Underwater" && !elementSearch.trim()) {
+      // Underwater: substructure/foundations (or culvert barrels) in every
+      // material variant — the `core` reduction would hide PSC columns, timber
+      // pier walls and every culvert. Structure type and material still narrow
+      // the substructure family; the underside families ride along untouched.
+      list = SNBI_ELEMENTS.filter((e) => isInZone(e, "Underwater", zoneOptions));
+      const activeSubTypes = substructureTypes.filter((id) => id !== "OTHER");
+      if (!zoneOptions.culvertStructure && activeSubTypes.length > 0) {
+        const allowed = new Set<string>();
+        for (const id of activeSubTypes) {
+          SUBSTRUCTURE_TYPES.find((t) => t.id === id)?.elementIds.forEach((eid) => allowed.add(eid));
+        }
+        list = list.filter((e) => e.category !== "Substructure" || allowed.has(e.id));
+      }
+      if (substructureMaterials.length > 0) {
+        list = list.filter(
+          (e) => (e.category !== "Substructure" && e.category !== "Culvert") || substructureMaterials.includes(e.material)
+        );
+      }
+      if (superstructureMaterials.length > 0) {
+        list = list.filter((e) => e.category !== "Superstructure" || superstructureMaterials.includes(e.material));
+      }
+      list = sortForUnderwater(list, zoneOptions);
+    } else {
+      list = getFilteredElements(
         currentLocation,
         superstructureTypes,
         substructureTypes,
         superstructureMaterials,
         substructureMaterials,
         elementSearch,
-        elementZoneFilter === "All" ? inspectionType : elementZoneFilter
+        zone === "All" ? inspectionType : zone
       );
-    if (elementZoneFilter === "Topside") {
-      list = list.filter((item) =>
-        ["Deck", "Railing", "Joint"].includes(item.category) || item.id === "510"
-      );
-    } else if (elementZoneFilter === "Underside") {
-      list = list.filter((item) =>
-        ["Superstructure", "Substructure", "Bearing", "Culvert"].includes(item.category)
-        || ["515", "520"].includes(item.id)
-      );
+      if (zone !== "All" && !elementSearch.trim()) {
+        list = list.filter((item) => isInZone(item, zone, zoneOptions));
+      }
     }
     if (!elementSearch.trim() && activeElementIds.length > 0) {
       list = list.filter((item) => activeElementIds.includes(item.id));
@@ -2863,6 +2925,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
       elementSearch,
       inspectionType,
       elementZoneFilter,
+      zoneOptions,
       activeElementIds,
       editId,
       element,
@@ -3970,6 +4033,9 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     setElementSearch,
     elementZoneFilter,
     setElementZoneFilter,
+    includeUndersideUnderwater,
+    setIncludeUndersideUnderwater,
+    zoneOptions,
     activeElementIds,
     setActiveElementIds,
     resetElementFilters,

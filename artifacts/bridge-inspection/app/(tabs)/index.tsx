@@ -25,6 +25,7 @@ import { lookupCS } from "@/data/csDescriptions";
 import { useIsTablet } from "@/hooks/useIsTablet";
 
 import { useColors } from "@/hooks/useColors";
+import { effectiveZone, isInZone, sortForUnderwater, ZONE_FILTERS } from "@/utils/elementZones";
 import {
   DEFECTS_BY_ELEMENT,
   INSPECTION_TYPES,
@@ -101,6 +102,9 @@ export default function InspectionScreen() {
     setElementSearch,
     elementZoneFilter,
     setElementZoneFilter,
+    includeUndersideUnderwater,
+    setIncludeUndersideUnderwater,
+    zoneOptions,
     activeElementIds,
     setActiveElementIds,
     resetElementFilters,
@@ -301,18 +305,19 @@ export default function InspectionScreen() {
   };
 
   const availableDefects = element ? DEFECTS_BY_ELEMENT[element.id] || [] : [];
+  // Shortlist editing lists the whole catalog for the chosen zone (no
+  // location/structure-type narrowing) so any element can be starred.
   const shortlistElements = React.useMemo(() => {
     const query = elementSearch.trim().toLowerCase();
-    return SNBI_ELEMENTS.filter((item) => {
-      const inZone = elementZoneFilter === "All"
-        || (elementZoneFilter === "Topside"
-          ? ["Deck", "Railing", "Joint"].includes(item.category) || item.id === "510"
-          : ["Superstructure", "Substructure", "Bearing", "Culvert"].includes(item.category)
-            || ["515", "520"].includes(item.id));
+    const zone = effectiveZone(elementZoneFilter, inspectionType);
+    const list = SNBI_ELEMENTS.filter((item) => {
+      const inZone = !!query || isInZone(item, zone, zoneOptions);
       return inZone && (!query
         || `${item.id} ${item.name} ${item.category} ${item.material}`.toLowerCase().includes(query));
     });
-  }, [elementSearch, elementZoneFilter]);
+    return zone === "Underwater" && !query ? sortForUnderwater(list, zoneOptions) : list;
+  }, [elementSearch, elementZoneFilter, inspectionType, zoneOptions]);
+  const underwaterZoneActive = effectiveZone(elementZoneFilter, inspectionType) === "Underwater";
   const displayedElements = editingShortlist ? shortlistElements : filteredElements;
 
   const applyConditionQuantitiesToLoggedDefects = () => {
@@ -788,7 +793,7 @@ export default function InspectionScreen() {
              </TouchableOpacity>
            </View>
            <View style={styles.zoneFilterRow}>
-             {(["All", "Topside", "Underside"] as const).map((zone) => (
+             {ZONE_FILTERS.map((zone) => (
                <TouchableOpacity
                  key={zone}
                  accessibilityRole="button"
@@ -826,6 +831,29 @@ export default function InspectionScreen() {
                </Text>
              </TouchableOpacity>
            </View>
+           {underwaterZoneActive && (
+             <TouchableOpacity
+               accessibilityRole="switch"
+               accessibilityState={{ checked: includeUndersideUnderwater }}
+               accessibilityLabel="Include underside elements in the underwater list"
+               style={[
+                 styles.zoneToggle,
+                 includeUndersideUnderwater
+                   ? { backgroundColor: c.primary, borderColor: c.primary }
+                   : { backgroundColor: c.secondary, borderColor: c.border },
+               ]}
+               onPress={() => setIncludeUndersideUnderwater(!includeUndersideUnderwater)}
+             >
+               <Feather
+                 name={includeUndersideUnderwater ? "check-square" : "square"}
+                 size={12}
+                 color={includeUndersideUnderwater ? "#fff" : c.mutedForeground}
+               />
+               <Text style={[styles.zoneFilterText, { color: includeUndersideUnderwater ? "#fff" : c.mutedForeground }]}>
+                 {zoneOptions.culvertStructure ? "Include underside elements" : "Include underside elements (girders, bearings, deck)"}
+               </Text>
+             </TouchableOpacity>
+           )}
           <TouchableOpacity
             style={[styles.picker, { backgroundColor: c.background, borderColor: c.border }]}
             onPress={() => setElementPickerOpen(!elementPickerOpen)}
@@ -1506,6 +1534,17 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   zoneFilterText: { fontSize: 10, fontWeight: "800" },
+  zoneToggle: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
   notesLabelRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   picker: {
     flexDirection: "row",
