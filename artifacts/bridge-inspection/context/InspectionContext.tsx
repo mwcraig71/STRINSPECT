@@ -2483,20 +2483,19 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         const FS = await import("expo-file-system/legacy");
         const info = await FS.getInfoAsync(importedPdfPath);
         if (info.exists) {
-          const b64 = await FS.readAsStringAsync(importedPdfPath, { encoding: FS.EncodingType.Base64 });
-          const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+          // Stream the file from disk; reading it into JS as base64 needs
+          // ~2.7x the file size in memory and fails on large reports.
           const uploadUrl = (apiUrl ?? "") + `/api/sessions/pdf/${encodeURIComponent(sn)}`;
-          const uploadRes = await fetch(uploadUrl, {
-            method: "PUT",
+          const uploadRes = await FS.uploadAsync(uploadUrl, importedPdfPath, {
+            httpMethod: "PUT",
+            uploadType: FS.FileSystemUploadType.BINARY_CONTENT,
             headers: {
               "Content-Type": "application/pdf",
               ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
             },
-            body: bytes,
           });
-          if (!uploadRes.ok) {
-            const text = await uploadRes.text().catch(() => uploadRes.status.toString());
-            throw new Error(`PDF upload failed (${uploadRes.status}): ${text}`);
+          if (uploadRes.status < 200 || uploadRes.status >= 300) {
+            throw new Error(`PDF upload failed (${uploadRes.status}): ${uploadRes.body || uploadRes.status}`);
           }
           setPdfUploadedState(true);
           AsyncStorage.setItem(STORAGE_KEYS.PDF_UPLOADED, "1").catch(() => {});

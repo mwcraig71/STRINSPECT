@@ -13,9 +13,10 @@ split by platform in `utils/pdfParser.ts` (`loadPdfText`):
   **lazy-loaded** (`getWebPdfjs`) so the heavy browser-only bundle never enters
   the native Metro graph.
 - **Native** (`loadPdfTextNative`): drives a headless WebView through an imperative
-  bridge. Normal picked files use an expo-file-system base64 read; large bundled
-  PDFs pass their local file URI directly to the WebView to avoid duplicating
-  hundreds of megabytes in React Native memory.
+  bridge. Every local `file://` source (picked files are copied to the app cache;
+  bundled assets resolve to a file URI) is passed to the WebView directly so the
+  PDF is read once by pdf.js. The base64 route remains only for non-file URIs and
+  is refused above `MAX_BASE64_PDF_BYTES` (60 MB) with a clear message.
 
 ## Moving parts
 - `components/pdfExtractorHtml.ts` — self-contained HTML that reuses the annotator's

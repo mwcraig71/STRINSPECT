@@ -31,7 +31,7 @@ and `atob`-decode directly — no platform branch needed.
 **Why:** RN's `fetch`/Blob has no dependable local-file support; expo-file-system
 is the supported way to get bytes. **How to apply:** when React Native itself
 needs raw bytes for parsing, uploading, or hashing, use the FS read, not fetch.
-Exception: do not load very large bundled PDFs into RN memory as base64. The
-headless extraction WebView can receive a direct local file URI with local-file
-access enabled, avoiding several in-memory copies while still letting pdf.js read
-the file in a browser runtime.
+Exception: never load a whole PDF into RN memory. The headless extraction WebView
+receives the local file URI directly (all `file://` sources, not just bundled
+ones), and PDF uploads use `FileSystem.uploadAsync(..., BINARY_CONTENT)` so the
+file streams from disk instead of being base64-decoded in JS.

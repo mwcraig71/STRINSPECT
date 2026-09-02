@@ -322,16 +322,14 @@ export async function processQueueEntry(
       const FS = await import("expo-file-system/legacy");
       const info = await FS.getInfoAsync(entry.pdfPath);
       if (info.exists) {
-        const b64 = await FS.readAsStringAsync(entry.pdfPath, {
-          encoding: FS.EncodingType.Base64,
-        });
-        const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-        await fetch(
+        // Stream from disk rather than base64-decoding the whole file in JS.
+        await FS.uploadAsync(
           `${apiUrl}/api/sessions/pdf/${encodeURIComponent(entry.structureNumber)}`,
+          entry.pdfPath,
           {
-            method: "PUT",
+            httpMethod: "PUT",
+            uploadType: FS.FileSystemUploadType.BINARY_CONTENT,
             headers: { "Content-Type": "application/pdf", ...authHeader },
-            body: bytes,
           },
         );
       }

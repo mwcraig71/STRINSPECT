@@ -142,6 +142,11 @@ export interface ParsedChannelCrossSection {
 
 type PdfSource = File | { uri: string; nativeDirectUri?: boolean };
 
+// Above this size the base64 route (file → JS string → WebView → bytes, three
+// copies of the file in memory) is likely to crash a phone. Files at a local
+// file:// URI never take that route; this guards the remaining cases.
+export const MAX_BASE64_PDF_BYTES = 60 * 1024 * 1024;
+
 // Read the raw PDF bytes from a source. WEB ONLY — on web, fetch() reads
 // file/blob/http URLs correctly and File exposes arrayBuffer(). Native never
 // calls this; it reads base64 and extracts inside a WebView (see readPdfBase64
@@ -182,14 +187,29 @@ async function loadPdfText(source: PdfSource): Promise<string[][]> {
 // Native: run pdf.js inside the headless WebView. The WebView reproduces the
 // SAME per-page line/column reconstruction as loadPdfTextWeb below (see
 // components/pdfExtractorHtml.ts), so downstream parsers match identically.
+//
+// Any local file:// URI (picked files are copied to the app cache, bundled
+// assets resolve to one) is handed to the WebView directly so the PDF is read
+// once, by pdf.js, in the browser runtime. Inspection reports run to hundreds
+// of megabytes of photos; the text layer pdf.js actually parses is tiny, but
+// the base64 route would hold three copies of the whole file in memory.
 async function loadPdfTextNative(source: PdfSource): Promise<string[][]> {
-  if (
-    typeof source === "object" &&
-    "uri" in source &&
-    source.nativeDirectUri &&
-    !source.uri.startsWith("data:")
-  ) {
-    return extractPdfTextNative({ uri: source.uri });
+  const uri = typeof source === "object" && "uri" in source ? source.uri : "";
+  const useDirect = !!uri && !uri.startsWith("data:") && (source as { nativeDirectUri?: boolean }).nativeDirectUri !== false && /^file:/i.test(uri);
+  if (useDirect) {
+    return extractPdfTextNative({ uri });
+  }
+  if (uri && !uri.startsWith("data:")) {
+    // content:// or other non-file URI: base64 is the only way in. Refuse
+    // sizes that would exhaust memory rather than crashing mid-import.
+    const FS = await import("expo-file-system/legacy");
+    const info = await FS.getInfoAsync(uri);
+    if (info.exists && typeof info.size === "number" && info.size > MAX_BASE64_PDF_BYTES) {
+      const mb = Math.round(info.size / (1024 * 1024));
+      throw new Error(
+        `This PDF is ${mb} MB, too large to load through the document picker on this device. Save it to the device's Files app and open it from there, or import a smaller copy.`
+      );
+    }
   }
   const base64 = await readPdfBase64(source);
   return extractPdfTextNative({ base64 });
