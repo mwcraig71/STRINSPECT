@@ -8,6 +8,16 @@ import React, {
   useState,
 } from "react";
 import { nbiSubNameMatchScore, parseReport, ParsedUnderclearance, ParsedChannelCrossSection } from "../utils/pdfParser";
+import type { ScdotElementRow } from "../utils/scdotParser";
+import { scdotLocationLabel, scdotNoteDescription } from "../utils/scdotImport";
+import {
+  effectiveZone,
+  isInZone,
+  isZoneFilter,
+  sortForUnderwater,
+  type ZoneFilter,
+  type ZoneOptions,
+} from "../utils/elementZones";
 import { setBaseUrl, setAuthTokenGetter, upsertSession } from "@workspace/api-client-react";
 import { Platform } from "react-native";
 import * as Network from "expo-network";
@@ -335,11 +345,11 @@ const DEFECT_OVERRIDES: Record<string, { id: string; name: string; unit: string 
   "333": [{ id: "deterioration", name: "Deterioration", unit: "ea" }, { id: "impact", name: "Impact Damage", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }],
   "334": [{ id: "mortar", name: "Mortar Deterioration", unit: "ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "spall", name: "Spalling/Splitting", unit: "sq ft" }, { id: "impact", name: "Impact Damage", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }],
   // Substructure (material suite + settlement / movement)
-  "215": [{ id: "spall", name: "Delamination/Spall/Patched Area", unit: "sq ft" }, { id: "rebar", name: "Exposed/Corroded Reinforcing", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "corr_s", name: "Efflorescence/Rust Staining", unit: "sq ft" }, { id: "settle", name: "Settlement/Movement", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }],
-  "216": [{ id: "decay", name: "Decay/Section Loss", unit: "in" }, { id: "check", name: "Checks/Shakes", unit: "ft" }, { id: "crack", name: "Splits/Cracks", unit: "ft" }, { id: "settle", name: "Settlement/Movement", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }],
-  "217": [{ id: "mortar", name: "Mortar Deterioration", unit: "ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "spall", name: "Spalling/Splitting", unit: "sq ft" }, { id: "displace", name: "Masonry Displacement", unit: "ea" }, { id: "settle", name: "Settlement/Movement", unit: "ea" }],
-  "218": [{ id: "deterioration", name: "Deterioration", unit: "ea" }, { id: "settle", name: "Settlement/Movement", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }],
-  "220": [{ id: "spall", name: "Delamination/Spall/Patched Area", unit: "sq ft" }, { id: "rebar", name: "Exposed/Corroded Reinforcing", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "corr_s", name: "Efflorescence/Rust Staining", unit: "sq ft" }, { id: "settle", name: "Settlement/Movement", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }],
+  "215": [{ id: "spall", name: "Delamination/Spall/Patched Area", unit: "sq ft" }, { id: "rebar", name: "Exposed/Corroded Reinforcing", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "corr_s", name: "Efflorescence/Rust Staining", unit: "sq ft" }, { id: "settle", name: "Settlement/Movement", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }, { id: "scour", name: "Scour", unit: "ea" }],
+  "216": [{ id: "decay", name: "Decay/Section Loss", unit: "in" }, { id: "check", name: "Checks/Shakes", unit: "ft" }, { id: "crack", name: "Splits/Cracks", unit: "ft" }, { id: "settle", name: "Settlement/Movement", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }, { id: "scour", name: "Scour", unit: "ea" }],
+  "217": [{ id: "mortar", name: "Mortar Deterioration", unit: "ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "spall", name: "Spalling/Splitting", unit: "sq ft" }, { id: "displace", name: "Masonry Displacement", unit: "ea" }, { id: "settle", name: "Settlement/Movement", unit: "ea" }, { id: "scour", name: "Scour", unit: "ea" }],
+  "218": [{ id: "deterioration", name: "Deterioration", unit: "ea" }, { id: "settle", name: "Settlement/Movement", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }, { id: "scour", name: "Scour", unit: "ea" }],
+  "220": [{ id: "spall", name: "Delamination/Spall/Patched Area", unit: "sq ft" }, { id: "rebar", name: "Exposed/Corroded Reinforcing", unit: "sq ft" }, { id: "crack", name: "Cracking", unit: "ft" }, { id: "corr_s", name: "Efflorescence/Rust Staining", unit: "sq ft" }, { id: "settle", name: "Settlement/Movement", unit: "ea" }, { id: "damage", name: "Damage", unit: "ea" }, { id: "scour", name: "Scour", unit: "ea" }],
   // Protective systems / wearing surface
   "510": [{ id: "spall", name: "Delamination/Spall/Pothole", unit: "sq ft" }, { id: "crack_ws", name: "Cracking (Wearing Surface)", unit: "ft" }, { id: "deterioration", name: "Effectiveness/Deterioration", unit: "sq ft" }, { id: "damage", name: "Damage", unit: "ea" }],
   "515": [{ id: "coat_fail", name: "Peeling/Bubbling/Cracking", unit: "sq ft" }, { id: "deterioration", name: "Chalking/Oxide Film/Effectiveness", unit: "sq ft" }, { id: "corr", name: "Underlying Steel Corrosion", unit: "sq ft" }, { id: "damage", name: "Damage", unit: "ea" }],
@@ -614,6 +624,13 @@ export interface ImportSummary {
   sections: ImportSectionAudit[];
   emptySections: ImportSectionAudit[];
   unmatchedComponents: string[];
+  /** Agency asset identifier when it differs from the structure number (SCDOT Asset ID). */
+  assetId?: string;
+  agency?: string;
+  /** Records created from itemised "[elem, CSn, Qn]" defect notes (SCDOT). */
+  taggedDefectRecords?: number;
+  /** Parser notes for the inspector: roll-up mismatches, ambiguous values, unattributed captions. */
+  warnings?: string[];
 }
 
 export interface CifData {
@@ -1337,8 +1354,13 @@ interface InspectionContextType {
   setSubstructureMaterials: (v: string[]) => void;
   elementSearch: string;
   setElementSearch: (v: string) => void;
-  elementZoneFilter: "All" | "Topside" | "Underside";
-  setElementZoneFilter: (v: "All" | "Topside" | "Underside") => void;
+  elementZoneFilter: ZoneFilter;
+  setElementZoneFilter: (v: ZoneFilter) => void;
+  /** Underwater picker: also list the underside families (superstructure, bearings, coatings, deck undersides). */
+  includeUndersideUnderwater: boolean;
+  setIncludeUndersideUnderwater: (v: boolean) => void;
+  /** Options the zone classifier needs (culvert override, underside toggle) — shared by picker and shortlist editor. */
+  zoneOptions: ZoneOptions;
   activeElementIds: string[];
   setActiveElementIds: (v: string[]) => void;
   resetElementFilters: () => void;
@@ -1454,6 +1476,9 @@ interface InspectionContextType {
   // Structure number
   structureNumber: string;
   setStructureNumber: (v: string) => void;
+  /** Agency asset identifier (SCDOT "Asset ID"); empty when the agency uses the structure number only. */
+  assetId: string;
+  setAssetId: (v: string) => void;
   teamLeader: string;
   setTeamLeader: (v: string) => void;
   teamMembers: string[];
@@ -1764,6 +1789,7 @@ const STORAGE_KEYS = {
   SUPERSTRUCTURE_MATERIAL: "@bridge_superstructure_material",
   SUBSTRUCTURE_MATERIAL: "@bridge_substructure_material",
   STRUCTURE_NUMBER: "@bridge_structure_number",
+  ASSET_ID: "@bridge_asset_id",
   UNDERCLEARANCE: "@bridge_underclearance",
   CHANNEL: "@bridge_channel",
   SAFETY_BRIEFING: "@bridge_safety_briefing",
@@ -1796,6 +1822,7 @@ const STORAGE_KEYS = {
   WEATHER: "@bridge_weather",
   EQUIPMENT_USED: "@bridge_equipment_used",
   ELEMENT_ZONE_FILTER: "@bridge_element_zone_filter",
+  INCLUDE_UNDERSIDE_UNDERWATER: "@bridge_include_underside_underwater",
   ACTIVE_ELEMENT_IDS: "@bridge_active_element_ids",
 };
 
@@ -1870,7 +1897,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const [superstructureMaterials, setSuperstructureMaterialsState] = useState<string[]>([]);
   const [substructureMaterials, setSubstructureMaterialsState] = useState<string[]>([]);
   const [elementSearch, setElementSearch] = useState("");
-  const [elementZoneFilter, setElementZoneFilterState] = useState<"All" | "Topside" | "Underside">("All");
+  const [elementZoneFilter, setElementZoneFilterState] = useState<ZoneFilter>("All");
+  const [includeUndersideUnderwater, setIncludeUndersideUnderwaterState] = useState(false);
   const [activeElementIds, setActiveElementIdsState] = useState<string[]>([]);
   const [lastSynced, setLastSynced] = useState<string | null>(null);
   const [lastModified, setLastModifiedState] = useState<string | null>(null);
@@ -1881,6 +1909,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const [savedDefects, setSavedDefectsState] = useState<DefectRecord[]>([]);
   const [nbiRatings, setNbiRatingsState] = useState<NbiRating[]>(INITIAL_SNBI_RATINGS);
   const [structureNumber, setStructureNumberState] = useState("");
+  const [assetId, setAssetIdState] = useState("");
   const [teamLeader, setTeamLeaderState] = useState("");
   const [teamMembers, setTeamMembersState] = useState<string[]>([]);
   const [inspectionDate, setInspectionDateState] = useState("");
@@ -1956,6 +1985,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
             STORAGE_KEYS.SAVED_DEFECTS,
             STORAGE_KEYS.NBI_RATINGS,
             STORAGE_KEYS.STRUCTURE_NUMBER,
+            STORAGE_KEYS.ASSET_ID,
             STORAGE_KEYS.IMPORT_SUMMARY,
             STORAGE_KEYS.NOMENCLATURE,
             STORAGE_KEYS.INSPECTION_TYPE,
@@ -1982,7 +2012,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
             "@bridge_demo_mode",
           ]);
         }
-        const [defects, nbi, nom, insType, superType, subType, superMat, subMat, structNum, uc, ch, sb, sn, spp, impSummary, lastJoint, lastSync, lastMod, pdfPath, pdfAnns, pdfUploadedStr, imgSz, aspectRatioStr, dateStampStr, finalizedAtStr, importAuditAckStr, criticalAckStr, stdPhotosStr, openAiKeyStr, aiRephraseStr, extraPhotosStr, ucChannelOverrideStr, isSnbiFormatStr, teamLeaderStr, teamMembersStr, inspectionDateStr, weatherStr, equipmentUsedStr, elementZoneStr, activeElementIdsStr, lastPhotoSourceStr] = await Promise.all([
+        const [defects, nbi, nom, insType, superType, subType, superMat, subMat, structNum, uc, ch, sb, sn, spp, impSummary, lastJoint, lastSync, lastMod, pdfPath, pdfAnns, pdfUploadedStr, imgSz, aspectRatioStr, dateStampStr, finalizedAtStr, importAuditAckStr, criticalAckStr, stdPhotosStr, openAiKeyStr, aiRephraseStr, extraPhotosStr, ucChannelOverrideStr, isSnbiFormatStr, teamLeaderStr, teamMembersStr, inspectionDateStr, weatherStr, equipmentUsedStr, elementZoneStr, activeElementIdsStr, lastPhotoSourceStr, assetIdStr, includeUndersideStr] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.SAVED_DEFECTS),
           AsyncStorage.getItem(STORAGE_KEYS.NBI_RATINGS),
           AsyncStorage.getItem(STORAGE_KEYS.NOMENCLATURE),
@@ -2024,6 +2054,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           AsyncStorage.getItem(STORAGE_KEYS.ELEMENT_ZONE_FILTER),
           AsyncStorage.getItem(STORAGE_KEYS.ACTIVE_ELEMENT_IDS),
           AsyncStorage.getItem(STORAGE_KEYS.LAST_PHOTO_SOURCE),
+          AsyncStorage.getItem(STORAGE_KEYS.ASSET_ID),
+          AsyncStorage.getItem(STORAGE_KEYS.INCLUDE_UNDERSIDE_UNDERWATER),
         ]);
         if (lastJoint) setLastJointElementIdState(lastJoint);
         if (lastSync) setLastSynced(lastSync);
@@ -2045,6 +2077,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         if (openAiKeyStr) setOpenAiKeyState(openAiKeyStr);
         if (aiRephraseStr !== null) setAiRephraseState(aiRephraseStr !== "0");
         if (teamLeaderStr) setTeamLeaderState(teamLeaderStr);
+        if (assetIdStr) setAssetIdState(assetIdStr);
+        if (includeUndersideStr === "1") setIncludeUndersideUnderwaterState(true);
         if (teamMembersStr) {
           try {
             const parsed = JSON.parse(teamMembersStr);
@@ -2054,7 +2088,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         if (inspectionDateStr) setInspectionDateState(inspectionDateStr);
         if (weatherStr) setWeatherState(weatherStr);
         if (equipmentUsedStr) setEquipmentUsedState(equipmentUsedStr);
-        if (elementZoneStr === "All" || elementZoneStr === "Topside" || elementZoneStr === "Underside") {
+        if (isZoneFilter(elementZoneStr)) {
           setElementZoneFilterState(elementZoneStr);
         }
         if (activeElementIdsStr) {
@@ -2466,20 +2500,19 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         const FS = await import("expo-file-system/legacy");
         const info = await FS.getInfoAsync(importedPdfPath);
         if (info.exists) {
-          const b64 = await FS.readAsStringAsync(importedPdfPath, { encoding: FS.EncodingType.Base64 });
-          const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+          // Stream the file from disk; reading it into JS as base64 needs
+          // ~2.7x the file size in memory and fails on large reports.
           const uploadUrl = (apiUrl ?? "") + `/api/sessions/pdf/${encodeURIComponent(sn)}`;
-          const uploadRes = await fetch(uploadUrl, {
-            method: "PUT",
+          const uploadRes = await FS.uploadAsync(uploadUrl, importedPdfPath, {
+            httpMethod: "PUT",
+            uploadType: FS.FileSystemUploadType.BINARY_CONTENT,
             headers: {
               "Content-Type": "application/pdf",
               ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
             },
-            body: bytes,
           });
-          if (!uploadRes.ok) {
-            const text = await uploadRes.text().catch(() => uploadRes.status.toString());
-            throw new Error(`PDF upload failed (${uploadRes.status}): ${text}`);
+          if (uploadRes.status < 200 || uploadRes.status >= 300) {
+            throw new Error(`PDF upload failed (${uploadRes.status}): ${uploadRes.body || uploadRes.status}`);
           }
           setPdfUploadedState(true);
           AsyncStorage.setItem(STORAGE_KEYS.PDF_UPLOADED, "1").catch(() => {});
@@ -2530,6 +2563,12 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     AsyncStorage.setItem(STORAGE_KEYS.CRITICAL_FINDINGS_ACK, "1").catch(() => {});
   }, []);
 
+  const setAssetId = useCallback((v: string) => {
+    setAssetIdState(v);
+    AsyncStorage.setItem(STORAGE_KEYS.ASSET_ID, v).catch(() => {});
+    bumpLastModified();
+  }, [bumpLastModified]);
+
   const setStructureNumber = useCallback((v: string) => {
     setStructureNumberState(v);
     AsyncStorage.setItem(STORAGE_KEYS.STRUCTURE_NUMBER, v).catch(() => {});
@@ -2547,9 +2586,14 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     });
   }, [bumpLastModified]);
 
-  const setElementZoneFilter = useCallback((v: "All" | "Topside" | "Underside") => {
+  const setElementZoneFilter = useCallback((v: ZoneFilter) => {
     setElementZoneFilterState(v);
     AsyncStorage.setItem(STORAGE_KEYS.ELEMENT_ZONE_FILTER, v).catch(() => {});
+  }, []);
+
+  const setIncludeUndersideUnderwater = useCallback((v: boolean) => {
+    setIncludeUndersideUnderwaterState(v);
+    AsyncStorage.setItem(STORAGE_KEYS.INCLUDE_UNDERSIDE_UNDERWATER, v ? "1" : "0").catch(() => {});
   }, []);
 
   const setActiveElementIds = useCallback((values: string[]) => {
@@ -2561,10 +2605,12 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
 
   const resetElementFilters = useCallback(() => {
     setElementZoneFilterState("All");
+    setIncludeUndersideUnderwaterState(false);
     setActiveElementIdsState([]);
     setElementSearch("");
     AsyncStorage.multiRemove([
       STORAGE_KEYS.ELEMENT_ZONE_FILTER,
+      STORAGE_KEYS.INCLUDE_UNDERSIDE_UNDERWATER,
       STORAGE_KEYS.ACTIVE_ELEMENT_IDS,
     ]).catch(() => {});
   }, []);
@@ -2588,6 +2634,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     AsyncStorage.removeItem(STORAGE_KEYS.WEATHER).catch(() => {});
     setEquipmentUsedState("");
     AsyncStorage.removeItem(STORAGE_KEYS.EQUIPMENT_USED).catch(() => {});
+    setAssetIdState("");
+    AsyncStorage.removeItem(STORAGE_KEYS.ASSET_ID).catch(() => {});
     resetElementFilters();
     setImportSummary(null);
     setLastModifiedState(null);
@@ -2802,25 +2850,63 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     [inspectionType, nomenclature]
   );
 
+  // A culvert structure has no other substructure elements: once a culvert
+  // element is in play (recorded, shortlisted, or set up), the Culvert family
+  // replaces the Substructure category in the Underside/Underwater zones.
+  const culvertStructure = useMemo(() => {
+    const isCulvert = (id: string) => /^24[0-5]$/.test(id);
+    return (
+      savedDefects.some((d) => isCulvert(d.elementId)) ||
+      activeElementIds.some(isCulvert) ||
+      (!!element && isCulvert(element.id))
+    );
+  }, [savedDefects, activeElementIds, element]);
+
+  const zoneOptions = useMemo<ZoneOptions>(
+    () => ({ includeUnderside: includeUndersideUnderwater, culvertStructure }),
+    [includeUndersideUnderwater, culvertStructure]
+  );
+
   const filteredElements = useMemo(() => {
-    let list = getFilteredElements(
+    const zone = effectiveZone(elementZoneFilter, inspectionType);
+    let list: readonly SnbiElement[];
+
+    if (zone === "Underwater" && !elementSearch.trim()) {
+      // Underwater: substructure/foundations (or culvert barrels) in every
+      // material variant — the `core` reduction would hide PSC columns, timber
+      // pier walls and every culvert. Structure type and material still narrow
+      // the substructure family; the underside families ride along untouched.
+      list = SNBI_ELEMENTS.filter((e) => isInZone(e, "Underwater", zoneOptions));
+      const activeSubTypes = substructureTypes.filter((id) => id !== "OTHER");
+      if (!zoneOptions.culvertStructure && activeSubTypes.length > 0) {
+        const allowed = new Set<string>();
+        for (const id of activeSubTypes) {
+          SUBSTRUCTURE_TYPES.find((t) => t.id === id)?.elementIds.forEach((eid) => allowed.add(eid));
+        }
+        list = list.filter((e) => e.category !== "Substructure" || allowed.has(e.id));
+      }
+      if (substructureMaterials.length > 0) {
+        list = list.filter(
+          (e) => (e.category !== "Substructure" && e.category !== "Culvert") || substructureMaterials.includes(e.material)
+        );
+      }
+      if (superstructureMaterials.length > 0) {
+        list = list.filter((e) => e.category !== "Superstructure" || superstructureMaterials.includes(e.material));
+      }
+      list = sortForUnderwater(list, zoneOptions);
+    } else {
+      list = getFilteredElements(
         currentLocation,
         superstructureTypes,
         substructureTypes,
         superstructureMaterials,
         substructureMaterials,
         elementSearch,
-        elementZoneFilter === "All" ? inspectionType : elementZoneFilter
+        zone === "All" ? inspectionType : zone
       );
-    if (elementZoneFilter === "Topside") {
-      list = list.filter((item) =>
-        ["Deck", "Railing", "Joint"].includes(item.category) || item.id === "510"
-      );
-    } else if (elementZoneFilter === "Underside") {
-      list = list.filter((item) =>
-        ["Superstructure", "Substructure", "Bearing", "Culvert"].includes(item.category)
-        || ["515", "520"].includes(item.id)
-      );
+      if (zone !== "All" && !elementSearch.trim()) {
+        list = list.filter((item) => isInZone(item, zone, zoneOptions));
+      }
     }
     if (!elementSearch.trim() && activeElementIds.length > 0) {
       list = list.filter((item) => activeElementIds.includes(item.id));
@@ -2839,6 +2925,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
       elementSearch,
       inspectionType,
       elementZoneFilter,
+      zoneOptions,
       activeElementIds,
       editId,
       element,
@@ -3377,6 +3464,9 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           inspectionType: parsedInspectionType,
           underclearance: parsedUnderclearance,
           channelCrossSection: parsedChannelCrossSection,
+          assetId: parsedAssetId,
+          scdot: parsedScdot,
+          warnings: parsedWarnings,
         } = await parseReport(source);
 
         if (parsedAgency === "SCDOT") {
@@ -3407,15 +3497,78 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         if (parsedNum) {
           setStructureNumber(parsedNum);
         }
+        if (parsedAssetId) {
+          setAssetId(parsedAssetId);
+        }
+
+        // SCDOT reports carry the inspection header on the cover page.
+        if (parsedScdot) {
+          const h = parsedScdot.header;
+          if (h.teamLeader) setTeamLeader(h.teamLeader);
+          if (h.teamMembers.length > 0) setTeamMembers(h.teamMembers);
+          if (h.inspectionDate) setInspectionDate(h.inspectionDate);
+          if (h.weather) setWeather(h.weather);
+          if (parsedScdot.equipment.length > 0) {
+            setEquipmentUsed(parsedScdot.equipment.map((e) => e.name).join(", "));
+          }
+        }
 
         const ts = Date.now();
         const newDefects: DefectRecord[] = [];
         let recIndex = 0;
+        let taggedDefectRecords = 0;
 
         let currentParentElementId = "";
         let currentParentElementName = "";
+        // SCDOT: the parsed element the current parent row came from (same order as `elements`).
+        let currentScdotParent: ScdotElementRow | null = null;
 
-        for (const row of elements) {
+        // One record per itemised "[elem, CSn, Qn]" note, keeping the note's
+        // location, size and sentence. Returns the quantity attributed per CS.
+        const pushTaggedRecords = (
+          notes: ScdotElementRow["defects"],
+          elementId: string,
+          elementName: string,
+          environment: string,
+          defectName: string,
+          defectId: string,
+          unit: string
+        ): Record<ConditionState, number> => {
+          const attributed: Record<ConditionState, number> = { CS1: 0, CS2: 0, CS3: 0, CS4: 0 };
+          for (const note of notes) {
+            const cs = `CS${note.cs}` as ConditionState;
+            attributed[cs] += note.qty;
+            recIndex++;
+            taggedDefectRecords++;
+            newDefects.push({
+              id: `pdf-${ts}-${recIndex}`,
+              location: scdotLocationLabel(note.location),
+              elementId,
+              element: elementName,
+              environment,
+              defect: defectName,
+              defectId,
+              cs,
+              conditionQuantities: { [cs]: String(note.qty) } as ConditionQuantities,
+              quantityValue: String(note.qty),
+              maintenanceQuantityValue: String(note.qty),
+              quantity: `${note.qty} ${unit}`,
+              size: note.size,
+              locationDesc: scdotNoteDescription(note),
+              needsVerification: true,
+              isLegacy: true,
+              isImported: true,
+              photos: [],
+              photosCount: 0,
+              isCritical: false,
+              isMaintenance: false,
+            });
+          }
+          return attributed;
+        };
+
+        for (let rowIndex = 0; rowIndex < elements.length; rowIndex++) {
+          const row = elements[rowIndex];
           const csMap: [ConditionState, number][] = [
             ["CS1", row.cs1],
             ["CS2", row.cs2],
@@ -3425,6 +3578,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
 
           if (!row.isDefect) {
             currentParentElementId = row.elementId;
+            currentScdotParent = parsedScdot?.elements[rowIndex] ?? null;
             const match = (SNBI_ELEMENTS as readonly { id: string; name: string }[]).find(
               (e) => e.id === row.elementId
             );
@@ -3462,6 +3616,21 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
                 isMaintenance: false,
               });
             }
+            // SCDOT notes tagged "[CSn, Qn]" with no defect code describe the
+            // element itself; file them under its default defect.
+            const untypedNotes = currentScdotParent?.defects.filter((d) => !d.defectCode) ?? [];
+            if (untypedNotes.length > 0) {
+              const defaultDefect = DEFECTS_BY_ELEMENT[row.elementId]?.[0] || { id: "other", name: "General Defect", unit: row.unit || "ea" };
+              pushTaggedRecords(
+                untypedNotes,
+                row.elementId,
+                currentParentElementName,
+                row.environment || "2",
+                defaultDefect.name,
+                defaultDefect.id,
+                row.unit || defaultDefect.unit
+              );
+            }
           } else {
             const defectName = row.elementName;
             const snbiCode = row.defectCode || "";
@@ -3473,10 +3642,24 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
               DEFECTS_BY_ELEMENT[currentParentElementId]?.find((d) => d.id === internalDefectId)?.unit ||
               "ea";
 
+            // SCDOT: itemised notes for this defect become individual records;
+            // whatever the row still carries beyond them becomes one remainder record.
+            const taggedNotes = currentScdotParent?.defects.filter((d) => d.defectCode === snbiCode) ?? [];
+            const attributed = pushTaggedRecords(
+              taggedNotes,
+              currentParentElementId,
+              currentParentElementName,
+              row.environment || "2",
+              defectName,
+              internalDefectId,
+              row.unit || unit
+            );
+            const remainder: [ConditionState, number][] = csMap.map(([cs, qty]) => [cs, Math.max(0, qty - attributed[cs])]);
+
             const conditionQuantities = Object.fromEntries(
-              csMap.filter(([, qty]) => qty > 0).map(([cs, qty]) => [cs, String(qty)])
+              remainder.filter(([, qty]) => qty > 0).map(([cs, qty]) => [cs, String(qty)])
             ) as ConditionQuantities;
-            const total = csMap.reduce((sum, [, qty]) => sum + Math.max(0, qty), 0);
+            const total = remainder.reduce((sum, [, qty]) => sum + qty, 0);
             if (total > 0) {
               recIndex++;
               newDefects.push({
@@ -3491,9 +3674,9 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
                 conditionQuantities,
                 quantityValue: String(total),
                 maintenanceQuantityValue: String(total),
-                quantity: `${total} ${unit}`,
+                quantity: `${total} ${row.unit || unit}`,
                 size: "",
-                locationDesc: `${defectName} — Imported`,
+                locationDesc: taggedNotes.length > 0 ? `${defectName} — Imported (not itemised in element notes)` : `${defectName} — Imported`,
                 needsVerification: true,
                 isLegacy: true,
                 isImported: true,
@@ -3738,6 +3921,10 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
           sections: sectionAudits,
           emptySections,
           unmatchedComponents: unmatchedNames,
+          assetId: parsedAssetId,
+          agency: parsedAgency,
+          taggedDefectRecords,
+          warnings: parsedWarnings,
         };
         setImportSummary(summary);
 
@@ -3790,12 +3977,21 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         const chNote = parsedChannelCrossSection
           ? `\nChannel Cross-Section (Form 2600): ${parsedChannelCrossSection.upstream.length} upstream, ${parsedChannelCrossSection.downstream.length} downstream measurement(s) imported.`
           : "";
+        const taggedNote =
+          taggedDefectRecords > 0 ? `\n${taggedDefectRecords} record(s) came from itemised element notes with location and size.` : "";
+        const warningNote =
+          parsedWarnings.length > 0
+            ? `\n\n${parsedWarnings.length} parser note(s) to review:\n${parsedWarnings.slice(0, 5).join("\n")}${
+                parsedWarnings.length > 5 ? `\n…and ${parsedWarnings.length - 5} more (see the import audit).` : ""
+              }`
+            : "";
+        const idLine = parsedNum
+          ? `Structure: ${parsedNum}${parsedAssetId ? ` (Asset ID ${parsedAssetId})` : ""}`
+          : "Structure number not found.";
         const { Alert } = require("react-native");
         Alert.alert(
           "Import Complete",
-          `Imported ${newDefects.length} element record(s) across ${elementsFound} elements.\n${nbiFilledCount} of ${nbiTotalCount} condition-rating field(s) pre-filled.${ucNote}${chNote}${emptySummary}${unmatchedSummary}\n\n${
-            parsedNum ? `Structure: ${parsedNum}` : "Structure number not found."
-          }\n\nSee the import audit on the Summary tab. Assign locations and verify records before submitting.`
+          `Imported ${newDefects.length} element record(s) across ${elementsFound} elements.${taggedNote}\n${nbiFilledCount} of ${nbiTotalCount} condition-rating field(s) pre-filled.${ucNote}${chNote}${emptySummary}${unmatchedSummary}${warningNote}\n\n${idLine}\n\nSee the import audit on the Summary tab. Assign locations and verify records before submitting.`
         );
       } catch (err: unknown) {
         console.warn("[PDF import]", err);
@@ -3806,7 +4002,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
         setParsingActive(false);
       }
     },
-    [clearInspection, setSavedDefectsState, setNbiRatingsState, setUnderclearanceDataState, setChannelDataState, setStructureNumber, setNomenclature, setInspectionType, nbiRatings, setImportSummary, bumpLastModified]
+    [clearInspection, setSavedDefectsState, setNbiRatingsState, setUnderclearanceDataState, setChannelDataState, setStructureNumber, setAssetId, setTeamLeader, setTeamMembers, setInspectionDate, setWeather, setEquipmentUsed, setNomenclature, setInspectionType, nbiRatings, setImportSummary, bumpLastModified]
   );
 
   // Retained fallback hook. The UI always triggers a real PDF import via
@@ -3837,6 +4033,9 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     setElementSearch,
     elementZoneFilter,
     setElementZoneFilter,
+    includeUndersideUnderwater,
+    setIncludeUndersideUnderwater,
+    zoneOptions,
     activeElementIds,
     setActiveElementIds,
     resetElementFilters,
@@ -3963,6 +4162,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     reviewImportedSubComponent,
     structureNumber,
     setStructureNumber,
+    assetId,
+    setAssetId,
     teamLeader,
     setTeamLeader,
     teamMembers,

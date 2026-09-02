@@ -46,7 +46,8 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
   - Legacy defect verification workflow
   - Structural summary tables (element matrix, maintenance plan, critical findings)
   - CS color coding (CS1=green, CS2=blue, CS3=amber, CS4=red)
-  - **PDF import**: Real client-side PDF parsing via pdfjs-dist; parses ELEMENTS table (element+defect rows → DefectRecord), NBI ratings (BRIDGE INSPECTION RECORD sections), and structure number from TxDOT reports
+  - **PDF import**: Real client-side PDF parsing via pdfjs-dist. TxDOT: ELEMENTS table (element+defect rows → DefectRecord), NBI ratings (BRIDGE INSPECTION RECORD sections), structure number. SCDOT (BrM "Bridge Inspection Report"): `utils/scdotParser.ts` reads the header (Asset ID, structure number, team, date, weather), ~200 `(NNN)` inventory/condition fields, ELEMENT NOTES rows plus `[elem, CSn, Qn]`-tagged defect sentences (→ one DefectRecord each with location/size/description, remainder record for untagged quantity), Section 4 notes (→ SNBI sub-component comments), photo captions, streambed cross sections (→ ChannelData), procedures, equipment and sign-off. Parser notes (roll-up mismatches etc.) land in `ImportSummary.warnings`.
+  - **Parser tests**: `pnpm --filter @workspace/bridge-inspection test` (vitest). Fixtures in `utils/__fixtures__` are generated with `scripts/extract-pages.mjs` using the app's exact text reconstruction; TxDOT output is pinned to `*.expected.json`.
   - Structure number: persisted field shown in Inspection tab header (tappable to edit); auto-fills CIF form
 - **Persistence**: All data via @react-native-async-storage/async-storage (crash-safe, offline-first)
 - **State**: React Context (InspectionContext) — single provider in (tabs)/_layout.tsx

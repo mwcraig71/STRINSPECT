@@ -13,9 +13,10 @@ split by platform in `utils/pdfParser.ts` (`loadPdfText`):
   **lazy-loaded** (`getWebPdfjs`) so the heavy browser-only bundle never enters
   the native Metro graph.
 - **Native** (`loadPdfTextNative`): drives a headless WebView through an imperative
-  bridge. Picked files and moderate bundled files use an expo-file-system base64
-  read. Do not assume a direct local file URI is fetchable inside WKWebView or
-  Android WebView.
+  bridge. Every local `file://` source (picked files are copied to the app cache;
+  bundled assets resolve to a file URI) is passed to the WebView directly so the
+  PDF is read once by pdf.js. The base64 route remains only for non-file URIs and
+  is refused above `MAX_BASE64_PDF_BYTES` (60 MB) with a clear message.
 
 ## Moving parts
 - `components/pdfExtractorHtml.ts` — self-contained HTML that reuses the annotator's
@@ -37,11 +38,9 @@ downstream pure parsers stop matching. The shared recipe: bucket rows by
 - Send the PDF to the WebView via `webViewRef.postMessage(...)`, NOT by eval'ing a
   multi-MB JS string through `injectJavaScript` — the latter is fragile for large
   payloads.
-- Base64 adds roughly one-third in size and JSON/state transfer creates additional
-  copies, so very large bundled PDFs can exhaust a phone's memory before pdf.js
-  starts. But direct local-URI transport is not a safe fallback: native WebView
-  `fetch(file://...)` can reject with "Load failed" despite file-access flags.
-  Prefer a smaller sample PDF; use base64 for moderate files such as the 12 MB
-  bundled SCDOT report.
+- Do not base64-encode very large bundled PDFs. Base64 adds roughly one-third in
+  size and JSON/state transfer creates additional copies, which can exhaust a
+  phone's memory before pdf.js starts. Mark that source for direct URI transport
+  and allow local-file access on the extraction WebView.
 - Correlate request/response with a **job id**; a late result from a torn-down job
   must be ignored or it can resolve a newer pending job with stale pages.

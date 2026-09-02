@@ -66,6 +66,13 @@ export interface ImportSummary {
   sections: ImportSectionAudit[];
   emptySections: ImportSectionAudit[];
   unmatchedComponents: string[];
+  /** Agency asset identifier when it differs from the structure number (SCDOT Asset ID). */
+  assetId?: string;
+  agency?: string;
+  /** Records created from itemised "[elem, CSn, Qn]" defect notes (SCDOT). */
+  taggedDefectRecords?: number;
+  /** Parser notes for the inspector: roll-up mismatches, ambiguous values, unattributed captions. */
+  warnings?: string[];
 }
 
 export interface SessionData {
