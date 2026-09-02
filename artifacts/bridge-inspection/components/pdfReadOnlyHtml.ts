@@ -238,17 +238,20 @@ function onMsg(e) {
     }
     if (Array.isArray(data.shortcuts)) scList = data.shortcuts;
     if (Array.isArray(data.scFavorites)) scFavorites = data.scFavorites;
-    loadPdf(data.pdfBase64);
+    loadPdf(data.pdfUri || data.pdfBase64);
   }
 }
 window.addEventListener('message', onMsg);
 document.addEventListener('message', onMsg);
 
-async function loadPdf(base64Uri) {
+async function loadPdf(pdfUri) {
   if (!pdfjsLib) { showError('PDF.js not available.'); return; }
   try {
     setLoadTxt('Decoding PDF...');
-    var resp = await fetch(base64Uri);
+    var resp = await fetch(pdfUri);
+    if (!resp.ok && typeof resp.status !== 'undefined' && resp.status !== 0) {
+      throw new Error('Could not open PDF file (' + resp.status + ').');
+    }
     var buf = await resp.arrayBuffer();
     setLoadTxt('Rendering pages...');
     pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
