@@ -29,4 +29,4 @@
 - [Universal SNBI ratings](universal-snbi-ratings.md) — B.C.01–B.C.11 is always the active model; preserve Item-based imports only as explicit historical review records.
 - [SCDOT PDF import](scdot-pdf-import.md) — scdotParser.ts + fixtures; `[elem, CSn, Qn]` note tags are the per-defect source; never change row bucketing to fix split values.
 - [Element zones](element-zones.md) — utils/elementZones.ts is the only zone classifier; Underwater = substructure/culvert (+ underside toggle); culvert override is derived, never a structure type.
-- [Element picker defaults](element-picker-defaults.md) — default-selection effects must preserve a valid explicit choice instead of resetting to the first filtered element.
+- [Element picker defaults](element-picker-defaults.md) — preserve explicit catalog choices; mode changes clear selection and location together before choosing a new default.

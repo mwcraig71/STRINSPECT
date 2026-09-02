@@ -2363,6 +2363,13 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
 
   const setInspectionType = useCallback((v: string) => {
     setInspectionTypeState(v);
+    // A mode change defines a new inspection scope. Clear the prior element so
+    // the defaulting effect can choose from the new Topside/Underside/Underwater
+    // list instead of carrying a deck element into another work area.
+    setCurrentLocation(buildLocationSequence(v, nomenclature, supportCount)[0] || "");
+    setElement(null);
+    setDefect(null);
+    setElementSearch("");
     AsyncStorage.setItem(STORAGE_KEYS.INSPECTION_TYPE, v).catch(() => {});
     setStandardPhotosState((current) => {
       const next = mergePhotoCatalog(requiredPhotoSlotsFor(nomenclature, v), current);
@@ -2941,10 +2948,11 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     if (editId || filteredElements.length === 0) return;
 
-    // Keep an explicit picker selection. The filtered list is recomputed when
-    // element changes, so blindly choosing the first item here would make
-    // every selection snap back to the first element (typically element 12).
-    if (element && filteredElements.some((item) => item.id === element.id)) return;
+    // Any non-null element is an explicit or established selection. Preserve it
+    // even when it came from catalog search and is outside the compact default
+    // list. Mode changes clear element in setInspectionType, allowing this
+    // effect to choose a fresh default for the new work area.
+    if (element) return;
 
     // On joint locations, default to the last joint type the inspector chose —
     // bridges usually repeat the same joint across spans, saving a re-selection.

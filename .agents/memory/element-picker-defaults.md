@@ -3,8 +3,8 @@ name: Element picker defaults
 description: Preventing filtered element-list updates from overriding an inspector's explicit selection.
 ---
 
-When choosing a default element from a filtered list, first preserve the current element if it is still present. Only choose a remembered or first-list default when the current selection is absent or invalid.
+Once the inspector explicitly selects an element, preserve it even if it came from search and is outside the compact default list. Only choose a remembered or first-list default when no element is selected. A mode change must clear the old element and update the first valid location together before defaulting.
 
-**Why:** The filtered list can be recomputed as a consequence of selecting an element. An unconditional “select the first result” effect then immediately overrides the inspector’s choice and makes the picker appear stuck.
+**Why:** The compact list intentionally omits non-core catalog items such as some material variants. Treating absence from that list as an invalid selection makes searched choices snap back. Separately, defaulting before a mode's location changes can select a Topside deck for Underside.
 
-**How to apply:** Any effect that synchronizes the current element with location, inspection mode, shortlist, search, or material filters must test whether the current selection remains valid before assigning a default.
+**How to apply:** Default-selection effects should return whenever an element already exists. Topside, Underside, or Underwater transitions should clear search/element/defect and set the mode's first location in the same state update cycle.
