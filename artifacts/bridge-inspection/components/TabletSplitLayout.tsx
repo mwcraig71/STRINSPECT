@@ -7,7 +7,7 @@ import {
   Platform,
   PanResponder,
 } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { AppIcon as Feather } from "@/components/AppIcon";
 import * as DocumentPicker from "expo-document-picker";
 
 import { useIsTablet } from "@/hooks/useIsTablet";

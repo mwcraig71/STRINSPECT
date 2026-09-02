@@ -1,4 +1,4 @@
-import { Feather } from "@expo/vector-icons";
+import { AppIcon as Feather } from "@/components/AppIcon";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React from "react";
 import {

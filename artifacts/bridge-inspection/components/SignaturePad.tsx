@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { AppIcon as Feather } from "@/components/AppIcon";
 import { WebView } from "react-native-webview";
 
 const SIG_HTML = `<!DOCTYPE html>

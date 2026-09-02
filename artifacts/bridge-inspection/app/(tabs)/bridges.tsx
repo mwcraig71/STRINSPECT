@@ -1,4 +1,4 @@
-import { Feather } from "@expo/vector-icons";
+import { AppIcon as Feather } from "@/components/AppIcon";
 import * as DocumentPicker from "expo-document-picker";
 import { Asset } from "expo-asset";
 import React, { useState } from "react";

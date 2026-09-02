@@ -7,7 +7,7 @@ import {
   ActivityIndicator,
   TouchableOpacity,
 } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { AppIcon as Feather } from "@/components/AppIcon";
 import { getPdfReadOnlyHtml } from "./pdfReadOnlyHtml";
 import { SC_FAVORITES_KEY, CUSTOM_SHORTCUTS_KEY, SC_OVERRIDES_KEY, SC_HIDDEN_KEY, mergeShortcuts } from "@/data/textShortcuts";
 import AsyncStorage from "@react-native-async-storage/async-storage";

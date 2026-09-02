@@ -1,4 +1,4 @@
-import { Feather } from "@expo/vector-icons";
+import { AppIcon as Feather } from "@/components/AppIcon";
 import { AudioModule, RecordingPresets, useAudioRecorder } from "expo-audio";
 import * as Network from "expo-network";
 import React, { useRef, useState } from "react";
