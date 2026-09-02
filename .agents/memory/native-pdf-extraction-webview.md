@@ -46,5 +46,8 @@ downstream pure parsers stop matching. The shared recipe: bucket rows by
 - Treat direct `file://` loading as an optimization, not a guarantee. Samsung
   Android System WebView may still block it despite the file-access flags. On a
   direct transport error, retry base64 only after enforcing the 60 MB cap.
+- The tablet's read-only Previous Report pane has the same WebView restriction.
+  On Android, pass local PDFs at or below 60 MB as base64 before rendering;
+  preserve direct URI loading for larger files to avoid extra memory copies.
 - Correlate request/response with a **job id**; a late result from a torn-down job
   must be ignored or it can resolve a newer pending job with stale pages.

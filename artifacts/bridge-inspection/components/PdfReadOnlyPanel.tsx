@@ -13,6 +13,7 @@ import { SC_FAVORITES_KEY, CUSTOM_SHORTCUTS_KEY, SC_OVERRIDES_KEY, SC_HIDDEN_KEY
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const HTML = getPdfReadOnlyHtml();
+const MAX_BASE64_PDF_BYTES = 60 * 1024 * 1024;
 
 interface Props {
   pdfPath: string | null;
@@ -61,7 +62,8 @@ export function PdfReadOnlyPanel({ pdfPath, style, onImportPress, annotations, o
     return () => window.removeEventListener("message", handler);
   }, []);
 
-  // ── Native: hand the local file URI to the WebView (no base64 copy in RN memory) ──
+  // ── Native: use bounded base64 on Android because Samsung WebView can reject
+  // local file:// fetches; retain direct loading for large files to avoid OOM. ──
   const injectPdf = useCallback(async () => {
     if (injectedRef.current || !pdfPath) return;
     injectedRef.current = true;
@@ -72,7 +74,13 @@ export function PdfReadOnlyPanel({ pdfPath, style, onImportPress, annotations, o
         setLoadError("PDF file not found. Please re-import the report.");
         return;
       }
-      const source = /^file:/i.test(pdfPath)
+      const isLocalFile = /^file:/i.test(pdfPath);
+      const useAndroidBase64 =
+        Platform.OS === "android" &&
+        isLocalFile &&
+        typeof info.size === "number" &&
+        info.size <= MAX_BASE64_PDF_BYTES;
+      const source = isLocalFile && !useAndroidBase64
         ? pdfPath
         : "data:application/pdf;base64," +
           (await FileSystem.readAsStringAsync(pdfPath, { encoding: FileSystem.EncodingType.Base64 }));
