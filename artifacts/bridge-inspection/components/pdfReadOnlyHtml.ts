@@ -23,8 +23,7 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
 #tool-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .zoom-group{display:flex;gap:6px;align-items:center;margin-left:auto;flex-shrink:0}
 #zoom-label{color:#94a3b8;font-size:11px;font-weight:700;padding:0 2px;min-width:34px;text-align:center;flex-shrink:0}
-#opt-row{display:flex;flex-wrap:nowrap;gap:6px;align-items:center;min-height:28px}
-#opt-dynamic{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+#opt-dynamic{display:contents}
 .tbtn{background:#1e293b;border:1.5px solid #334155;border-radius:10px;color:#94a3b8;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap;flex-shrink:0;-webkit-user-select:none;user-select:none}
 .tbtn.active{border-color:#38bdf8;color:#38bdf8;background:rgba(56,189,248,.1)}
 .ui-icon{width:14px;height:14px;display:block;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
@@ -86,14 +85,12 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
     <button class="tbtn" id="btn-highlight"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 11-6 6v3h3l6-6"/><path d="m22 6-4-4L8 12l4 4L22 6z"/><path d="M2 22h20"/></svg>HL</button>
     <button class="tbtn" id="btn-text">T&nbsp;Text</button>
     <button class="tbtn" id="btn-undo"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 6 6v4"/></svg>Undo</button>
+    <div id="opt-dynamic"></div>
     <div class="zoom-group">
       <button class="tbtn" id="btn-zoom-out" aria-label="Zoom out"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button>
       <span id="zoom-label">100%</span>
       <button class="tbtn" id="btn-zoom-in" aria-label="Zoom in"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg></button>
     </div>
-  </div>
-  <div id="opt-row">
-    <div id="opt-dynamic"></div>
   </div>
   <div id="shortcuts-row"></div>
 </div>
