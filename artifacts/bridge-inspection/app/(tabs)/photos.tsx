@@ -505,74 +505,81 @@ export default function PhotosScreen() {
       {previewPhoto && previewTarget && (
         <Modal visible transparent animationType="fade" onRequestClose={() => setPreviewTarget(null)}>
           <Pressable style={styles.previewBackdrop} onPress={() => setPreviewTarget(null)}>
-            <Pressable style={[styles.previewCard, { backgroundColor: c.card }]} onPress={() => {}}>
-              <View style={styles.previewHeader}>
-                <View style={{ flex: 1, marginRight: 8 }}>
-                  <Text style={[styles.previewTitle, { color: c.foreground }]}>
-                    {previewPhoto.note ? previewPhoto.note : previewPhoto.label}
-                  </Text>
-                  {previewPhoto.note ? (
-                    <Text style={[styles.previewSubtitle, { color: c.mutedForeground }]}>{previewPhoto.label}</Text>
-                  ) : null}
+            <ScrollView
+              style={styles.previewScroll}
+              contentContainerStyle={[styles.previewScrollContent, { paddingBottom: Math.max(insets.bottom, 24) }]}
+              showsVerticalScrollIndicator
+              keyboardShouldPersistTaps="handled"
+            >
+              <Pressable style={[styles.previewCard, { backgroundColor: c.card }]} onPress={() => {}}>
+                <View style={styles.previewHeader}>
+                  <View style={{ flex: 1, marginRight: 8 }}>
+                    <Text style={[styles.previewTitle, { color: c.foreground }]}>
+                      {previewPhoto.note ? previewPhoto.note : previewPhoto.label}
+                    </Text>
+                    {previewPhoto.note ? (
+                      <Text style={[styles.previewSubtitle, { color: c.mutedForeground }]}>{previewPhoto.label}</Text>
+                    ) : null}
+                  </View>
+                  <TouchableOpacity onPress={() => setPreviewTarget(null)} style={{ padding: 4 }}>
+                    <Feather name="x" size={20} color={c.mutedForeground} />
+                  </TouchableOpacity>
                 </View>
-                <TouchableOpacity onPress={() => setPreviewTarget(null)} style={{ padding: 4 }}>
-                  <Feather name="x" size={20} color={c.mutedForeground} />
-                </TouchableOpacity>
-              </View>
-              <Image source={{ uri: previewPhoto.uri }} style={styles.previewImage} resizeMode="contain" />
-              <View style={styles.previewTags}>
-                <PhotoTagEditor
-                  directionTags={previewPhoto.directionTags}
-                  subjectTags={previewPhoto.subjectTags}
-                  onDirectionChange={handlePreviewDirectionChange}
-                  onSubjectChange={handlePreviewSubjectChange}
-                />
-                {previewTarget.kind === "defect" && (
-                  <>
-                    <Text style={[styles.previewNoteLabel, { color: c.mutedForeground }]}>Photo note</Text>
-                    <TextInput
-                      style={[styles.previewNoteInput, { color: c.foreground, borderColor: c.border, backgroundColor: c.background }]}
-                      value={previewPhoto.note ?? ""}
-                      onChangeText={(description) =>
-                        updateDefectPhoto(previewTarget.defectId, previewTarget.photoId, { description })
-                      }
-                      placeholder="Add inspection photo notes..."
-                      placeholderTextColor={c.mutedForeground}
-                      multiline
-                    />
-                    <View style={styles.previewActions}>
-                      <TouchableOpacity style={[styles.previewActionBtn, { backgroundColor: "#0284c7" }]} onPress={() => replaceDefectPhoto(Platform.OS === "web" ? "library" : lastPhotoSource)}>
-                        <Feather name={Platform.OS !== "web" && lastPhotoSource === "camera" ? "camera" : "image"} size={13} color="#fff" />
-                        <Text style={styles.previewActionText}>Replace with {Platform.OS !== "web" && lastPhotoSource === "camera" ? "Camera" : "Library"}</Text>
-                      </TouchableOpacity>
-                      {Platform.OS !== "web" && (
-                        <TouchableOpacity
-                          style={[styles.previewActionBtn, { backgroundColor: "#334155" }]}
-                          onPress={() => replaceDefectPhoto(lastPhotoSource === "camera" ? "library" : "camera")}
-                        >
-                          <Text style={styles.previewActionText}>Other source</Text>
+                <Image source={{ uri: previewPhoto.uri }} style={styles.previewImage} resizeMode="contain" />
+                <View style={styles.previewTags}>
+                  <PhotoTagEditor
+                    directionTags={previewPhoto.directionTags}
+                    subjectTags={previewPhoto.subjectTags}
+                    onDirectionChange={handlePreviewDirectionChange}
+                    onSubjectChange={handlePreviewSubjectChange}
+                  />
+                  {previewTarget.kind === "defect" && (
+                    <>
+                      <Text style={[styles.previewNoteLabel, { color: c.mutedForeground }]}>Photo note</Text>
+                      <TextInput
+                        style={[styles.previewNoteInput, { color: c.foreground, borderColor: c.border, backgroundColor: c.background }]}
+                        value={previewPhoto.note ?? ""}
+                        onChangeText={(description) =>
+                          updateDefectPhoto(previewTarget.defectId, previewTarget.photoId, { description })
+                        }
+                        placeholder="Add inspection photo notes..."
+                        placeholderTextColor={c.mutedForeground}
+                        multiline
+                      />
+                      <View style={styles.previewActions}>
+                        <TouchableOpacity style={[styles.previewActionBtn, { backgroundColor: "#0284c7" }]} onPress={() => replaceDefectPhoto(Platform.OS === "web" ? "library" : lastPhotoSource)}>
+                          <Feather name={Platform.OS !== "web" && lastPhotoSource === "camera" ? "camera" : "image"} size={13} color="#fff" />
+                          <Text style={styles.previewActionText}>Replace with {Platform.OS !== "web" && lastPhotoSource === "camera" ? "Camera" : "Library"}</Text>
                         </TouchableOpacity>
-                      )}
-                      <TouchableOpacity
-                        style={[styles.previewActionBtn, { backgroundColor: "#7f1d1d" }]}
-                        onPress={() => confirm("Remove this photo from the linked defect?", () => {
-                          removeDefectPhoto(previewTarget.defectId, previewTarget.photoId);
-                          setPreviewTarget(null);
-                        })}
-                      >
-                        <Feather name="trash-2" size={13} color="#fff" />
-                        <Text style={styles.previewActionText}>Remove</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </>
+                        {Platform.OS !== "web" && (
+                          <TouchableOpacity
+                            style={[styles.previewActionBtn, { backgroundColor: "#334155" }]}
+                            onPress={() => replaceDefectPhoto(lastPhotoSource === "camera" ? "library" : "camera")}
+                          >
+                            <Text style={styles.previewActionText}>Other source</Text>
+                          </TouchableOpacity>
+                        )}
+                        <TouchableOpacity
+                          style={[styles.previewActionBtn, { backgroundColor: "#7f1d1d" }]}
+                          onPress={() => confirm("Remove this photo from the linked defect?", () => {
+                            removeDefectPhoto(previewTarget.defectId, previewTarget.photoId);
+                            setPreviewTarget(null);
+                          })}
+                        >
+                          <Feather name="trash-2" size={13} color="#fff" />
+                          <Text style={styles.previewActionText}>Remove</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </>
+                  )}
+                </View>
+                {previewPhoto.capturedAt && (
+                  <Text style={[styles.previewMeta, { color: c.mutedForeground }]}>
+                    {new Date(previewPhoto.capturedAt).toLocaleString("en-US")}
+                  </Text>
                 )}
-              </View>
-              {previewPhoto.capturedAt && (
-                <Text style={[styles.previewMeta, { color: c.mutedForeground }]}>
-                  {new Date(previewPhoto.capturedAt).toLocaleString("en-US")}
-                </Text>
-              )}
-            </Pressable>
+              </Pressable>
+            </ScrollView>
           </Pressable>
         </Modal>
       )}
@@ -831,6 +838,8 @@ const styles = StyleSheet.create({
   notNeededBtn: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 2, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8, borderWidth: 1, borderColor: "#334155" },
   notNeededBtnText: { color: "#64748b", fontSize: 12, fontWeight: "500" },
   previewBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.85)", justifyContent: "center", alignItems: "center", padding: 16 },
+  previewScroll: { width: "100%", maxWidth: 520, maxHeight: "100%" },
+  previewScrollContent: { flexGrow: 1, justifyContent: "center" },
   previewCard: { width: "100%", maxWidth: 520, borderRadius: 16, overflow: "hidden" },
   previewHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12 },
   previewTitle: { fontSize: 15, fontWeight: "700" },

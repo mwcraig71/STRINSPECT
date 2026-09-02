@@ -33,9 +33,9 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
 #opt-dynamic{display:contents}
 .tbtn{background:#1e293b;border:1.5px solid #334155;border-radius:10px;color:#94a3b8;padding:7px 10px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap;flex-shrink:0;-webkit-user-select:none;user-select:none}
 .tbtn.active{border-color:#38bdf8;color:#38bdf8;background:rgba(56,189,248,.1)}
-.auto-note-toggle{min-height:44px;display:flex;align-items:center;gap:5px;padding:0 8px;border:1.5px solid #334155;border-radius:8px;background:#1e293b;color:#94a3b8;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;-webkit-user-select:none;user-select:none}
+.auto-note-toggle{min-height:32px;display:flex;align-items:center;gap:4px;padding:0 6px;border:1.5px solid #334155;border-radius:7px;background:#1e293b;color:#94a3b8;font-size:9px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;-webkit-user-select:none;user-select:none}
 .auto-note-toggle:has(input:checked){border-color:#38bdf8;color:#38bdf8;background:rgba(56,189,248,.1)}
-.auto-note-toggle input{width:20px;height:20px;accent-color:#38bdf8;margin:0}
+.auto-note-toggle input{width:17px;height:17px;accent-color:#38bdf8;margin:0}
 .clr-dot{width:44px;height:44px;min-width:44px;border-radius:50%;cursor:pointer;border:2px solid transparent;padding:0;appearance:none;flex-shrink:0;transition:transform .1s}
 .clr-dot.active{border-color:#fff;transform:scale(1.25)}
 .sz-btn{background:#1e293b;border:1.5px solid #334155;border-radius:8px;color:#94a3b8;min-width:48px;min-height:44px;padding:7px 12px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;-webkit-user-select:none;user-select:none}
@@ -105,11 +105,11 @@ if (/Android/i.test(navigator.userAgent)) {
     <button class="tbtn" id="btn-undo"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 6 6v4"/></svg>Undo</button>
     <label class="auto-note-toggle" title="Automatically open a note after a highlight">
       <input type="checkbox" id="auto-note-highlight">
-      <span>HL Note</span>
+      <span>HL note</span>
     </label>
     <label class="auto-note-toggle" title="Automatically open a note after a pen stroke">
       <input type="checkbox" id="auto-note-pen">
-      <span>Pen Note</span>
+      <span>Pen note</span>
     </label>
     <div id="opt-dynamic"></div>
     <div class="zoom-group">

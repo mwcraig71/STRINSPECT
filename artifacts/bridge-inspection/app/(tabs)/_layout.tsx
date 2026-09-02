@@ -17,19 +17,19 @@ function NativeTabLayout() {
   return (
     <NativeTabs>
       <NativeTabs.Trigger name="index">
-        <Icon sf={{ default: "doc.text", selected: "doc.text.fill" }} />
+        <Icon sf={{ default: "square.grid.2x2", selected: "square.grid.2x2.fill" }} />
         <Label>Elements</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="nbi">
-        <Icon sf={{ default: "chart.bar", selected: "chart.bar.fill" }} />
+        <Icon sf={{ default: "star", selected: "star.fill" }} />
         <Label>Ratings</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="photos">
-        <Icon sf={{ default: "photo", selected: "photo.fill" }} />
+        <Icon sf={{ default: "camera", selected: "camera.fill" }} />
         <Label>Photos</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="summary">
-        <Icon sf={{ default: "list.bullet.clipboard", selected: "list.bullet.clipboard.fill" }} />
+        <Icon sf={{ default: "clipboard", selected: "clipboard.fill" }} />
         <Label>Summary</Label>
       </NativeTabs.Trigger>
     </NativeTabs>
@@ -79,9 +79,9 @@ function ClassicTabLayout({ missingPhotoCount }: { missingPhotoCount: number }) 
           title: "Elements",
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="doc.text" tintColor={color} size={22} />
+              <SymbolView name="square.grid.2x2" tintColor={color} size={22} />
             ) : (
-              <Feather name="file-text" size={21} color={color} />
+              <Feather name="layers" size={21} color={color} />
             ),
         }}
       />
@@ -91,9 +91,9 @@ function ClassicTabLayout({ missingPhotoCount }: { missingPhotoCount: number }) 
           title: "Ratings",
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="chart.bar" tintColor={color} size={22} />
+              <SymbolView name="star" tintColor={color} size={22} />
             ) : (
-              <Feather name="bar-chart-2" size={21} color={color} />
+              <Feather name="star" size={21} color={color} />
             ),
         }}
       />
@@ -105,9 +105,9 @@ function ClassicTabLayout({ missingPhotoCount }: { missingPhotoCount: number }) 
           tabBarBadgeStyle: { backgroundColor: "#f59e0b", fontSize: 10 },
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="photo" tintColor={color} size={22} />
+              <SymbolView name="camera" tintColor={color} size={22} />
             ) : (
-              <Feather name="image" size={21} color={color} />
+              <Feather name="camera" size={21} color={color} />
             ),
         }}
       />
@@ -117,9 +117,9 @@ function ClassicTabLayout({ missingPhotoCount }: { missingPhotoCount: number }) 
           title: "Summary",
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="list.bullet.clipboard" tintColor={color} size={22} />
+              <SymbolView name="clipboard" tintColor={color} size={22} />
             ) : (
-              <Feather name="list" size={21} color={color} />
+              <Feather name="clipboard" size={21} color={color} />
             ),
         }}
       />
