@@ -197,7 +197,31 @@ async function loadPdfTextNative(source: PdfSource): Promise<string[][]> {
   const uri = typeof source === "object" && "uri" in source ? source.uri : "";
   const useDirect = !!uri && !uri.startsWith("data:") && (source as { nativeDirectUri?: boolean }).nativeDirectUri !== false && /^file:/i.test(uri);
   if (useDirect) {
-    return extractPdfTextNative({ uri });
+    try {
+      return await extractPdfTextNative({ uri });
+    } catch (error) {
+      const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+      const isLocalFileTransportFailure =
+        message.includes("failed to fetch") ||
+        message.includes("network request failed") ||
+        message.includes("load failed") ||
+        message.includes("could not open pdf file");
+      if (!isLocalFileTransportFailure) throw error;
+
+      // Some Android System WebView builds (notably on Samsung tablets) deny
+      // fetch(file://...) even when file access is enabled. Retry through the
+      // WebView data channel for PDFs small enough to encode safely.
+      const FS = await import("expo-file-system/legacy");
+      const info = await FS.getInfoAsync(uri);
+      if (info.exists && typeof info.size === "number" && info.size > MAX_BASE64_PDF_BYTES) {
+        const mb = Math.round(info.size / (1024 * 1024));
+        throw new Error(
+          `This PDF is ${mb} MB. This device cannot open it directly, and it is too large for the safe fallback. Import a smaller copy of the report.`
+        );
+      }
+      const base64 = await readPdfBase64(source);
+      return extractPdfTextNative({ base64 });
+    }
   }
   if (uri && !uri.startsWith("data:")) {
     // content:// or other non-file URI: base64 is the only way in. Refuse

@@ -13,10 +13,11 @@ split by platform in `utils/pdfParser.ts` (`loadPdfText`):
   **lazy-loaded** (`getWebPdfjs`) so the heavy browser-only bundle never enters
   the native Metro graph.
 - **Native** (`loadPdfTextNative`): drives a headless WebView through an imperative
-  bridge. Every local `file://` source (picked files are copied to the app cache;
-  bundled assets resolve to a file URI) is passed to the WebView directly so the
-  PDF is read once by pdf.js. The base64 route remains only for non-file URIs and
-  is refused above `MAX_BASE64_PDF_BYTES` (60 MB) with a clear message.
+  bridge. Local `file://` sources are passed directly first so the PDF is read
+  once by pdf.js. Some Samsung Android WebViews reject `fetch(file://...)` with
+  "Failed to fetch"; for that transport failure only, retry through base64 below
+  `MAX_BASE64_PDF_BYTES` (60 MB). Larger files fail clearly instead of risking an
+  out-of-memory crash.
 
 ## Moving parts
 - `components/pdfExtractorHtml.ts` — self-contained HTML that reuses the annotator's
@@ -42,5 +43,8 @@ downstream pure parsers stop matching. The shared recipe: bucket rows by
   size and JSON/state transfer creates additional copies, which can exhaust a
   phone's memory before pdf.js starts. Mark that source for direct URI transport
   and allow local-file access on the extraction WebView.
+- Treat direct `file://` loading as an optimization, not a guarantee. Samsung
+  Android System WebView may still block it despite the file-access flags. On a
+  direct transport error, retry base64 only after enforcing the 60 MB cap.
 - Correlate request/response with a **job id**; a late result from a torn-down job
   must be ignored or it can resolve a newer pending job with stale pages.
