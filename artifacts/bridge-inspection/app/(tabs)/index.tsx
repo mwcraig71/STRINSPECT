@@ -4,7 +4,7 @@ import * as ImagePicker from "expo-image-picker";
 import { resizePhoto } from "@/lib/photoUtils";
 import * as Location from "expo-location";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
   Alert,
@@ -136,6 +136,7 @@ export default function InspectionScreen() {
     dateStampEnabled,
     setLastPhotoSource,
   } = useInspection();
+  const router = useRouter();
 
   const scrollRef = React.useRef<ScrollView>(null);
 
@@ -520,6 +521,25 @@ export default function InspectionScreen() {
         />
           <View style={[styles.menuDropdown, { backgroundColor: c.card, borderColor: c.border, left: isTabletLayout ? Math.round(screenWidth / 2) + 12 : 12 }]}>
             <Text style={[styles.menuHeading, { color: c.mutedForeground }]}>General</Text>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setModuleMenuOpen(false);
+                router.navigate("/bridges");
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Open bridge selection"
+            >
+              <View style={[styles.menuIcon, { backgroundColor: "#0369a1" }]}>
+                <Feather name="layers" size={15} color="#fff" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.menuItemTitle, { color: c.foreground }]}>Bridge Selection</Text>
+                <Text style={[styles.menuItemSub, { color: c.mutedForeground }]}>Open or start an inspection</Text>
+              </View>
+              <Feather name="chevron-right" size={16} color={c.mutedForeground} />
+            </TouchableOpacity>
+            <View style={[styles.menuDivider, { backgroundColor: c.border }]} />
             <TouchableOpacity
               style={styles.menuItem}
               onPress={() => {
