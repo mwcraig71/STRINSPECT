@@ -28,9 +28,9 @@ body{background:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
 .tbtn{background:#1e293b;border:1.5px solid #334155;border-radius:10px;color:#94a3b8;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap;flex-shrink:0;-webkit-user-select:none;user-select:none}
 .tbtn.active{border-color:#38bdf8;color:#38bdf8;background:rgba(56,189,248,.1)}
 .ui-icon{width:14px;height:14px;display:block;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.clr-dot{width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent;flex-shrink:0;transition:transform .1s}
+.clr-dot{width:44px;height:44px;min-width:44px;border-radius:50%;cursor:pointer;border:2px solid transparent;padding:0;appearance:none;flex-shrink:0;transition:transform .1s}
 .clr-dot.active{border-color:#fff;transform:scale(1.25)}
-.sz-btn{background:#1e293b;border:1.5px solid #334155;border-radius:7px;color:#94a3b8;padding:4px 9px;font-size:10px;font-weight:700;cursor:pointer;flex-shrink:0;-webkit-user-select:none;user-select:none}
+.sz-btn{background:#1e293b;border:1.5px solid #334155;border-radius:8px;color:#94a3b8;min-width:48px;min-height:44px;padding:7px 12px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;-webkit-user-select:none;user-select:none}
 .sz-btn.active{border-color:#38bdf8;color:#38bdf8}
 .sep{width:1px;background:#334155;height:18px;flex-shrink:0;margin:0 2px}
 #shortcuts-row{display:none;flex-wrap:wrap;gap:5px;align-items:center;min-height:34px;padding:2px 0}
@@ -159,6 +159,8 @@ if (!pdfjsLib) {
 var tool = 'pan';
 var penColor = '#ef4444';
 var penSize = 4;
+var highlightSize = 16;
+var highlightColor = '#facc15';
 var annotations = [];
 var currentStroke = null;
 var pdfDoc = null;
@@ -175,7 +177,9 @@ var textPendingY = 0;
 var annScale = 1;
 
 var COLORS_PEN = ['#ef4444','#2563eb'];
+var COLORS_HIGHLIGHT = ['#facc15','#86efac','#f9a8d4'];
 var SIZES = [2,4,8];
+var HIGHLIGHT_SIZES = [8,16,26];
 var zoomLevel = 1.0;
 var ZOOM_STEPS = [0.5,0.75,1.0,1.25,1.5,2.0,2.5,3.0];
 var scList = [];
@@ -358,8 +362,8 @@ function onDown(e, cv, pn) {
   currentStroke = {
     type: tool === 'highlight' ? 'highlight' : 'stroke',
     page: pn,
-    color: tool === 'highlight' ? '#facc15' : penColor,
-    width: penSize * 0.25,
+    color: tool === 'highlight' ? highlightColor : penColor,
+    width: tool === 'highlight' ? highlightSize : penSize * 0.25,
     points: [pt]
   };
 }
@@ -691,17 +695,25 @@ function renderOptRow() {
   if (tool === 'pan') return;
 
   if (tool === 'highlight') {
-    var d = document.createElement('div');
-    d.className = 'clr-dot active';
-    d.style.background = '#facc15';
-    d.style.border = '2px solid #fff';
-    row.appendChild(d);
+    COLORS_HIGHLIGHT.forEach(function(c) {
+      var d = document.createElement('button');
+      d.type = 'button';
+      d.className = 'clr-dot' + (c === highlightColor ? ' active' : '');
+      d.style.background = c;
+      d.style.border = '2px solid ' + (c === highlightColor ? '#fff' : 'transparent');
+      d.setAttribute('aria-label', 'Highlighter color ' + c);
+      d.title = 'Highlighter color';
+      d.onclick = function() { highlightColor = c; renderOptRow(); };
+      row.appendChild(d);
+    });
   } else {
     COLORS_PEN.forEach(function(c) {
-      var d = document.createElement('div');
+      var d = document.createElement('button');
+      d.type = 'button';
       d.className = 'clr-dot' + (c === penColor ? ' active' : '');
       d.style.background = c;
       d.style.border = '2px solid ' + (c === penColor ? '#fff' : 'transparent');
+      d.setAttribute('aria-label', 'Pen color ' + c);
       d.onclick = function() { penColor = c; renderOptRow(); };
       row.appendChild(d);
     });
@@ -713,13 +725,22 @@ function renderOptRow() {
 
   var sizeDefs = (tool === 'text')
     ? [{ s:4, label:'M', title:'Medium font' }, { s:8, label:'L', title:'Large font' }]
-    : [{ s:2, label:'S', title:'Thin line' }, { s:4, label:'M', title:'Medium line' }, { s:8, label:'L', title:'Thick line' }];
+    : (tool === 'highlight')
+      ? [{ s:8, label:'S', title:'Small highlighter' }, { s:16, label:'M', title:'Medium highlighter' }, { s:26, label:'L', title:'Large highlighter' }]
+      : [{ s:2, label:'S', title:'Thin line' }, { s:4, label:'M', title:'Medium line' }, { s:8, label:'L', title:'Thick line' }];
   sizeDefs.forEach(function(def) {
+    var selectedSize = tool === 'highlight' ? highlightSize : penSize;
     var b = document.createElement('button');
-    b.className = 'sz-btn' + (def.s === penSize ? ' active' : '');
+    b.type = 'button';
+    b.className = 'sz-btn' + (def.s === selectedSize ? ' active' : '');
     b.textContent = def.label;
     b.title = def.title;
-    b.onclick = function() { penSize = def.s; renderOptRow(); };
+    b.setAttribute('aria-label', def.title);
+    b.onclick = function() {
+      if (tool === 'highlight') highlightSize = def.s;
+      else penSize = def.s;
+      renderOptRow();
+    };
     row.appendChild(b);
   });
 }
